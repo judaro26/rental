@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Tenant Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --cream:#F7F4EF; --charcoal:#1A1A2E; --amber:#C9903A; --amber-light:#F0C97A; --slate:#5A6475; --border:#E8E2D8; --sidebar-w:240px; }
+    * { box-sizing:border-box; }
+    body { font-family:'Jost',sans-serif; background:var(--cream); color:var(--charcoal); margin:0; display:flex; min-height:100vh; }
+    h1,h2,h3,h4 { font-family:'Cormorant Garamond',serif; }
+    .label { display:block; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:var(--slate); margin-bottom:6px; }
+    .form-input { border:1.5px solid var(--border); background:#FDFBF8; transition:border-color 0.2s; width:100%; padding:10px 14px; border-radius:2px; font-family:'Jost',sans-serif; font-size:14px; }
+    .form-input:focus { outline:none; border-color:var(--amber); }
+    .btn { display:inline-block; padding:10px 22px; border-radius:2px; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; border:none; transition:all 0.2s; font-family:'Jost',sans-serif; font-weight:500; }
+    .btn-primary { background:var(--charcoal); color:#fff; }
+    .btn-primary:hover { background:var(--amber); }
+    .btn-outline { border:1.5px solid var(--charcoal); color:var(--charcoal); background:transparent; }
+    .btn-outline:hover { background:var(--charcoal); color:#fff; }
+    .btn-sm { padding:6px 12px; font-size:11px; }
+    .btn-success { background:#16A34A; color:#fff; }
+    .btn-success:hover { background:#15803D; }
+    .btn-danger { background:#DC2626; color:#fff; }
+    .btn-danger:hover { background:#B91C1C; }
+    .btn-amber { background:var(--amber); color:#fff; }
+    .btn-amber:hover { background:#A8751E; }
+    /* Sidebar */
+    #sidebar { width:var(--sidebar-w); background:var(--charcoal); min-height:100vh; display:flex; flex-direction:column; position:fixed; left:0; top:0; bottom:0; z-index:30; }
+    .sidebar-logo { padding:24px 20px; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; gap:10px; }
+    .sidebar-nav { flex:1; padding:16px 0; }
+    .nav-item { display:flex; align-items:center; gap:12px; padding:12px 20px; font-size:13px; color:rgba(255,255,255,0.65); cursor:pointer; transition:all 0.2s; border:none; background:none; width:100%; text-align:left; font-family:'Jost',sans-serif; }
+    .nav-item:hover { background:rgba(255,255,255,0.06); color:#fff; }
+    .nav-item.active { background:rgba(201,144,58,0.18); color:var(--amber-light); border-left:3px solid var(--amber); }
+    .sidebar-footer { padding:20px; border-top:1px solid rgba(255,255,255,0.08); }
+    /* Main */
+    #main { margin-left:var(--sidebar-w); flex:1; }
+    .topbar { background:#fff; border-bottom:1px solid var(--border); padding:14px 28px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:20; }
+    .content { padding:32px 28px; }
+    /* Cards */
+    .stat-card { background:#fff; border-radius:2px; padding:22px; box-shadow:0 2px 12px rgba(26,26,46,0.06); }
+    .card { background:#fff; border-radius:2px; box-shadow:0 2px 12px rgba(26,26,46,0.06); overflow:hidden; margin-bottom:24px; }
+    .card-header { padding:18px 22px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .card-body { padding:22px; }
+    /* Table */
+    .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .data-table th { font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--slate); padding:10px 14px; text-align:left; border-bottom:2px solid var(--border); font-weight:500; background:#FDFAF5; }
+    .data-table td { padding:11px 14px; border-bottom:1px solid #F3EEE5; vertical-align:middle; }
+    .data-table tr:last-child td { border-bottom:none; }
+    .data-table tr:hover td { background:#FDFAF5; }
+    /* Badges */
+    .badge { display:inline-block; font-size:11px; padding:3px 9px; border-radius:20px; font-weight:500; }
+    .badge-active { background:#D1FAE5; color:#065F46; }
+    .badge-pending { background:#FEF3C7; color:#92400E; }
+    .badge-paid { background:#D1FAE5; color:#065F46; }
+    .badge-failed { background:#FEE2E2; color:#991B1B; }
+    .badge-open { background:#DBEAFE; color:#1E40AF; }
+    .badge-in-progress { background:#FEF3C7; color:#92400E; }
+    .badge-resolved { background:#D1FAE5; color:#065F46; }
+    /* Sections */
+    .section { display:none; }
+    .section.active { display:block; }
+    /* Alerts */
+    .alert { font-size:13px; padding:12px 16px; border-radius:2px; margin-bottom:16px; }
+    .alert-error { background:#FEF2F2; border:1px solid #FECACA; color:#DC2626; }
+    .alert-success { background:#F0FDF4; border:1px solid #BBF7D0; color:#16A34A; }
+    /* Modal */
+    .modal-backdrop { backdrop-filter:blur(4px); background:rgba(26,26,46,0.55); }
+    /* Priority */
+    .priority-high { color:#DC2626; font-weight:600; }
+    .priority-medium { color:#D97706; font-weight:600; }
+    .priority-low { color:#16A34A; font-weight:600; }
+    .spinner { border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; width:14px; height:14px; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    @media (max-width:768px) { #sidebar { transform:translateX(-100%); transition:transform 0.3s; } #sidebar.open { transform:translateX(0); } #main { margin-left:0; } .content { padding:20px 16px; } }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <div style="background:var(--amber);width:30px;height:30px;border-radius:2px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2"><path d="M12 2l10 8v12H2V10z"/></svg>
+    </div>
+    <span style="font-family:'Cormorant Garamond',serif;font-size:17px;color:#fff;font-weight:500;">Admin Panel</span>
+  </div>
+  <nav class="sidebar-nav">
+    <button class="nav-item active" onclick="switchSection('dashboard',this)" title="Dashboard">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      Dashboard
+    </button>
+    <button class="nav-item" onclick="switchSection('properties',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      Properties
+    </button>
+    <button class="nav-item" onclick="switchSection('tenants',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Tenants
+    </button>
+    <button class="nav-item" onclick="switchSection('payments',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+      Payments
+    </button>
+    <button class="nav-item" onclick="switchSection('documents',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+      Documents
+    </button>
+    <button class="nav-item" onclick="switchSection('maintenance',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      Maintenance
+    </button>
+    <button class="nav-item" onclick="switchSection('announcements',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
+      Announcements
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div style="font-size:12px;color:rgba(255,255,255,0.45);margin-bottom:10px;" id="admin-email-label">Admin</div>
+    <button onclick="handleSignOut()" class="btn btn-sm" style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.7);width:100%;text-align:center;display:block;">Sign Out</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <button onclick="document.getElementById('sidebar').classList.toggle('open')" style="background:none;border:none;cursor:pointer;display:none;" id="mobile-toggle">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--charcoal)" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h2 style="font-size:1.5rem;font-weight:400;margin:0;" id="page-title">Dashboard</h2>
+    </div>
+    <a href="/index.html" style="font-size:12px;color:var(--slate);text-decoration:none;" class="btn btn-sm btn-outline">← View Site</a>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <section id="section-dashboard" class="section active">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Properties</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-props">—</div></div>
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Active Tenants</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-tenants">—</div></div>
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Pending Approvals</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-pending">—</div></div>
+        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Open Requests</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-requests">—</div></div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="card">
+          <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;">Pending Tenant Approvals</h3></div>
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead><tr><th>Name</th><th>Email</th><th>Property</th><th>Action</th></tr></thead>
+              <tbody id="pending-tenants-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;">Open Maintenance</h3></div>
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead><tr><th>Tenant</th><th>Category</th><th>Priority</th><th>Action</th></tr></thead>
+              <tbody id="open-maint-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROPERTIES -->
+    <section id="section-properties" class="section">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">Manage Properties</h3>
+          <button onclick="openPropertyModal()" class="btn btn-primary btn-sm">+ Add Property</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Name</th><th>Address</th><th>Units</th><th>Image URL</th><th>Actions</th></tr></thead>
+            <tbody id="properties-tbody"><tr><td colspan="5" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TENANTS -->
+    <section id="section-tenants" class="section">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">All Tenants</h3>
+          <input type="text" id="tenant-search" class="form-input" style="width:220px;" placeholder="Search by name or email..." oninput="filterTenants()">
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Property / Unit</th><th>Rent</th><th>Lease End</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="tenants-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAYMENTS -->
+    <section id="section-payments" class="section">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">All Payments</h3>
+          <div style="display:flex;gap:8px;">
+            <select id="payment-filter" class="form-input" style="width:150px;" onchange="filterPayments()">
+              <option value="">All statuses</option>
+              <option value="paid">Paid</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+            <button onclick="openManualPaymentModal()" class="btn btn-success btn-sm">+ Record Payment</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Tenant</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="payments-tbody"><tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOCUMENTS -->
+    <section id="section-documents" class="section">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">Upload Document for Tenant</h3>
+        </div>
+        <div class="card-body">
+          <div id="doc-alert" class="hidden alert"></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="label">Tenant *</label>
+              <select id="doc-tenant" class="form-input"><option value="">Select tenant...</option></select>
+            </div>
+            <div>
+              <label class="label">Category</label>
+              <select id="doc-category" class="form-input">
+                <option>Lease Agreement</option>
+                <option>Rent Receipt</option>
+                <option>Move-in Inspection</option>
+                <option>Notice</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="label">Document Name *</label>
+              <input type="text" id="doc-name" class="form-input" placeholder="e.g. Lease Agreement 2025">
+            </div>
+            <div>
+              <label class="label">File URL * <span style="font-size:10px;font-weight:400;">(Firebase Storage, Drive, Dropbox...)</span></label>
+              <input type="url" id="doc-url" class="form-input" placeholder="https://...">
+            </div>
+          </div>
+          <button onclick="uploadDocument()" class="btn btn-primary">Add Document</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;">All Documents</h3></div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Tenant</th><th>Name</th><th>Category</th><th>Date</th><th>Actions</th></tr></thead>
+            <tbody id="documents-tbody"><tr><td colspan="5" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE -->
+    <section id="section-maintenance" class="section">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">Maintenance Requests</h3>
+          <select id="maint-filter" class="form-input" style="width:170px;" onchange="filterMaintenance()">
+            <option value="">All statuses</option>
+            <option value="open">Open</option>
+            <option value="in-progress">In Progress</option>
+            <option value="resolved">Resolved</option>
+          </select>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Tenant</th><th>Unit</th><th>Category</th><th>Description</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="maintenance-tbody"><tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANNOUNCEMENTS -->
+    <section id="section-announcements" class="section">
+      <div class="card">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;">Post Announcement</h3></div>
+        <div class="card-body">
+          <div id="ann-alert" class="hidden alert"></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div><label class="label">Title *</label><input type="text" id="ann-title" class="form-input" placeholder="e.g. Water Shutoff Notice"></div>
+            <div>
+              <label class="label">Send To</label>
+              <select id="ann-property" class="form-input"><option value="">All Properties</option></select>
+            </div>
+            <div class="col-span-2">
+              <label class="label">Message *</label>
+              <textarea id="ann-message" class="form-input" rows="4" placeholder="Write your announcement..."></textarea>
+            </div>
+          </div>
+          <button onclick="postAnnouncement()" class="btn btn-primary">Post Announcement</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;">Posted Announcements</h3></div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Title</th><th>Message</th><th>Sent To</th><th>Actions</th></tr></thead>
+            <tbody id="announcements-tbody"><tr><td colspan="5" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- PROPERTY MODAL -->
+<div id="property-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('property-modal')"></div>
+  <div style="background:#fff; width:100%; max-width:480px; padding:32px; border-radius:2px; box-shadow:0 24px 64px rgba(26,26,46,0.2); position:relative; z-index:1;">
+    <button onclick="closeModal('property-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:24px;" id="prop-modal-title">Add Property</h3>
+    <input type="hidden" id="prop-id">
+    <div id="prop-alert" class="hidden alert"></div>
+    <div class="grid grid-cols-2 gap-4">
+      <div class="col-span-2"><label class="label">Property Name *</label><input type="text" id="prop-name" class="form-input" placeholder="e.g. Sunset Apartments"></div>
+      <div class="col-span-2"><label class="label">Address *</label><input type="text" id="prop-address" class="form-input" placeholder="123 Main St, City, State"></div>
+      <div><label class="label">Units</label><input type="number" id="prop-units" class="form-input" placeholder="12" min="1"></div>
+      <div><label class="label">Type</label><select id="prop-type" class="form-input"><option>Apartment Complex</option><option>Single Family</option><option>Duplex / Triplex</option><option>Commercial</option><option>Other</option></select></div>
+      <div class="col-span-2"><label class="label">Image URL <span style="font-size:10px;font-weight:400;">(optional)</span></label><input type="url" id="prop-image" class="form-input" placeholder="https://..."></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="saveProperty()" class="btn btn-primary" style="flex:1;" id="prop-save-btn">Save Property</button>
+      <button onclick="closeModal('property-modal')" class="btn btn-outline" style="flex:0 0 auto;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- TENANT EDIT MODAL -->
+<div id="tenant-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('tenant-modal')"></div>
+  <div style="display:flex;align-items:flex-start;justify-content:center;min-height:100vh;padding:40px 16px;">
+    <div style="background:#fff; width:100%; max-width:560px; padding:32px; border-radius:2px; box-shadow:0 24px 64px rgba(26,26,46,0.2); position:relative; z-index:1; margin:auto;">
+      <button onclick="closeModal('tenant-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+      <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:24px;">Edit Tenant</h3>
+      <input type="hidden" id="edit-tenant-id">
+      <div id="tenant-edit-alert" class="hidden alert"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label class="label">First Name</label><input type="text" id="edit-first" class="form-input"></div>
+        <div><label class="label">Last Name</label><input type="text" id="edit-last" class="form-input"></div>
+        <div class="col-span-2"><label class="label">Email</label><input type="email" id="edit-email" class="form-input" readonly style="background:#F3F0EB;"></div>
+        <div><label class="label">Phone</label><input type="tel" id="edit-phone" class="form-input"></div>
+        <div>
+          <label class="label">Property</label>
+          <select id="edit-property" class="form-input"><option value="">— None —</option></select>
+        </div>
+        <div><label class="label">Unit</label><input type="text" id="edit-unit" class="form-input" placeholder="2B"></div>
+        <div>
+          <label class="label">Status</label>
+          <select id="edit-status" class="form-input">
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div><label class="label">Monthly Rent ($)</label><input type="number" id="edit-rent" class="form-input" placeholder="0.00" step="0.01"></div>
+        <div><label class="label">Lease Start</label><input type="date" id="edit-lease-start" class="form-input"></div>
+        <div><label class="label">Lease End</label><input type="date" id="edit-lease-end" class="form-input"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button onclick="saveTenant()" class="btn btn-primary" style="flex:1;" id="tenant-save-btn">Save Changes</button>
+        <button onclick="closeModal('tenant-modal')" class="btn btn-outline">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAINTENANCE UPDATE MODAL -->
+<div id="maint-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('maint-modal')"></div>
+  <div style="background:#fff; width:100%; max-width:440px; padding:32px; border-radius:2px; box-shadow:0 24px 64px rgba(26,26,46,0.2); position:relative; z-index:1;">
+    <button onclick="closeModal('maint-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;">Update Request</h3>
+    <input type="hidden" id="maint-edit-id">
+    <div class="mb-4"><label class="label">Status</label>
+      <select id="maint-edit-status" class="form-input">
+        <option value="open">Open</option>
+        <option value="in-progress">In Progress</option>
+        <option value="resolved">Resolved</option>
+      </select>
+    </div>
+    <div class="mb-4"><label class="label">Admin Notes</label><textarea id="maint-edit-notes" class="form-input" rows="3" placeholder="Update message for tenant..."></textarea></div>
+    <button onclick="saveMaintenance()" class="btn btn-primary" style="width:100%;">Update Request</button>
+  </div>
+</div>
+
+<!-- MANUAL PAYMENT MODAL -->
+<div id="manual-payment-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('manual-payment-modal')"></div>
+  <div style="background:#fff; width:100%; max-width:440px; padding:32px; border-radius:2px; box-shadow:0 24px 64px rgba(26,26,46,0.2); position:relative; z-index:1;">
+    <button onclick="closeModal('manual-payment-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;">Record Manual Payment</h3>
+    <div id="manual-pay-alert" class="hidden alert"></div>
+    <div class="grid gap-4">
+      <div><label class="label">Tenant *</label><select id="manual-pay-tenant" class="form-input"><option value="">Select tenant...</option></select></div>
+      <div><label class="label">Amount ($) *</label><input type="number" id="manual-pay-amount" class="form-input" placeholder="0.00" step="0.01" min="1"></div>
+      <div><label class="label">Description</label><input type="text" id="manual-pay-desc" class="form-input" placeholder="e.g. June Rent — Cash"></div>
+      <div><label class="label">Date</label><input type="date" id="manual-pay-date" class="form-input"></div>
+    </div>
+    <button onclick="saveManualPayment()" class="btn btn-success" style="width:100%;margin-top:20px;">Record Payment</button>
+  </div>
+</div>
+
+<!-- FIREBASE + ADMIN LOGIC -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+  // ============================================================
+  // ⚙️  CONFIGURATION — replace with your values
+  // ============================================================
+  const firebaseConfig = {
+    apiKey:            'YOUR_API_KEY',
+    authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
+    projectId:         'YOUR_PROJECT_ID',
+    storageBucket:     'YOUR_PROJECT_ID.appspot.com',
+    messagingSenderId: 'YOUR_SENDER_ID',
+    appId:             'YOUR_APP_ID'
+  };
+  // ============================================================
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  let allTenants = [], allPayments = [], allMaintenance = [], allProperties = [], allDocuments = [], allAnnouncements = [];
+
+  // AUTH GUARD — must be admin
+  onAuthStateChanged(auth, async user => {
+    if (!user) { window.location.href = '/index.html'; return; }
+    const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+    if (!adminSnap.exists()) { window.location.href = '/index.html'; return; }
+    document.getElementById('admin-email-label').textContent = user.email;
+    await loadAll();
+  });
+
+  async function loadAll() {
+    await Promise.all([loadProperties(), loadTenants(), loadPayments(), loadDocuments(), loadMaintenance(), loadAnnouncements()]);
+    updateDashboardStats();
+  }
+
+  // ===== PROPERTIES =====
+  async function loadProperties() {
+    const snap = await getDocs(collection(db,'properties'));
+    allProperties = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderPropertiesTable();
+    populatePropertySelects();
+  }
+  function renderPropertiesTable() {
+    const tbody = document.getElementById('properties-tbody');
+    if (!allProperties.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--slate);padding:24px;">No properties yet. Click "Add Property" to get started.</td></tr>'; return; }
+    tbody.innerHTML = allProperties.map(p => `<tr>
+      <td><strong>${p.name}</strong></td>
+      <td style="font-size:12px;">${p.address||'—'}</td>
+      <td>${p.units||'—'}</td>
+      <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--slate);">${p.imageUrl||'—'}</td>
+      <td>
+        <button onclick="editProperty('${p.id}')" class="btn btn-sm btn-outline" style="margin-right:6px;">Edit</button>
+        <button onclick="deleteProperty('${p.id}')" class="btn btn-sm btn-danger">Delete</button>
+      </td>
+    </tr>`).join('');
+  }
+  function populatePropertySelects() {
+    const opts = allProperties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    ['edit-property','ann-property'].forEach(id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const first = el.id === 'ann-property' ? '<option value="">All Properties</option>' : '<option value="">— None —</option>';
+      el.innerHTML = first + opts;
+    });
+  }
+
+  window.openPropertyModal = () => {
+    ['prop-id','prop-name','prop-address','prop-units','prop-image'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('prop-modal-title').textContent = 'Add Property';
+    document.getElementById('prop-alert').classList.add('hidden');
+    openModal('property-modal');
+  };
+  window.editProperty = id => {
+    const p = allProperties.find(x => x.id === id);
+    if (!p) return;
+    document.getElementById('prop-id').value = id;
+    document.getElementById('prop-name').value = p.name||'';
+    document.getElementById('prop-address').value = p.address||'';
+    document.getElementById('prop-units').value = p.units||'';
+    document.getElementById('prop-image').value = p.imageUrl||'';
+    document.getElementById('prop-type').value = p.type||'Apartment Complex';
+    document.getElementById('prop-modal-title').textContent = 'Edit Property';
+    document.getElementById('prop-alert').classList.add('hidden');
+    openModal('property-modal');
+  };
+  window.saveProperty = async () => {
+    const id   = document.getElementById('prop-id').value;
+    const name = document.getElementById('prop-name').value.trim();
+    const addr = document.getElementById('prop-address').value.trim();
+    if (!name || !addr) { showAlert('prop-alert','Name and address are required.'); return; }
+    const data = { name, address: addr, units: parseInt(document.getElementById('prop-units').value)||0, type: document.getElementById('prop-type').value, imageUrl: document.getElementById('prop-image').value.trim(), updatedAt: serverTimestamp() };
+    const btn = document.getElementById('prop-save-btn'); btn.disabled=true; btn.textContent='Saving...';
+    try {
+      if (id) { await updateDoc(doc(db,'properties',id), data); }
+      else     { await addDoc(collection(db,'properties'), { ...data, createdAt: serverTimestamp() }); }
+      closeModal('property-modal');
+      await loadProperties();
+    } catch(e) { showAlert('prop-alert', e.message); }
+    btn.disabled=false; btn.textContent='Save Property';
+  };
+  window.deleteProperty = async id => {
+    if (!confirm('Delete this property? This cannot be undone.')) return;
+    await deleteDoc(doc(db,'properties',id));
+    await loadProperties();
+  };
+
+  // ===== TENANTS =====
+  async function loadTenants() {
+    const snap = await getDocs(query(collection(db,'tenants'), orderBy('createdAt','desc')));
+    allTenants = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTenantsTable(allTenants);
+    populateTenantSelects();
+  }
+  function renderTenantsTable(tenants) {
+    const tbody = document.getElementById('tenants-tbody');
+    if (!tenants.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No tenants found.</td></tr>'; return; }
+    tbody.innerHTML = tenants.map(t => {
+      const pName = allProperties.find(p=>p.id===t.propertyId)?.name || t.propertyName || '—';
+      return `<tr>
+        <td><strong>${t.firstName||''} ${t.lastName||''}</strong></td>
+        <td style="font-size:12px;">${t.email||'—'}</td>
+        <td style="font-size:12px;">${pName} / ${t.unit||'—'}</td>
+        <td>$${Number(t.monthlyRent||0).toLocaleString()}</td>
+        <td style="font-size:12px;">${t.leaseEnd||'—'}</td>
+        <td><span class="badge badge-${t.status||'pending'}">${t.status||'pending'}</span></td>
+        <td>
+          <button onclick="openEditTenant('${t.id}')" class="btn btn-sm btn-outline" style="margin-right:6px;">Edit</button>
+          ${t.status==='pending'?`<button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success">Approve</button>`:''}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+  window.filterTenants = () => {
+    const q = document.getElementById('tenant-search').value.toLowerCase();
+    renderTenantsTable(allTenants.filter(t => `${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(q)));
+  };
+  window.approveTenant = async id => {
+    await updateDoc(doc(db,'tenants',id), { status:'active' });
+    await loadTenants(); updateDashboardStats();
+  };
+  window.openEditTenant = id => {
+    const t = allTenants.find(x=>x.id===id);
+    if (!t) return;
+    document.getElementById('edit-tenant-id').value = id;
+    document.getElementById('edit-first').value = t.firstName||'';
+    document.getElementById('edit-last').value = t.lastName||'';
+    document.getElementById('edit-email').value = t.email||'';
+    document.getElementById('edit-phone').value = t.phone||'';
+    document.getElementById('edit-unit').value = t.unit||'';
+    document.getElementById('edit-status').value = t.status||'pending';
+    document.getElementById('edit-rent').value = t.monthlyRent||'';
+    document.getElementById('edit-lease-start').value = t.leaseStart||'';
+    document.getElementById('edit-lease-end').value = t.leaseEnd||'';
+    document.getElementById('edit-property').value = t.propertyId||'';
+    document.getElementById('tenant-edit-alert').classList.add('hidden');
+    openModal('tenant-modal');
+  };
+  window.saveTenant = async () => {
+    const id     = document.getElementById('edit-tenant-id').value;
+    const propId = document.getElementById('edit-property').value;
+    const propName = allProperties.find(p=>p.id===propId)?.name || '';
+    const btn = document.getElementById('tenant-save-btn'); btn.disabled=true; btn.textContent='Saving...';
+    try {
+      await updateDoc(doc(db,'tenants',id), {
+        firstName:    document.getElementById('edit-first').value.trim(),
+        lastName:     document.getElementById('edit-last').value.trim(),
+        phone:        document.getElementById('edit-phone').value.trim(),
+        propertyId:   propId||null, propertyName: propName,
+        unit:         document.getElementById('edit-unit').value.trim(),
+        status:       document.getElementById('edit-status').value,
+        monthlyRent:  parseFloat(document.getElementById('edit-rent').value)||0,
+        leaseStart:   document.getElementById('edit-lease-start').value||null,
+        leaseEnd:     document.getElementById('edit-lease-end').value||null,
+        updatedAt:    serverTimestamp()
+      });
+      closeModal('tenant-modal');
+      await loadTenants(); updateDashboardStats();
+    } catch(e) { showAlert('tenant-edit-alert', e.message); }
+    btn.disabled=false; btn.textContent='Save Changes';
+  };
+  function populateTenantSelects() {
+    const opts = allTenants.map(t=>`<option value="${t.id}">${t.firstName||''} ${t.lastName||''} (${t.email||''})</option>`).join('');
+    ['doc-tenant','manual-pay-tenant'].forEach(id => {
+      const el = document.getElementById(id); if (!el) return;
+      el.innerHTML = '<option value="">Select tenant...</option>' + opts;
+    });
+    // Pending approvals table
+    const pending = allTenants.filter(t=>t.status==='pending');
+    const tbody = document.getElementById('pending-tenants-tbody');
+    if (!pending.length) { tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">No pending approvals</td></tr>'; return; }
+    tbody.innerHTML = pending.map(t=>`<tr>
+      <td>${t.firstName||''} ${t.lastName||''}</td>
+      <td style="font-size:12px;">${t.email||''}</td>
+      <td style="font-size:12px;">${t.propertyName||'—'} / ${t.unit||'—'}</td>
+      <td>
+        <button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success" style="margin-right:4px;">Approve</button>
+        <button onclick="openEditTenant('${t.id}')" class="btn btn-sm btn-outline">Setup</button>
+      </td>
+    </tr>`).join('');
+  }
+
+  // ===== PAYMENTS =====
+  async function loadPayments() {
+    const snap = await getDocs(query(collection(db,'payments'), orderBy('createdAt','desc')));
+    allPayments = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderPaymentsTable(allPayments);
+  }
+  function renderPaymentsTable(payments) {
+    const tbody = document.getElementById('payments-tbody');
+    if (!payments.length) { tbody.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px;">No payments found.</td></tr>'; return; }
+    tbody.innerHTML = payments.map(p => {
+      const tenant = allTenants.find(t=>t.id===p.tenantId);
+      const tName = tenant ? `${tenant.firstName||''} ${tenant.lastName||''}` : p.tenantId;
+      const date = p.createdAt?.toDate ? p.createdAt.toDate().toLocaleDateString() : (p.manualDate||'—');
+      return `<tr>
+        <td>${date}</td>
+        <td>${tName}</td>
+        <td>${p.description||'Rent Payment'}</td>
+        <td><strong>$${Number(p.amount).toLocaleString(undefined,{minimumFractionDigits:2})}</strong></td>
+        <td><span class="badge badge-${p.status}">${p.status}</span></td>
+        <td>
+          ${p.status!=='paid'?`<button onclick="markPaymentPaid('${p.id}')" class="btn btn-sm btn-success">Mark Paid</button>`:''}
+          <button onclick="deletePayment('${p.id}')" class="btn btn-sm btn-danger" style="margin-left:4px;">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+  window.filterPayments = () => {
+    const filter = document.getElementById('payment-filter').value;
+    renderPaymentsTable(filter ? allPayments.filter(p=>p.status===filter) : allPayments);
+  };
+  window.markPaymentPaid = async id => {
+    await updateDoc(doc(db,'payments',id), { status:'paid', paidAt: serverTimestamp() });
+    await loadPayments();
+  };
+  window.deletePayment = async id => {
+    if (!confirm('Delete this payment record?')) return;
+    await deleteDoc(doc(db,'payments',id)); await loadPayments();
+  };
+  window.openManualPaymentModal = () => {
+    document.getElementById('manual-pay-amount').value = '';
+    document.getElementById('manual-pay-desc').value = '';
+    document.getElementById('manual-pay-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('manual-pay-alert').classList.add('hidden');
+    openModal('manual-payment-modal');
+  };
+  window.saveManualPayment = async () => {
+    const tenantId = document.getElementById('manual-pay-tenant').value;
+    const amount   = parseFloat(document.getElementById('manual-pay-amount').value);
+    const desc     = document.getElementById('manual-pay-desc').value.trim() || 'Rent Payment (Manual)';
+    const dateVal  = document.getElementById('manual-pay-date').value;
+    if (!tenantId) { showAlert('manual-pay-alert','Please select a tenant.'); return; }
+    if (!amount||amount<1) { showAlert('manual-pay-alert','Please enter a valid amount.'); return; }
+    const tenant = allTenants.find(t=>t.id===tenantId);
+    await addDoc(collection(db,'payments'), {
+      tenantId, propertyId: tenant?.propertyId||null,
+      amount, description: desc, status: 'paid',
+      manualDate: dateVal, manualEntry: true,
+      createdAt: serverTimestamp(), paidAt: serverTimestamp()
+    });
+    closeModal('manual-payment-modal'); await loadPayments();
+  };
+
+  // ===== DOCUMENTS =====
+  async function loadDocuments() {
+    const snap = await getDocs(query(collection(db,'documents'), orderBy('uploadedAt','desc')));
+    allDocuments = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderDocumentsTable();
+  }
+  function renderDocumentsTable() {
+    const tbody = document.getElementById('documents-tbody');
+    if (!allDocuments.length) { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--slate);padding:24px;">No documents uploaded yet.</td></tr>'; return; }
+    tbody.innerHTML = allDocuments.map(d => {
+      const tenant = allTenants.find(t=>t.id===d.tenantId);
+      const tName = tenant ? `${tenant.firstName||''} ${tenant.lastName||''}` : '—';
+      const date = d.uploadedAt?.toDate ? d.uploadedAt.toDate().toLocaleDateString() : '—';
+      return `<tr>
+        <td>${tName}</td>
+        <td><a href="${d.url}" target="_blank" style="color:var(--amber);text-decoration:none;" rel="noopener">${d.name}</a></td>
+        <td>${d.category||'—'}</td>
+        <td>${date}</td>
+        <td><button onclick="deleteDocument('${d.id}')" class="btn btn-sm btn-danger">Delete</button></td>
+      </tr>`;
+    }).join('');
+  }
+  window.uploadDocument = async () => {
+    const tenantId  = document.getElementById('doc-tenant').value;
+    const name      = document.getElementById('doc-name').value.trim();
+    const url       = document.getElementById('doc-url').value.trim();
+    const category  = document.getElementById('doc-category').value;
+    if (!tenantId)  { showAlert('doc-alert','Please select a tenant.'); return; }
+    if (!name||!url){ showAlert('doc-alert','Name and URL are required.'); return; }
+    const tenant = allTenants.find(t=>t.id===tenantId);
+    const ext = url.split('.').pop().toLowerCase();
+    const type = ['pdf'].includes(ext)?'pdf':['jpg','jpeg','png','gif','webp'].includes(ext)?'image':'file';
+    await addDoc(collection(db,'documents'), {
+      tenantId, propertyId: tenant?.propertyId||null, name, url, category, type,
+      uploadedAt: serverTimestamp(), uploadedBy: 'admin'
+    });
+    document.getElementById('doc-name').value=''; document.getElementById('doc-url').value='';
+    showAlert('doc-alert','✓ Document added successfully.','success');
+    await loadDocuments();
+  };
+  window.deleteDocument = async id => {
+    if (!confirm('Delete this document?')) return;
+    await deleteDoc(doc(db,'documents',id)); await loadDocuments();
+  };
+
+  // ===== MAINTENANCE =====
+  async function loadMaintenance() {
+    const snap = await getDocs(query(collection(db,'maintenanceRequests'), orderBy('createdAt','desc')));
+    allMaintenance = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderMaintenanceTable(allMaintenance);
+    // Dashboard: open requests
+    const openMaint = allMaintenance.filter(r=>r.status==='open');
+    const tbody = document.getElementById('open-maint-tbody');
+    if (!openMaint.length) { tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">No open requests</td></tr>'; return; }
+    tbody.innerHTML = openMaint.slice(0,5).map(r=>`<tr>
+      <td>${r.tenantName||'—'}</td><td>${r.category}</td>
+      <td><span class="${r.priority==='high'?'priority-high':r.priority==='medium'?'priority-medium':'priority-low'}">${r.priority}</span></td>
+      <td><button onclick="openMaintModal('${r.id}')" class="btn btn-sm btn-amber">Update</button></td>
+    </tr>`).join('');
+  }
+  function renderMaintenanceTable(items) {
+    const tbody = document.getElementById('maintenance-tbody');
+    if (!items.length) { tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">No maintenance requests.</td></tr>'; return; }
+    tbody.innerHTML = items.map(r => {
+      const date = r.createdAt?.toDate ? r.createdAt.toDate().toLocaleDateString() : '—';
+      const pClass = r.priority==='high'?'priority-high':r.priority==='medium'?'priority-medium':'priority-low';
+      return `<tr>
+        <td>${date}</td>
+        <td>${r.tenantName||'—'}</td>
+        <td>${r.unit||'—'}</td>
+        <td>${r.category}</td>
+        <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.description}">${r.description}</td>
+        <td><span class="${pClass}">${r.priority}</span></td>
+        <td><span class="badge badge-${r.status||'open'}">${r.status||'open'}</span></td>
+        <td><button onclick="openMaintModal('${r.id}')" class="btn btn-sm btn-amber">Update</button></td>
+      </tr>`;
+    }).join('');
+  }
+  window.filterMaintenance = () => {
+    const filter = document.getElementById('maint-filter').value;
+    renderMaintenanceTable(filter ? allMaintenance.filter(r=>r.status===filter) : allMaintenance);
+  };
+  window.openMaintModal = id => {
+    const r = allMaintenance.find(x=>x.id===id);
+    if (!r) return;
+    document.getElementById('maint-edit-id').value = id;
+    document.getElementById('maint-edit-status').value = r.status||'open';
+    document.getElementById('maint-edit-notes').value = r.adminNotes||'';
+    openModal('maint-modal');
+  };
+  window.saveMaintenance = async () => {
+    const id     = document.getElementById('maint-edit-id').value;
+    const status = document.getElementById('maint-edit-status').value;
+    const notes  = document.getElementById('maint-edit-notes').value.trim();
+    await updateDoc(doc(db,'maintenanceRequests',id), { status, adminNotes: notes, updatedAt: serverTimestamp() });
+    closeModal('maint-modal'); await loadMaintenance(); updateDashboardStats();
+  };
+
+  // ===== ANNOUNCEMENTS =====
+  async function loadAnnouncements() {
+    const snap = await getDocs(query(collection(db,'announcements'), orderBy('createdAt','desc')));
+    allAnnouncements = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    renderAnnouncementsTable();
+  }
+  function renderAnnouncementsTable() {
+    const tbody = document.getElementById('announcements-tbody');
+    if (!allAnnouncements.length) { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--slate);padding:24px;">No announcements posted yet.</td></tr>'; return; }
+    tbody.innerHTML = allAnnouncements.map(a => {
+      const date = a.createdAt?.toDate ? a.createdAt.toDate().toLocaleDateString() : '—';
+      const propName = a.propertyId ? allProperties.find(p=>p.id===a.propertyId)?.name||'—' : 'All';
+      return `<tr>
+        <td>${date}</td>
+        <td><strong>${a.title}</strong></td>
+        <td style="font-size:12px;max-width:200px;">${a.message}</td>
+        <td>${propName}</td>
+        <td><button onclick="deleteAnnouncement('${a.id}')" class="btn btn-sm btn-danger">Delete</button></td>
+      </tr>`;
+    }).join('');
+  }
+  window.postAnnouncement = async () => {
+    const title   = document.getElementById('ann-title').value.trim();
+    const message = document.getElementById('ann-message').value.trim();
+    const propId  = document.getElementById('ann-property').value;
+    if (!title||!message) { showAlert('ann-alert','Title and message are required.'); return; }
+    await addDoc(collection(db,'announcements'), { title, message, propertyId: propId||null, createdAt: serverTimestamp() });
+    document.getElementById('ann-title').value=''; document.getElementById('ann-message').value='';
+    showAlert('ann-alert','✓ Announcement posted.','success');
+    await loadAnnouncements();
+  };
+  window.deleteAnnouncement = async id => {
+    if (!confirm('Delete this announcement?')) return;
+    await deleteDoc(doc(db,'announcements',id)); await loadAnnouncements();
+  };
+
+  // ===== DASHBOARD STATS =====
+  function updateDashboardStats() {
+    document.getElementById('stat-props').textContent    = allProperties.length;
+    document.getElementById('stat-tenants').textContent  = allTenants.filter(t=>t.status==='active').length;
+    document.getElementById('stat-pending').textContent  = allTenants.filter(t=>t.status==='pending').length;
+    document.getElementById('stat-requests').textContent = allMaintenance.filter(r=>r.status==='open').length;
+  }
+
+  // ===== HELPERS =====
+  window.openModal  = id => document.getElementById(id).classList.remove('hidden');
+  window.closeModal = id => document.getElementById(id).classList.add('hidden');
+
+  function showAlert(elId, msg, type='error') {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.className = `alert alert-${type}`; el.textContent = msg; el.classList.remove('hidden');
+  }
+
+  window.switchSection = (id, btn) => {
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    document.getElementById('section-'+id).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    const titles = { dashboard:'Dashboard', properties:'Properties', tenants:'Tenants', payments:'Payments', documents:'Documents', maintenance:'Maintenance', announcements:'Announcements' };
+    document.getElementById('page-title').textContent = titles[id]||id;
+    document.getElementById('sidebar').classList.remove('open');
+  };
+
+  window.handleSignOut = async () => {
+    await signOut(auth); window.location.href = '/index.html';
+  };
+</script>
+</body>
+</html>
