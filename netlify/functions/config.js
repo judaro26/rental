@@ -9,6 +9,7 @@
  *   ALLOWED_ORIGIN  (e.g. https://your-site.netlify.app)
  */
 
+
 exports.handler = async (event) => {
   // ── Origin check ────────────────────────────────────────────────────────────
   const allowedOrigin = process.env.ALLOWED_ORIGIN || '';
