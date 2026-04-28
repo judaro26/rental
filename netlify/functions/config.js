@@ -36,6 +36,10 @@ exports.handler = async (event) => {
     console.error('Missing env vars:', missing);
     return { statusCode: 500, body: JSON.stringify({ error: 'Server misconfiguration' }) };
   }
+  // Cloudinary is optional — warn but don't block
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_UPLOAD_PRESET) {
+    console.warn('CLOUDINARY_CLOUD_NAME or CLOUDINARY_UPLOAD_PRESET not set — document uploads will be unavailable.');
+  }
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
 
@@ -55,7 +59,9 @@ exports.handler = async (event) => {
         messagingSenderId: process.env.FIREBASE_SENDER_ID,
         appId:             process.env.FIREBASE_APP_ID,
       },
-      stripePk: process.env.STRIPE_PUBLISHABLE_KEY,
+      stripePk:         process.env.STRIPE_PUBLISHABLE_KEY,
+      cloudinaryCloud:  process.env.CLOUDINARY_CLOUD_NAME    || null,
+      cloudinaryPreset: process.env.CLOUDINARY_UPLOAD_PRESET || null,
     }),
   };
 };
