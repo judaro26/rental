@@ -1,0 +1,41 @@
+[build]
+  command   = "npm install"
+  functions = "netlify/functions"
+  publish   = "."
+
+[functions]
+  node_bundler = "esbuild"
+
+# ── API routes → Netlify Functions ──────────────────────────────────────────
+[[redirects]]
+  from   = "/api/*"
+  to     = "/.netlify/functions/:splat"
+  status = 200
+
+# ── Clean URL rewrites ───────────────────────────────────────────────────────
+[[redirects]]
+  from   = "/tenant-portal"
+  to     = "/tenant-portal.html"
+  status = 200
+
+[[redirects]]
+  from   = "/admin"
+  to     = "/admin.html"
+  status = 200
+
+# ── Security headers (all routes) ───────────────────────────────────────────
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options        = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection       = "1; mode=block"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+    Permissions-Policy     = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://js.stripe.com https://www.googletagmanager.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.tailwindcss.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://firebasestorage.googleapis.com https://api.stripe.com https://js.stripe.com https://www.gstatic.com; frame-src https://js.stripe.com https://hooks.stripe.com; object-src 'none'; base-uri 'self'; form-action 'self';"
+
+# ── No caching for HTML (always fresh auth state) ───────────────────────────
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
