@@ -119,9 +119,15 @@ exports.handler = async (event) => {
 
   const a   = getAdmin();
   const db  = a.firestore();
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, ''); // strip trailing slash
+  // Derive site URL from env var, or fall back to the incoming request's host
+  let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
   if (!siteUrl) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'SITE_URL environment variable is not set. Please add it in Netlify → Environment variables (e.g. https://your-site.netlify.app).' }) };
+    const host = event.headers?.host || event.headers?.['x-forwarded-host'] || '';
+    const proto = event.headers?.['x-forwarded-proto'] || 'https';
+    if (host) siteUrl = `${proto}://${host}`;
+  }
+  if (!siteUrl) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Could not determine site URL. Please set SITE_URL in Netlify environment variables (e.g. https://your-site.netlify.app).' }) };
   }
 
   try {
