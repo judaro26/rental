@@ -19,7 +19,7 @@ function getTransporter() {
   });
 }
 
-function buildEmailHtml({ tenantName, unit, propertyName, category, priority, description, imageUrls, siteUrl, siteName }) {
+function buildEmailHtml({ tenantName, unit, propertyName, category, priority, description, imageUrls, siteUrl, siteName, isUpdate, statusUpdate, adminNotes }) {
   const priorityColor = priority === 'high' ? '#DC2626' : priority === 'medium' ? '#D97706' : '#6B7280';
   const priorityBg    = priority === 'high' ? '#FEF2F2' : priority === 'medium' ? '#FFFBEB' : '#F9FAFB';
   const priorityLabel = priority === 'high' ? '🔴 High — Urgent' : priority === 'medium' ? '🟡 Medium — Needs attention' : '🟢 Low — Not urgent';
@@ -47,7 +47,7 @@ function buildEmailHtml({ tenantName, unit, propertyName, category, priority, de
           <td style="background:#1A1A2E;padding:24px 32px;display:flex;align-items:center;justify-content:space-between;">
             <table width="100%"><tr>
               <td><span style="font-size:20px;font-weight:300;color:#E8D5B0;letter-spacing:0.06em;">${siteName || 'Tenant Portal'}</span></td>
-              <td align="right"><span style="font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:0.08em;text-transform:uppercase;">Maintenance Alert</span></td>
+              <td align="right"><span style="font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:0.08em;text-transform:uppercase;">${isUpdate ? "Request Updated" : "Maintenance Alert"}</span></td>
             </tr></table>
           </td>
         </tr>
@@ -60,7 +60,7 @@ function buildEmailHtml({ tenantName, unit, propertyName, category, priority, de
         <!-- Body -->
         <tr>
           <td style="padding:28px 32px 8px;">
-            <h2 style="margin:0 0 4px;font-size:22px;font-weight:400;color:#1A1A2E;">New Repair Request</h2>
+            <h2 style="margin:0 0 4px;font-size:22px;font-weight:400;color:#1A1A2E;">${isUpdate ? "Request Updated" : "New Repair Request"}</h2>
             <p style="margin:0;font-size:13px;color:#9CA3AF;">Submitted ${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p>
           </td>
         </tr>
@@ -100,6 +100,16 @@ function buildEmailHtml({ tenantName, unit, propertyName, category, priority, de
             </div>
           </td>
         </tr>
+        <!-- Status update badge (for update emails) -->
+        ${isUpdate ? `<tr><td style="padding:0 32px 20px;">
+          <p style="margin:0 0 8px;font-size:11px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.08em;">Status Updated To</p>
+          <span style="display:inline-block;padding:4px 14px;border-radius:10px;font-size:13px;font-weight:600;
+            background:${statusUpdate==='resolved'?'#F0FDF4':statusUpdate==='in-progress'?'#FFFBEB':'#FEF2F2'};
+            color:${statusUpdate==='resolved'?'#16A34A':statusUpdate==='in-progress'?'#D97706':'#DC2626'};">
+            ${statusUpdate ? statusUpdate.charAt(0).toUpperCase()+statusUpdate.slice(1).replace('-',' ') : '—'}
+          </span>
+          ${adminNotes ? `<div style="margin-top:10px;background:#FFFBEB;border-left:3px solid #C9903A;padding:8px 12px;border-radius:0 3px 3px 0;font-size:13px;color:#374151;">${adminNotes}</div>` : ''}
+        </td></tr>` : ''}
         <!-- Photos if any -->
         ${imagesSection}
         <!-- CTA -->
@@ -138,17 +148,19 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
   }
 
-  const { tenantName, unit, propertyName, category, priority, description, imageUrls, siteName } = body;
+  const { tenantName, unit, propertyName, category, priority, description, imageUrls, siteName, isUpdate, statusUpdate, adminNotes } = body;
   const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
 
   try {
-    const subject = `[${priority?.toUpperCase() || 'NEW'}] Maintenance Request — ${category}${unit ? ' · Unit ' + unit : ''}`;
+    const subject = isUpdate
+      ? `[Updated → ${(statusUpdate||'').toUpperCase()}] ${category} — ${tenantName||'Tenant'}${unit ? ' · Unit ' + unit : ''}`
+      : `[${priority?.toUpperCase() || 'NEW'}] Maintenance Request — ${category}${unit ? ' · Unit ' + unit : ''}`;
 
     await getTransporter().sendMail({
       from:    process.env.SMTP_FROM || process.env.SMTP_USER,
       to:      adminEmail,
       subject,
-      html:    buildEmailHtml({ tenantName, unit, propertyName, category, priority, description, imageUrls, siteUrl, siteName }),
+      html:    buildEmailHtml({ tenantName, unit, propertyName, category, priority, description, imageUrls, siteUrl, siteName, isUpdate, statusUpdate, adminNotes }),
     });
 
     return { statusCode: 200, body: JSON.stringify({ success: true }) };
