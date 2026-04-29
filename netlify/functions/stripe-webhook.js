@@ -13,7 +13,47 @@
 //   payment_intent.succeeded
 //   payment_intent.payment_failed
 
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe    = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const nodemailer = require('nodemailer');
+
+function getTransporter() {
+  return nodemailer.createTransport({
+    host:   process.env.SMTP_HOST,
+    port:   parseInt(process.env.SMTP_PORT || '587'),
+    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+}
+
+async function sendPaymentNotification({ tenantName, tenantEmail, amount, description, method, siteName, siteUrl }) {
+  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+  if (!adminEmail || !process.env.SMTP_HOST) return;
+  const label = method === 'zelle' ? 'Zelle' : method === 'stripe' ? 'Stripe' : 'Manual';
+  try {
+    await getTransporter().sendMail({
+      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      to:      adminEmail,
+      subject: `💳 Payment Received — ${tenantName} · $${parseFloat(amount).toFixed(2)}`,
+      html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">
+        <div style="background:#1A1A2E;padding:24px 32px;">
+          <span style="font-size:20px;font-weight:300;color:#E8D5B0;letter-spacing:0.06em;">${siteName||'Tenant Portal'}</span>
+          <span style="float:right;font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;line-height:2.2;">💳 Payment</span>
+        </div>
+        <div style="padding:28px 32px;">
+          <h2 style="margin:0 0 4px;font-size:22px;font-weight:400;color:#1A1A2E;">Payment Received</h2>
+          <p style="font-size:13px;color:#9CA3AF;margin:0 0 20px;">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'})}</p>
+          <table width="100%" style="background:#F9FAFB;border-radius:3px;padding:16px;margin-bottom:20px;" cellpadding="0" cellspacing="0">
+            <tr><td style="font-size:13px;color:#6B7280;padding-bottom:8px;">Tenant</td><td style="font-size:13px;font-weight:500;text-align:right;padding-bottom:8px;">${tenantName||'—'}</td></tr>
+            <tr><td style="font-size:13px;color:#6B7280;padding-bottom:8px;">Description</td><td style="font-size:13px;text-align:right;padding-bottom:8px;">${description||'Rent Payment'}</td></tr>
+            <tr><td style="font-size:13px;color:#6B7280;padding-bottom:8px;">Method</td><td style="font-size:13px;text-align:right;padding-bottom:8px;">${label}</td></tr>
+            <tr><td style="font-size:16px;font-weight:700;color:#1A1A2E;">Amount</td><td style="font-size:18px;font-weight:700;color:#C9903A;text-align:right;">$${parseFloat(amount).toFixed(2)}</td></tr>
+          </table>
+          ${siteUrl ? `<a href="${siteUrl}/admin" style="display:inline-block;background:#C9903A;color:#fff;text-decoration:none;padding:10px 24px;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;border-radius:2px;">View in Admin →</a>` : ''}
+        </div>
+      </div>`,
+    });
+  } catch(e) { console.warn('Payment notify email failed:', e.message); }
+}
 
 let admin;
 function getAdmin() {
@@ -60,11 +100,29 @@ exports.handler = async (event) => {
         await updatePaymentByIntentId(db, fb, pi.id, {
           status:  'paid',
           paidAt:  fb.firestore.FieldValue.serverTimestamp(),
-          stripeMeta: {
-            amount:   pi.amount / 100,
-            currency: pi.currency,
-          },
+          stripeMeta: { amount: pi.amount / 100, currency: pi.currency },
         });
+        // Notify admin of payment
+        try {
+          const siteUrl   = (process.env.SITE_URL || '').replace(/\/+$/, '');
+          const siteName  = process.env.SITE_NAME || '';
+          // Fetch payment record to get tenant info
+          const pmtSnap = await db.collection('payments')
+            .where('stripePaymentIntentId', '==', pi.id).limit(1).get();
+          if (!pmtSnap.empty) {
+            const pmt    = pmtSnap.docs[0].data();
+            const tSnap  = pmt.tenantId ? await db.collection('tenants').doc(pmt.tenantId).get() : null;
+            const tenant = tSnap?.data();
+            await sendPaymentNotification({
+              tenantName:  tenant ? `${tenant.firstName||''} ${tenant.lastName||''}`.trim() : 'Tenant',
+              tenantEmail: tenant?.email || '',
+              amount:      pmt.baseAmount || pi.amount / 100,
+              description: pmt.description || 'Rent Payment',
+              method:      'stripe',
+              siteName, siteUrl,
+            });
+          }
+        } catch(e) { console.warn('Notify failed:', e.message); }
         console.log(`Payment succeeded: ${pi.id}`);
         break;
       }
