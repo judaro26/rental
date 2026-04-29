@@ -37,7 +37,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { amount, tenantId, propertyId, description } = JSON.parse(event.body || '{}');
+    const { amount, baseAmount, fee, tenantId, propertyId, description } = JSON.parse(event.body || '{}');
 
     if (!amount || isNaN(amount) || amount < 0.5) {
       return jsonResponse(400, { error: 'Invalid amount. Minimum is $0.50.' });
