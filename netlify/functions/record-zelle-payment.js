@@ -29,7 +29,7 @@ exports.handler = async (event) => {
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
   const { tenantId, tenantName, tenantEmail, propertyId, propertyName, unit,
-          amount, description, zelleConfirmation, siteName } = body;
+          amount, description, zelleConfirmation, method: payMethod = 'zelle', siteName } = body;
 
   if (!tenantId || !amount) {
     return { statusCode: 400, body: JSON.stringify({ error: 'tenantId and amount are required' }) };
@@ -46,7 +46,7 @@ exports.handler = async (event) => {
       propertyId:   propertyId || null,
       amount:       parseFloat(amount),
       description:  description || 'Rent Payment',
-      method:       'zelle',
+      method:       payMethod || 'zelle',
       status:       'pending_approval',
       zelleConfirmation: zelleConfirmation || '',
       createdAt:    a.firestore.FieldValue.serverTimestamp(),
@@ -64,15 +64,15 @@ exports.handler = async (event) => {
       await transporter.sendMail({
         from:    process.env.SMTP_FROM || process.env.SMTP_USER,
         to:      adminEmail,
-        subject: `💸 Zelle Payment Confirmation — ${tenantName||'Tenant'} · $${parseFloat(amount).toFixed(2)}`,
+        subject: `${payMethod === 'cashapp' ? '💚 Cash App' : '💸 Zelle'} Payment Confirmation — ${tenantName||'Tenant'} · $${parseFloat(amount).toFixed(2)}`,
         html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">
           <div style="background:#1A1A2E;padding:24px 32px;">
             <span style="font-size:20px;font-weight:300;color:#E8D5B0;letter-spacing:0.06em;">${siteName||'Tenant Portal'}</span>
-            <span style="float:right;font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:0.08em;text-transform:uppercase;line-height:2.2;">💸 Zelle Payment</span>
+            <span style="float:right;font-size:11px;color:rgba(255,255,255,0.5);letter-spacing:0.08em;text-transform:uppercase;line-height:2.2;">${payMethod==="cashapp"?"💚 Cash App":"💸 Zelle"} Payment</span>
           </div>
           <div style="padding:28px 32px;">
             <h2 style="margin:0 0 4px;font-size:22px;font-weight:400;color:#1A1A2E;">Payment Confirmation Received</h2>
-            <p style="font-size:13px;color:#9CA3AF;margin:0 0 20px;">A tenant has submitted a Zelle payment for your approval.</p>
+            <p style="font-size:13px;color:#9CA3AF;margin:0 0 20px;">A tenant has submitted a ${payMethod === 'cashapp' ? 'Cash App' : 'Zelle'} payment for your approval.</p>
             <table width="100%" style="background:#F9FAFB;border-radius:3px;padding:16px;margin-bottom:20px;" cellpadding="0" cellspacing="0">
               <tr><td style="font-size:13px;color:#6B7280;padding-bottom:8px;">Tenant</td><td style="font-size:13px;font-weight:500;text-align:right;padding-bottom:8px;">${tenantName||'—'} ${unit?'· Unit '+unit:''}</td></tr>
               <tr><td style="font-size:13px;color:#6B7280;padding-bottom:8px;">Property</td><td style="font-size:13px;text-align:right;padding-bottom:8px;">${propertyName||'—'}</td></tr>
@@ -98,7 +98,7 @@ exports.handler = async (event) => {
       await transporter.sendMail({
         from:    process.env.SMTP_FROM || process.env.SMTP_USER,
         to:      tenantEmail,
-        subject: `Payment Received — Pending Confirmation · $${parseFloat(amount).toFixed(2)}`,
+        subject: `${payMethod === 'cashapp' ? 'Cash App' : 'Zelle'} Payment Received — Pending Confirmation · $${parseFloat(amount).toFixed(2)}`,
         html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">
           <div style="background:#1A1A2E;padding:24px 32px;">
             <span style="font-size:20px;font-weight:300;color:#E8D5B0;letter-spacing:0.06em;">${siteName||'Tenant Portal'}</span>
