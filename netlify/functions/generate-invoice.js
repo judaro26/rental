@@ -221,7 +221,12 @@ exports.handler = async (event) => {
 
   const a  = getAdmin();
   const db = a.firestore();
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  if (!siteUrl) {
+    const host  = event.headers?.['x-forwarded-host'] || event.headers?.host || '';
+    const proto = event.headers?.['x-forwarded-proto'] || 'https';
+    if (host) siteUrl = `${proto}://${host}`;
+  }  
 
   try {
     const isReceipt    = type === 'receipt';
