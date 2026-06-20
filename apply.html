@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Available Properties — Apply</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cream:    #F7F4EF;
+      --charcoal: #1A1A2E;
+      --amber:    #C9903A;
+      --amber-light: #F0C97A;
+      --slate:    #5A6475;
+      --border:   #E8E2D8;
+      --white:    #FFFFFF;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Jost', sans-serif; background: var(--cream); color: var(--charcoal); line-height: 1.6; }
+    h1, h2, h3, h4 { font-family: 'Cormorant Garamond', serif; }
+
+    /* ── Header ── */
+    .site-header {
+      background: rgba(255,255,255,0.96);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(8px);
+    }
+    .header-inner {
+      max-width: 1100px; margin: 0 auto; padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .logo-mark {
+      width: 34px; height: 34px; border-radius: 2px;
+      background: var(--charcoal);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .logo-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--charcoal); font-weight: 600; }
+    .header-nav { display: flex; align-items: center; gap: 20px; }
+    .nav-link { font-size: 13px; color: var(--slate); text-decoration: none; letter-spacing: 0.02em; }
+    .nav-link:hover { color: var(--amber); }
+
+    /* ── Hero ── */
+    .hero {
+      background: var(--charcoal);
+      padding: 64px 24px 56px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 120%, rgba(201,144,58,0.18) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: var(--amber); margin-bottom: 14px;
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      font-weight: 400; color: #fff; line-height: 1.1; margin-bottom: 16px;
+    }
+    .hero h1 em { color: var(--amber-light); font-style: italic; }
+    .hero p {
+      font-size: 15px; color: rgba(255,255,255,0.65);
+      max-width: 440px; margin: 0 auto; line-height: 1.7;
+    }
+
+    /* ── Layout ── */
+    .page-body { max-width: 1100px; margin: 0 auto; padding: 48px 24px 80px; }
+
+    /* ── Property grid ── */
+    #properties-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px; margin-bottom: 56px;
+    }
+    .property-card {
+      background: var(--white); border-radius: 3px;
+      box-shadow: 0 2px 16px rgba(26,26,46,0.07);
+      overflow: hidden; transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .property-card:hover { transform: translateY(-4px); box-shadow: 0 12px 36px rgba(26,26,46,0.13); }
+
+    .card-gallery { position: relative; height: 210px; overflow: hidden; background: #EDE8DF; }
+    .card-gallery img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: transform 0.4s ease;
+    }
+    .property-card:hover .card-gallery img { transform: scale(1.04); }
+    .card-badge {
+      position: absolute; top: 12px; left: 12px;
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 4px 10px; border-radius: 20px; font-weight: 600;
+    }
+    .badge-available { background: #D1FAE5; color: #065F46; }
+
+    .card-body { padding: 22px; }
+    .card-title { font-size: 1.35rem; font-weight: 500; margin-bottom: 4px; }
+    .card-address { font-size: 12px; color: var(--slate); margin-bottom: 14px; }
+    .card-meta {
+      display: flex; gap: 14px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .card-meta-item { font-size: 12px; color: var(--slate); }
+    .card-meta-item strong { color: var(--charcoal); font-size: 13px; }
+
+    .card-units { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 2px; }
+    .unit-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px dashed #EDE8DF; font-size: 13px;
+    }
+    .unit-row:last-child { border-bottom: none; }
+    .unit-label { font-weight: 500; }
+    .unit-rent { color: var(--amber); font-weight: 600; }
+    .unit-apply-btn {
+      font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 5px 12px; border-radius: 2px;
+      background: var(--charcoal); color: #fff; border: none; cursor: pointer;
+      transition: background 0.2s;
+      font-family: 'Jost', sans-serif;
+    }
+    .unit-apply-btn:hover { background: var(--amber); }
+
+    .card-apply-btn {
+      display: block; width: 100%; text-align: center;
+      padding: 11px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase;
+      background: var(--charcoal); color: #fff; border: none; cursor: pointer;
+      transition: background 0.2s; margin-top: 14px; border-radius: 2px;
+      font-family: 'Jost', sans-serif; font-weight: 500;
+    }
+    .card-apply-btn:hover { background: var(--amber); }
+
+    /* ── Empty state ── */
+    #empty-state {
+      text-align: center; padding: 80px 0;
+      display: none;
+    }
+    #empty-state svg { opacity: 0.3; margin: 0 auto 16px; display: block; }
+    #empty-state h3 { font-size: 1.8rem; font-weight: 400; margin-bottom: 8px; }
+    #empty-state p { font-size: 14px; color: var(--slate); }
+
+    /* ── Skeleton ── */
+    .skeleton {
+      background: linear-gradient(90deg, #EDE8DF 25%, #F5F2EC 50%, #EDE8DF 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 3px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* ── Application Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(26,26,46,0.65);
+      backdrop-filter: blur(6px);
+      overflow-y: auto;
+      padding: 24px 16px;
+    }
+    .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+    .modal-box {
+      background: var(--white); width: 100%; max-width: 620px;
+      border-radius: 3px;
+      box-shadow: 0 24px 80px rgba(26,26,46,0.25);
+      position: relative; margin: auto;
+    }
+
+    /* Modal sections */
+    .modal-header {
+      padding: 28px 32px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h2 { font-size: 1.8rem; font-weight: 400; margin-bottom: 4px; }
+    .modal-header p { font-size: 13px; color: var(--slate); }
+    .modal-close {
+      position: absolute; top: 16px; right: 18px;
+      background: none; border: none; font-size: 22px;
+      color: var(--slate); cursor: pointer; line-height: 1;
+    }
+
+    .modal-body { padding: 24px 32px; }
+
+    /* Progress steps */
+    .step-bar {
+      display: flex; gap: 0; margin-bottom: 28px;
+    }
+    .step-bar-item {
+      flex: 1; text-align: center; position: relative;
+    }
+    .step-bar-item::after {
+      content: ''; position: absolute;
+      top: 13px; left: 50%; width: 100%; height: 2px;
+      background: #E5E7EB; z-index: 0;
+    }
+    .step-bar-item:last-child::after { display: none; }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid #E5E7EB; background: var(--white);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; color: #9CA3AF;
+      margin: 0 auto 6px; position: relative; z-index: 1;
+      transition: all 0.2s;
+    }
+    .step-label { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: #9CA3AF; }
+    .step-bar-item.active .step-num   { border-color: var(--charcoal); background: var(--charcoal); color: #fff; }
+    .step-bar-item.active .step-label { color: var(--charcoal); }
+    .step-bar-item.done .step-num     { border-color: #16A34A; background: #16A34A; color: #fff; }
+    .step-bar-item.done .step-label   { color: #16A34A; }
+
+    /* Form fields */
+    .form-step { display: none; }
+    .form-step.active { display: block; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .field-row.full { grid-template-columns: 1fr; }
+    @media (max-width: 520px) { .field-row { grid-template-columns: 1fr; } }
+    .field-group { display: flex; flex-direction: column; }
+    .field-label {
+      font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--slate); margin-bottom: 6px;
+    }
+    .field-label .req { color: var(--amber); margin-left: 2px; }
+    .field-input, .field-select, .field-textarea {
+      border: 1.5px solid var(--border); background: #FDFBF8;
+      padding: 10px 14px; border-radius: 2px; font-size: 14px;
+      font-family: 'Jost', sans-serif; color: var(--charcoal);
+      transition: border-color 0.2s; width: 100%;
+    }
+    .field-input:focus, .field-select:focus, .field-textarea:focus {
+      outline: none; border-color: var(--amber);
+    }
+    .field-input.error, .field-select.error { border-color: #DC2626; }
+    .field-hint { font-size: 11px; color: #9CA3AF; margin-top: 4px; }
+    .field-error-msg { font-size: 11px; color: #DC2626; margin-top: 4px; display: none; }
+
+    /* Consent checkboxes */
+    .consent-block {
+      background: #F9FAFB; border: 1px solid var(--border); border-radius: 3px;
+      padding: 18px; margin-bottom: 14px;
+    }
+    .consent-block.required-consent { border-color: #FDE68A; background: #FFFBEB; }
+    .consent-label {
+      display: flex; gap: 12px; align-items: flex-start; cursor: pointer;
+    }
+    .consent-checkbox {
+      width: 18px; height: 18px; flex-shrink: 0;
+      margin-top: 2px; accent-color: var(--charcoal); cursor: pointer;
+    }
+    .consent-text { font-size: 13px; color: #374151; line-height: 1.6; }
+    .consent-text strong { color: var(--charcoal); }
+    .consent-legal {
+      font-size: 11px; color: #6B7280; margin-top: 8px; line-height: 1.6;
+      padding-left: 30px;
+    }
+    .consent-required-badge {
+      display: inline-block; font-size: 10px; font-weight: 600;
+      padding: 1px 7px; border-radius: 2px; margin-left: 6px;
+      background: #FEF3C7; color: #92400E; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+
+    /* Privacy disclosure box */
+    .privacy-box {
+      background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 3px;
+      padding: 16px; margin-bottom: 20px;
+    }
+    .privacy-box-title { font-size: 13px; font-weight: 600; color: #1D4ED8; margin-bottom: 8px; }
+    .privacy-box ul { padding-left: 18px; font-size: 12px; color: #374151; line-height: 2; }
+
+    /* Alert */
+    .alert { font-size: 13px; padding: 12px 16px; border-radius: 2px; margin-bottom: 16px; }
+    .alert-error   { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; }
+    .alert-success { background: #F0FDF4; border: 1px solid #BBF7D0; color: #16A34A; }
+
+    /* Modal footer */
+    .modal-footer {
+      padding: 18px 32px 26px;
+      border-top: 1px solid var(--border);
+      display: flex; gap: 10px; align-items: center;
+    }
+    .btn-next, .btn-back, .btn-submit {
+      padding: 11px 24px; font-size: 12px; letter-spacing: 0.1em;
+      text-transform: uppercase; border-radius: 2px; cursor: pointer;
+      font-family: 'Jost', sans-serif; font-weight: 500; border: none;
+      transition: all 0.2s;
+    }
+    .btn-next, .btn-submit { background: var(--charcoal); color: #fff; flex: 1; }
+    .btn-next:hover, .btn-submit:hover { background: var(--amber); }
+    .btn-back { background: transparent; border: 1.5px solid var(--charcoal); color: var(--charcoal); }
+    .btn-back:hover { background: var(--charcoal); color: #fff; }
+    .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* Spinner */
+    .spinner {
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%; width: 15px; height: 15px;
+      animation: spin 0.7s linear infinite;
+      display: inline-block; vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Success screen */
+    .success-screen { display: none; text-align: center; padding: 48px 32px 56px; }
+    .success-screen .check-icon {
+      width: 64px; height: 64px; border-radius: 50%;
+      background: #F0FDF4; border: 2px solid #BBF7D0;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; font-size: 28px;
+    }
+    .success-screen h2 { font-size: 2rem; font-weight: 400; margin-bottom: 10px; }
+    .success-screen p { font-size: 14px; color: var(--slate); max-width: 380px; margin: 0 auto 6px; line-height: 1.7; }
+    .success-app-id {
+      display: inline-block; margin-top: 16px; padding: 8px 20px;
+      background: #F9FAFB; border: 1px solid var(--border); border-radius: 2px;
+      font-size: 13px; color: var(--charcoal); font-family: monospace;
+    }
+
+    /* Footer */
+    .site-footer {
+      background: var(--charcoal); color: rgba(255,255,255,0.55);
+      padding: 32px 24px; text-align: center; font-size: 12px; line-height: 1.8;
+    }
+    .site-footer a { color: var(--amber); text-decoration: none; }
+
+    @media (max-width: 640px) {
+      .modal-header, .modal-body, .modal-footer { padding-left: 20px; padding-right: 20px; }
+      .hero { padding: 48px 20px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="logo">
+      <div class="logo-mark">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C9903A" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+      </div>
+      <span class="logo-name" id="header-brand">Tenant Portal</span>
+    </a>
+    <nav class="header-nav">
+      <a href="/" class="nav-link">← Back to Portal</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <p class="hero-eyebrow">Available Now</p>
+  <h1>Find Your<br><em>Next Home</em></h1>
+  <p id="hero-sub">Browse available properties and apply online. Our team reviews every application personally.</p>
+</section>
+
+<!-- ── PROPERTIES ── -->
+<div class="page-body">
+  <div id="properties-grid">
+    <!-- Skeletons -->
+    <div class="skeleton" style="height:360px;"></div>
+    <div class="skeleton" style="height:360px;"></div>
+    <div class="skeleton" style="height:360px;"></div>
+  </div>
+  <div id="empty-state">
+    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+    <h3>No Units Available</h3>
+    <p>We don't have any available units right now.<br>Check back soon or contact us to get on the waitlist.</p>
+  </div>
+</div>
+
+<!-- ── APPLICATION MODAL ── -->
+<div id="application-modal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeModal()" aria-label="Close">×</button>
+
+    <!-- Header -->
+    <div class="modal-header">
+      <h2 id="modal-title">Rental Application</h2>
+      <p id="modal-subtitle" style="color:var(--slate);font-size:13px;margin-top:4px;">Loading…</p>
+    </div>
+
+    <!-- Success screen (shown after submit) -->
+    <div id="success-screen" class="success-screen">
+      <div class="check-icon">✓</div>
+      <h2>Application Submitted</h2>
+      <p>Thank you! Your application has been received and is under review. We'll be in touch within 2–5 business days.</p>
+      <p style="margin-top:12px;">A confirmation email with your data rights disclosure has been sent to your email address.</p>
+      <div class="success-app-id">Application ID: <span id="success-app-id">—</span></div>
+      <button onclick="closeModal()" style="margin-top:24px;padding:12px 32px;background:var(--charcoal);color:#fff;border:none;border-radius:2px;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;font-family:'Jost',sans-serif;">Close</button>
+    </div>
+
+    <!-- Multi-step form -->
+    <div id="form-container">
+      <!-- Step bar -->
+      <div class="modal-body" style="padding-bottom:0;">
+        <div class="step-bar" id="step-bar">
+          <div class="step-bar-item active" id="step-ind-1"><div class="step-num">1</div><span class="step-label">You</span></div>
+          <div class="step-bar-item" id="step-ind-2"><div class="step-num">2</div><span class="step-label">Finances</span></div>
+          <div class="step-bar-item" id="step-ind-3"><div class="step-num">3</div><span class="step-label">Consent</span></div>
+        </div>
+      </div>
+
+      <div class="modal-body" style="padding-top:20px;">
+        <div id="form-alert" class="alert alert-error" style="display:none;"></div>
+
+        <!-- ── STEP 1: Personal Info ── -->
+        <div class="form-step active" id="step-1">
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">First Name<span class="req">*</span></label>
+              <input type="text" id="f-first" class="field-input" placeholder="Jane" autocomplete="given-name">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Last Name<span class="req">*</span></label>
+              <input type="text" id="f-last" class="field-input" placeholder="Smith" autocomplete="family-name">
+            </div>
+          </div>
+          <div class="field-row full">
+            <div class="field-group">
+              <label class="field-label">Email Address<span class="req">*</span></label>
+              <input type="email" id="f-email" class="field-input" placeholder="jane@example.com" autocomplete="email">
+              <span class="field-hint">Confirmation and application updates will be sent here.</span>
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Phone Number</label>
+              <input type="tel" id="f-phone" class="field-input" placeholder="(555) 000-0000" autocomplete="tel">
+            </div>
+            <div class="field-group">
+              <label class="field-label">Desired Move-in</label>
+              <input type="date" id="f-movein" class="field-input">
+            </div>
+          </div>
+          <div class="field-row full">
+            <div class="field-group">
+              <label class="field-label">Message to Property Manager <span style="font-size:10px;font-weight:400;">(optional)</span></label>
+              <textarea id="f-message" class="field-textarea" rows="3" placeholder="Tell us a bit about yourself or ask a question…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── STEP 2: Financial Info ── -->
+        <div class="form-step" id="step-2">
+          <p style="font-size:13px;color:var(--slate);margin-bottom:18px;line-height:1.6;">This information is used solely to assess your ability to meet rental obligations. It is stored securely and never sold.</p>
+          <div class="field-row">
+            <div class="field-group">
+              <label class="field-label">Gross Monthly Income ($)</label>
+              <input type="number" id="f-income" class="field-input" placeholder="0" min="0" step="100">
+              <span class="field-hint">Before taxes. Leave blank if you prefer not to share.</span>
+            </div>
+            <div class="field-group">
+              <label class="field-label">Current Employer</label>
+              <input type="text" id="f-employer" class="field-input" placeholder="Employer name">
+              <span class="field-hint">Or "Self-employed", "Retired", etc.</span>
+            </div>
+          </div>
+          <div class="field-row full" style="margin-top:8px;">
+            <div class="field-group">
+              <label class="field-label">Pets</label>
+              <select id="f-pets" class="field-select">
+                <option value="none">No pets</option>
+                <option value="dog_small">Dog (small, under 25 lbs)</option>
+                <option value="dog_large">Dog (large, 25+ lbs)</option>
+                <option value="cat">Cat</option>
+                <option value="other">Other</option>
+                <option value="multiple">Multiple pets</option>
+              </select>
+            </div>
+          </div>
+          <div style="background:#FEF3C7;border:1px solid #FDE68A;border-radius:3px;padding:14px;margin-top:8px;">
+            <p style="font-size:12px;color:#92400E;line-height:1.6;margin:0;">
+              <strong>Note:</strong> Providing false financial information may result in immediate application denial and could constitute fraud. We verify income at the lease stage, not during initial review.
+            </p>
+          </div>
+        </div>
+
+        <!-- ── STEP 3: Consent & Privacy ── -->
+        <div class="form-step" id="step-3">
+
+          <!-- Privacy disclosure -->
+          <div class="privacy-box">
+            <div class="privacy-box-title">🔒 How We Use Your Information</div>
+            <ul>
+              <li>To evaluate your rental application</li>
+              <li>To contact you regarding your application status</li>
+              <li>To verify income and references <em>only if your application proceeds</em></li>
+            </ul>
+            <p style="font-size:12px;color:#374151;margin-top:10px;line-height:1.6;"><strong>We do not sell your personal information.</strong> Data is stored securely and retained for 90 days for declined applications. You may request deletion at any time before a lease is signed.</p>
+          </div>
+
+          <!-- Consent 1: Data collection — REQUIRED -->
+          <div class="consent-block required-consent">
+            <label class="consent-label">
+              <input type="checkbox" id="c-data" class="consent-checkbox">
+              <span class="consent-text">
+                <strong>I consent to collection and use of my personal data</strong>
+                <span class="consent-required-badge">Required</span>
+                <br>I authorize this property management company to collect, store, and process the personal information I have provided in this form for the purpose of evaluating my rental application.
+              </span>
+            </label>
+            <p class="consent-legal">Your data is collected under CCPA (California) and GDPR (if applicable) frameworks. You have rights to access, correct, and delete your data. Consent recorded with timestamp and IP address.</p>
+          </div>
+
+          <!-- Consent 2: Background check — Optional but clearly labeled -->
+          <div class="consent-block">
+            <label class="consent-label">
+              <input type="checkbox" id="c-bgcheck" class="consent-checkbox">
+              <span class="consent-text">
+                <strong>I authorize a background and credit check</strong>
+                <span style="font-size:10px;color:#6B7280;margin-left:6px;text-transform:uppercase;letter-spacing:0.06em;">Optional at this stage</span>
+                <br>If my application progresses, I authorize the landlord to obtain a consumer report (background check and/or credit check) from a third-party consumer reporting agency.
+              </span>
+            </label>
+            <p class="consent-legal">You retain rights under the Fair Credit Reporting Act (FCRA). If a report is used to make an adverse decision, you will receive an Adverse Action Notice as required by law.</p>
+          </div>
+
+          <!-- Consent 3: Terms — REQUIRED -->
+          <div class="consent-block required-consent">
+            <label class="consent-label">
+              <input type="checkbox" id="c-terms" class="consent-checkbox">
+              <span class="consent-text">
+                <strong>I certify that all information is accurate</strong>
+                <span class="consent-required-badge">Required</span>
+                <br>I certify under penalty of perjury that all information provided in this application is true and complete. I understand that providing false information may result in immediate denial or termination of tenancy.
+              </span>
+            </label>
+          </div>
+
+          <p style="font-size:11px;color:#9CA3AF;line-height:1.6;margin-top:4px;">By submitting this application, your express consent is legally recorded along with the date, time, and IP address of submission as required for compliance with applicable privacy regulations.</p>
+        </div>
+      </div>
+
+      <div class="modal-footer" id="modal-footer">
+        <button class="btn-back" id="btn-back" onclick="prevStep()" style="display:none;">← Back</button>
+        <button class="btn-next" id="btn-next" onclick="nextStep()">Continue →</button>
+        <button class="btn-submit" id="btn-submit" onclick="submitApplication()" style="display:none;">Submit Application</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── FOOTER ── -->
+<footer class="site-footer">
+  <p id="footer-brand" style="font-family:'Cormorant Garamond',serif;font-size:17px;color:rgba(255,255,255,0.7);margin-bottom:8px;">Tenant Portal</p>
+  <p>Questions about your data? Contact us at <a href="#" id="footer-email">the email on record</a></p>
+  <p style="margin-top:8px;font-size:11px;opacity:0.5;">We do not sell personal information. © <span id="year"></span></p>
+</footer>
+
+<!-- ── FIREBASE + LOGIC ── -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { getFirestore, collection, getDocs, query, where, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+  document.getElementById('year').textContent = new Date().getFullYear();
+
+  // ── Load config ──────────────────────────────────────────────────────────
+  let _cfg, db;
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new Error('Config failed');
+    _cfg = await res.json();
+    const app = initializeApp(_cfg.firebase);
+    db = getFirestore(app);
+  } catch(e) {
+    document.getElementById('properties-grid').innerHTML =
+      '<p style="color:#DC2626;font-size:13px;padding:20px;">Failed to load listings. Please try again later.</p>';
+    throw e;
+  }
+
+  // ── Load site settings ───────────────────────────────────────────────────
+  let siteSettings = {};
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'site'));
+    if (snap.exists()) {
+      siteSettings = snap.data();
+      const name = siteSettings.siteName || 'Tenant Portal';
+      document.getElementById('header-brand').textContent = name;
+      document.getElementById('footer-brand').textContent = name;
+      if (siteSettings.email) {
+        const el = document.getElementById('footer-email');
+        el.textContent = siteSettings.email;
+        el.href = `mailto:${siteSettings.email}`;
+      }
+    }
+  } catch(e) { console.warn('Settings load failed:', e); }
+
+  // ── State ────────────────────────────────────────────────────────────────
+  let currentStep = 1;
+  const TOTAL_STEPS = 3;
+  let selectedProperty = null;
+  let selectedUnit     = null;
+
+  // ── Load available properties ────────────────────────────────────────────
+  async function loadListings() {
+    const grid = document.getElementById('properties-grid');
+    try {
+      // Load properties where available = true
+      const snap = await getDocs(
+        query(collection(db, 'properties'), where('available', '==', true))
+      );
+
+      grid.innerHTML = '';
+      let hasAny = false;
+
+      for (const propDoc of snap.docs) {
+        const p   = propDoc.data();
+        const pid = propDoc.id;
+
+        // Check for per-unit availability
+        let unitsSnap = null;
+        try {
+          unitsSnap = await getDocs(
+            query(collection(db, 'properties', pid, 'units'), where('available', '==', true))
+          );
+        } catch(_) {}
+
+        const availableUnits = unitsSnap ? unitsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+        hasAny = true;
+
+        // Images
+        const imgs = (p.imageUrls && p.imageUrls.length) ? p.imageUrls : (p.imageUrl ? [p.imageUrl] : []);
+        const mainImg = imgs[0] || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=700&q=80';
+
+        const hasUnits = availableUnits.length > 0;
+
+        const unitsHtml = hasUnits
+          ? `<div class="card-units">
+              <p style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Available Units</p>
+              ${availableUnits.map(u => `
+                <div class="unit-row">
+                  <span class="unit-label">Unit ${u.unitNumber || u.id}</span>
+                  <span class="unit-rent">${u.monthlyRent ? '$' + Number(u.monthlyRent).toLocaleString() + '/mo' : ''}</span>
+                  <span style="font-size:11px;color:var(--slate);">${u.beds ? u.beds + 'bd' : ''} ${u.baths ? u.baths + 'ba' : ''}</span>
+                  <button class="unit-apply-btn"
+                    onclick="openApplication('${pid}','${p.name}',${JSON.stringify({ id: u.id, label: 'Unit ' + (u.unitNumber || u.id), rent: u.monthlyRent || null }).replace(/"/g,'&quot;')})">
+                    Apply
+                  </button>
+                </div>`).join('')}
+            </div>`
+          : `<button class="card-apply-btn" onclick="openApplication('${pid}','${p.name}',null)">Apply Now</button>`;
+
+        grid.innerHTML += `
+          <div class="property-card">
+            <div class="card-gallery">
+              <img src="${mainImg}" alt="${p.name}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=700&q=80'">
+              <span class="card-badge badge-available">Available</span>
+            </div>
+            <div class="card-body">
+              <h3 class="card-title">${p.name}</h3>
+              <p class="card-address">📍 ${p.address || ''}</p>
+              <div class="card-meta">
+                ${p.units ? `<div class="card-meta-item"><strong>${p.units}</strong> total units</div>` : ''}
+                ${p.type  ? `<div class="card-meta-item">${p.type}</div>` : ''}
+                ${p.monthlyRent && !hasUnits ? `<div class="card-meta-item"><strong style="color:var(--amber)">$${Number(p.monthlyRent).toLocaleString()}</strong>/mo</div>` : ''}
+              </div>
+              ${unitsHtml}
+            </div>
+          </div>`;
+      }
+
+      if (!hasAny) {
+        grid.innerHTML = '';
+        document.getElementById('empty-state').style.display = 'block';
+      }
+
+    } catch(e) {
+      grid.innerHTML = `<p style="color:#DC2626;font-size:13px;">${e.message}</p>`;
+    }
+  }
+  loadListings();
+
+  // ── Application modal ────────────────────────────────────────────────────
+  window.openApplication = (propId, propName, unit) => {
+    selectedProperty = { id: propId, name: propName };
+    selectedUnit     = unit ? JSON.parse(JSON.stringify(unit)) : null;
+
+    const subtitle = unit
+      ? `${propName} — ${unit.label}${unit.rent ? ' · $' + Number(unit.rent).toLocaleString() + '/mo' : ''}`
+      : propName;
+
+    document.getElementById('modal-subtitle').textContent = subtitle;
+    document.getElementById('form-alert').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('form-container').style.display = 'block';
+
+    // Reset steps
+    currentStep = 1;
+    updateStepUI();
+
+    // Pre-fill move-in with today + 30 days
+    const soon = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    document.getElementById('f-movein').value = soon.toISOString().split('T')[0];
+
+    document.getElementById('application-modal').classList.add('open');
+    document.getElementById('f-first').focus();
+  };
+
+  window.closeModal = () => {
+    document.getElementById('application-modal').classList.remove('open');
+  };
+
+  // Close on backdrop click
+  document.getElementById('application-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+  // Close on Escape
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // ── Step navigation ──────────────────────────────────────────────────────
+  window.nextStep = () => {
+    if (!validateStep(currentStep)) return;
+    currentStep = Math.min(currentStep + 1, TOTAL_STEPS);
+    updateStepUI();
+  };
+  window.prevStep = () => {
+    currentStep = Math.max(currentStep - 1, 1);
+    updateStepUI();
+  };
+
+  function updateStepUI() {
+    for (let i = 1; i <= TOTAL_STEPS; i++) {
+      document.getElementById(`step-${i}`).classList.toggle('active', i === currentStep);
+      const ind = document.getElementById(`step-ind-${i}`);
+      ind.classList.remove('active','done');
+      if (i < currentStep) ind.classList.add('done');
+      else if (i === currentStep) ind.classList.add('active');
+    }
+
+    const isFirst = currentStep === 1;
+    const isLast  = currentStep === TOTAL_STEPS;
+    document.getElementById('btn-back').style.display   = isFirst  ? 'none'  : '';
+    document.getElementById('btn-next').style.display   = isLast   ? 'none'  : '';
+    document.getElementById('btn-submit').style.display = isLast   ? ''      : 'none';
+    document.getElementById('form-alert').style.display = 'none';
+  }
+
+  // ── Validation ───────────────────────────────────────────────────────────
+  function validateStep(step) {
+    const alertEl = document.getElementById('form-alert');
+    alertEl.style.display = 'none';
+
+    if (step === 1) {
+      const first = document.getElementById('f-first').value.trim();
+      const last  = document.getElementById('f-last').value.trim();
+      const email = document.getElementById('f-email').value.trim();
+      if (!first || !last) { showAlert('First name and last name are required.'); return false; }
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        showAlert('A valid email address is required.'); return false;
+      }
+    }
+
+    if (step === 3) {
+      if (!document.getElementById('c-data').checked) {
+        showAlert('You must consent to data collection to proceed. This is required to process your application legally.'); return false;
+      }
+      if (!document.getElementById('c-terms').checked) {
+        showAlert('You must certify that the information provided is accurate.'); return false;
+      }
+    }
+
+    return true;
+  }
+
+  function showAlert(msg) {
+    const el = document.getElementById('form-alert');
+    el.textContent = msg; el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // ── Submit ───────────────────────────────────────────────────────────────
+  window.submitApplication = async () => {
+    if (!validateStep(TOTAL_STEPS)) return;
+
+    const btn = document.getElementById('btn-submit');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Submitting…';
+
+    try {
+      const payload = {
+        firstName:            document.getElementById('f-first').value.trim(),
+        lastName:             document.getElementById('f-last').value.trim(),
+        email:                document.getElementById('f-email').value.trim().toLowerCase(),
+        phone:                document.getElementById('f-phone').value.trim() || null,
+        moveInDate:           document.getElementById('f-movein').value || null,
+        message:              document.getElementById('f-message').value.trim() || null,
+        income:               document.getElementById('f-income').value || null,
+        currentEmployer:      document.getElementById('f-employer').value.trim() || null,
+        pets:                 document.getElementById('f-pets').value,
+        propertyId:           selectedProperty.id,
+        propertyName:         selectedProperty.name,
+        unitId:               selectedUnit?.id   || null,
+        unitLabel:            selectedUnit?.label || null,
+        consentDataCollection: document.getElementById('c-data').checked,
+        consentBackgroundCheck: document.getElementById('c-bgcheck').checked,
+        consentTerms:         document.getElementById('c-terms').checked,
+        siteName:             siteSettings.siteName || 'Tenant Portal',
+      };
+
+      const res  = await fetch('/api/submit-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showAlert(data.error || 'Submission failed. Please try again.');
+        return;
+      }
+
+      // Show success screen
+      document.getElementById('success-app-id').textContent = '#' + data.applicationId;
+      document.getElementById('form-container').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'block';
+
+    } catch(e) {
+      showAlert('A network error occurred. Please check your connection and try again.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = 'Submit Application';
+    }
+  };
+</script>
+</body>
+</html>
