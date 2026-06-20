@@ -1,0 +1,658 @@
+<!--
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ADMIN.HTML INTEGRATION GUIDE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 1 — Add two nav items to the sidebar <nav class="sidebar-nav"> block,
+         AFTER the existing "Properties" nav-item button:
+
+<button class="nav-item" onclick="switchSection('availability',this)">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+  Availability
+</button>
+<button class="nav-item" onclick="switchSection('applications',this)">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+  Applications
+  <span id="apps-badge" style="display:none;margin-left:auto;background:#DC2626;color:#fff;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:600;"></span>
+</button>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 2 — Add to the switchSection() titles object (inside the JS):
+         availability:'Availability', applications:'Applications',
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+STEP 3 — Add the two <section> blocks below INSIDE <div class="content">
+         (paste them before the closing </div> of the content div)
+
+STEP 4 — Add the JavaScript block at the bottom to the <script type="module">
+         block inside admin.html (paste it before the closing </script> tag)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-->
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION: AVAILABILITY                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<section id="section-availability" class="section">
+
+  <div class="card" style="margin-bottom:16px;">
+    <div class="card-header">
+      <h3 style="font-size:1.2rem;font-weight:500;">Property Availability</h3>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <a href="/apply.html" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;">
+          👁 Preview Listings Page
+        </a>
+      </div>
+    </div>
+    <div class="card-body" style="padding:14px 22px;">
+      <p style="font-size:13px;color:var(--slate);margin:0;">Toggle a property to <strong>Available</strong> to show it on the public listings page and accept applications. Units within a property can each have their own availability status.</p>
+    </div>
+  </div>
+
+  <div id="availability-list" style="display:flex;flex-direction:column;gap:16px;">
+    <p style="font-size:13px;color:var(--slate);padding:20px;">Loading properties…</p>
+  </div>
+
+</section>
+
+<!-- Unit availability modal -->
+<div id="unit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('unit-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:540px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+    <button onclick="closeModal('unit-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.6rem;font-weight:400;margin-bottom:6px;" id="unit-modal-title">Manage Units</h3>
+    <p style="font-size:13px;color:var(--slate);margin-bottom:20px;" id="unit-modal-prop-name"></p>
+    <div id="unit-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+    <!-- Unit list -->
+    <div id="unit-list" style="margin-bottom:20px;"></div>
+    <!-- Add unit form -->
+    <div style="background:#F9FAFB;border-radius:3px;padding:16px;border:1px dashed #E5E7EB;">
+      <p style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin-bottom:12px;">Add Unit</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 60px 60px auto;gap:8px;align-items:end;">
+        <div>
+          <label class="label" style="font-size:10px;">Unit #</label>
+          <input type="text" id="new-unit-num" class="form-input" placeholder="101" style="font-size:13px;">
+        </div>
+        <div>
+          <label class="label" style="font-size:10px;">Rent ($/mo)</label>
+          <input type="number" id="new-unit-rent" class="form-input" placeholder="1200" style="font-size:13px;">
+        </div>
+        <div>
+          <label class="label" style="font-size:10px;">Beds</label>
+          <input type="number" id="new-unit-beds" class="form-input" placeholder="2" min="0" max="10" style="font-size:13px;">
+        </div>
+        <div>
+          <label class="label" style="font-size:10px;">Baths</label>
+          <input type="number" id="new-unit-baths" class="form-input" placeholder="1" min="0" max="10" step="0.5" style="font-size:13px;">
+        </div>
+        <div>
+          <button onclick="addUnit()" class="btn btn-primary btn-sm" style="margin-top:0;">Add</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  SECTION: APPLICATIONS                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<section id="section-applications" class="section">
+
+  <!-- Summary stats -->
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px;">
+    <div class="stat-card" style="padding:16px 20px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--slate);margin-bottom:6px;">Total Applications</div>
+      <div id="app-stat-total" style="font-size:24px;font-family:'Cormorant Garamond',serif;">—</div>
+    </div>
+    <div class="stat-card" style="padding:16px 20px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--slate);margin-bottom:6px;">Pending Review</div>
+      <div id="app-stat-pending" style="font-size:24px;font-family:'Cormorant Garamond',serif;color:#D97706;">—</div>
+    </div>
+    <div class="stat-card" style="padding:16px 20px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--slate);margin-bottom:6px;">Approved</div>
+      <div id="app-stat-approved" style="font-size:24px;font-family:'Cormorant Garamond',serif;color:#16A34A;">—</div>
+    </div>
+    <div class="stat-card" style="padding:16px 20px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--slate);margin-bottom:6px;">Declined</div>
+      <div id="app-stat-declined" style="font-size:24px;font-family:'Cormorant Garamond',serif;color:#DC2626;">—</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h3 style="font-size:1.2rem;font-weight:500;">Rental Applications</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select id="app-filter-status" class="form-input" style="width:150px;font-size:12px;" onchange="filterApplications()">
+          <option value="">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="declined">Declined</option>
+          <option value="withdrawn">Withdrawn</option>
+        </select>
+        <select id="app-filter-prop" class="form-input" style="width:180px;font-size:12px;" onchange="filterApplications()">
+          <option value="">All Properties</option>
+        </select>
+        <button onclick="loadApplications()" class="btn btn-sm" style="background:#F3F4F6;color:#374151;border:none;white-space:nowrap;">↺ Refresh</button>
+      </div>
+    </div>
+
+    <!-- Data privacy reminder -->
+    <div style="background:#FEF3C7;border-bottom:1px solid #FDE68A;padding:10px 22px;display:flex;align-items:center;gap:8px;">
+      <span style="font-size:16px;">⚠️</span>
+      <p style="font-size:12px;color:#92400E;margin:0;line-height:1.5;">This section contains personal data protected under CCPA/GDPR. Handle with care. Do not share applicant data with unauthorized parties. Use "Declined" to trigger the required Adverse Action Notice email.</p>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Applicant</th>
+            <th>Property / Unit</th>
+            <th>Move-in</th>
+            <th>Income</th>
+            <th>Consents</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="applications-tbody">
+          <tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</section>
+
+<!-- Application detail / action modal -->
+<div id="app-detail-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('app-detail-modal')"></div>
+  <div style="display:flex;align-items:flex-start;justify-content:center;min-height:100vh;padding:40px 16px;">
+    <div style="background:#fff;width:100%;max-width:580px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;margin:auto;">
+      <button onclick="closeModal('app-detail-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+      <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;" id="app-modal-name">Applicant</h3>
+      <p style="font-size:13px;color:var(--slate);margin-bottom:20px;" id="app-modal-prop"></p>
+
+      <div id="app-modal-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+
+      <!-- Applicant details grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;font-size:13px;" id="app-modal-details"></div>
+
+      <!-- Message from applicant -->
+      <div id="app-modal-message-wrap" style="display:none;margin-bottom:20px;">
+        <p style="font-size:11px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;">Message from Applicant</p>
+        <div id="app-modal-message" style="background:#F9FAFB;border-left:3px solid #C9903A;padding:10px 14px;font-size:13px;color:#374151;line-height:1.6;border-radius:0 3px 3px 0;"></div>
+      </div>
+
+      <!-- Consent record -->
+      <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:3px;padding:14px;margin-bottom:20px;">
+        <p style="font-size:11px;font-weight:600;color:#065F46;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">🔒 Consent Record</p>
+        <div id="app-modal-consents" style="font-size:12px;color:#374151;line-height:2;"></div>
+      </div>
+
+      <!-- Action panel -->
+      <div id="app-action-panel">
+        <p style="font-size:12px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Admin Notes (emailed to applicant if decision made)</p>
+        <textarea id="app-admin-notes" class="form-input" rows="3" placeholder="Optional — e.g. 'Please contact us to schedule a showing.'" style="margin-bottom:14px;"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="updateAppStatus('approved')" class="btn btn-success btn-sm">✓ Approve</button>
+          <button onclick="updateAppStatus('declined')" class="btn btn-danger btn-sm">✗ Decline</button>
+          <button onclick="updateAppStatus('pending')"  class="btn btn-sm btn-outline">↺ Reset to Pending</button>
+          <button onclick="requestDataDeletion()"        class="btn btn-sm" style="background:#F3F4F6;color:#374151;margin-left:auto;">🗑 Delete Applicant Data</button>
+        </div>
+        <p style="font-size:11px;color:#9CA3AF;margin-top:10px;line-height:1.5;">Declining will trigger an Adverse Action Notice email as required by the Fair Credit Reporting Act (FCRA) and applicable state law.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--  JAVASCRIPT — Paste inside the existing <script type="module"> -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<!--
+  Add this block to the BOTTOM of the existing <script type="module"> tag
+  in admin.html, just before </script>
+-->
+
+<script type="text/template" id="admin-additions-js">
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  AVAILABILITY MANAGEMENT                                                ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+let _unitModalPropId = null;
+let _unitModalUnits  = [];
+let _allApplications = [];
+let _currentAppId    = null;
+
+async function loadAvailability() {
+  const el = document.getElementById('availability-list');
+  if (!el) return;
+  el.innerHTML = '<p style="font-size:13px;color:var(--slate);padding:20px;">Loading…</p>';
+  try {
+    el.innerHTML = allProperties.length === 0
+      ? '<p style="font-size:13px;color:var(--slate);padding:20px;">No properties yet. Add properties first.</p>'
+      : '';
+
+    for (const p of allProperties) {
+      // Load units sub-collection
+      let units = [];
+      try {
+        const uSnap = await getDocs(collection(db, 'properties', p.id, 'units'));
+        units = uSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (a.unitNumber || a.id).localeCompare(b.unitNumber || b.id));
+      } catch(_) {}
+
+      const isAvailable    = p.available === true;
+      const availableUnits = units.filter(u => u.available === true).length;
+
+      el.innerHTML += `
+        <div class="card" style="overflow:visible;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 22px;gap:12px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:15px;font-weight:600;color:var(--charcoal);margin-bottom:2px;">${p.name}</div>
+              <div style="font-size:12px;color:var(--slate);">${p.address || ''}${units.length ? ` · ${availableUnits} of ${units.length} units available` : ''}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;">
+              <!-- Property-level availability toggle -->
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:12px;color:var(--slate);">Show on listings page</span>
+                <label style="position:relative;display:inline-flex;align-items:center;cursor:pointer;">
+                  <input type="checkbox" id="avail-${p.id}" ${isAvailable ? 'checked' : ''}
+                    onchange="togglePropertyAvailability('${p.id}', this.checked)"
+                    style="width:0;height:0;opacity:0;position:absolute;">
+                  <div id="avail-track-${p.id}"
+                    style="width:44px;height:24px;border-radius:12px;background:${isAvailable ? '#16A34A' : '#D1D5DB'};position:relative;transition:background 0.2s;flex-shrink:0;">
+                    <div style="position:absolute;top:3px;left:${isAvailable ? '23px' : '3px'};width:18px;height:18px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);" id="avail-thumb-${p.id}"></div>
+                  </div>
+                </label>
+                <span id="avail-label-${p.id}" style="font-size:12px;font-weight:600;color:${isAvailable ? '#16A34A' : '#6B7280'};">${isAvailable ? 'Available' : 'Unlisted'}</span>
+              </div>
+              <!-- Unit management button -->
+              <button onclick="openUnitModal('${p.id}','${p.name.replace(/'/g,"\\'")}',${JSON.stringify(units).replace(/"/g,'&quot;')})"
+                class="btn btn-sm btn-outline">Manage Units</button>
+            </div>
+          </div>
+          ${units.length ? `
+          <div style="border-top:1px solid var(--border);overflow-x:auto;">
+            <table class="data-table">
+              <thead><tr>
+                <th>Unit</th><th>Beds</th><th>Baths</th><th>Rent</th><th>Available</th><th>Actions</th>
+              </tr></thead>
+              <tbody>
+                ${units.map(u => `<tr>
+                  <td style="font-weight:500;">Unit ${u.unitNumber || u.id}</td>
+                  <td>${u.beds || '—'}</td>
+                  <td>${u.baths || '—'}</td>
+                  <td>${u.monthlyRent ? '$' + Number(u.monthlyRent).toLocaleString() : '—'}</td>
+                  <td>
+                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                      <input type="checkbox" ${u.available ? 'checked' : ''}
+                        onchange="toggleUnitAvailability('${p.id}','${u.id}',this.checked)"
+                        style="accent-color:#16A34A;width:15px;height:15px;">
+                      <span style="font-size:12px;color:${u.available ? '#16A34A' : '#6B7280'};">${u.available ? 'Available' : 'Occupied'}</span>
+                    </label>
+                  </td>
+                  <td>
+                    <button onclick="deleteUnit('${p.id}','${u.id}')" class="btn btn-sm btn-danger" style="font-size:10px;padding:4px 8px;">Remove</button>
+                  </td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
+        </div>`;
+    }
+  } catch(e) {
+    el.innerHTML = `<p style="color:#DC2626;font-size:13px;padding:20px;">${e.message}</p>`;
+  }
+}
+
+window.togglePropertyAvailability = async (propId, available) => {
+  try {
+    await updateDoc(doc(db, 'properties', propId), { available, updatedAt: serverTimestamp() });
+    // Update toggle UI
+    document.getElementById(`avail-track-${propId}`).style.background = available ? '#16A34A' : '#D1D5DB';
+    document.getElementById(`avail-thumb-${propId}`).style.left = available ? '23px' : '3px';
+    document.getElementById(`avail-label-${propId}`).textContent = available ? 'Available' : 'Unlisted';
+    document.getElementById(`avail-label-${propId}`).style.color = available ? '#16A34A' : '#6B7280';
+  } catch(e) { alert('Error: ' + e.message); }
+};
+
+window.toggleUnitAvailability = async (propId, unitId, available) => {
+  try {
+    await updateDoc(doc(db, 'properties', propId, 'units', unitId), { available, updatedAt: serverTimestamp() });
+    // Reload to sync the "X of Y units available" counter
+    await loadAvailability();
+  } catch(e) { alert('Error: ' + e.message); }
+};
+
+window.openUnitModal = (propId, propName, units) => {
+  _unitModalPropId = propId;
+  _unitModalUnits  = Array.isArray(units) ? units : [];
+  document.getElementById('unit-modal-title').textContent = `Manage Units — ${propName}`;
+  document.getElementById('unit-modal-prop-name').textContent = propName;
+  document.getElementById('unit-alert').classList.add('hidden');
+  document.getElementById('new-unit-num').value   = '';
+  document.getElementById('new-unit-rent').value  = '';
+  document.getElementById('new-unit-beds').value  = '';
+  document.getElementById('new-unit-baths').value = '';
+  renderUnitList();
+  openModal('unit-modal');
+};
+
+function renderUnitList() {
+  const el = document.getElementById('unit-list');
+  if (!_unitModalUnits.length) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--slate);">No units yet. Add units below.</p>';
+    return;
+  }
+  el.innerHTML = `<table class="data-table" style="margin-bottom:0;">
+    <thead><tr><th>Unit</th><th>Rent</th><th>Beds</th><th>Baths</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      ${_unitModalUnits.map(u => `<tr>
+        <td>Unit ${u.unitNumber || u.id}</td>
+        <td>${u.monthlyRent ? '$' + Number(u.monthlyRent).toLocaleString() : '—'}</td>
+        <td>${u.beds || '—'}</td>
+        <td>${u.baths || '—'}</td>
+        <td><span class="badge ${u.available ? 'badge-active' : 'badge-pending'}">${u.available ? 'Available' : 'Occupied'}</span></td>
+        <td><button onclick="deleteUnit('${_unitModalPropId}','${u.id}')" class="btn btn-sm btn-danger" style="font-size:10px;padding:3px 8px;">✕</button></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+window.addUnit = async () => {
+  const unitNumber = document.getElementById('new-unit-num').value.trim();
+  if (!unitNumber) { showAlert('unit-alert', 'Unit number is required.'); return; }
+  try {
+    const data = {
+      unitNumber,
+      monthlyRent: parseFloat(document.getElementById('new-unit-rent').value) || null,
+      beds:        parseFloat(document.getElementById('new-unit-beds').value)  || null,
+      baths:       parseFloat(document.getElementById('new-unit-baths').value) || null,
+      available:   true,
+      createdAt:   serverTimestamp(),
+      updatedAt:   serverTimestamp(),
+    };
+    const ref = await addDoc(collection(db, 'properties', _unitModalPropId, 'units'), data);
+    _unitModalUnits.push({ id: ref.id, ...data });
+    document.getElementById('new-unit-num').value   = '';
+    document.getElementById('new-unit-rent').value  = '';
+    document.getElementById('new-unit-beds').value  = '';
+    document.getElementById('new-unit-baths').value = '';
+    renderUnitList();
+    await loadAvailability();
+  } catch(e) { showAlert('unit-alert', e.message); }
+};
+
+window.deleteUnit = async (propId, unitId) => {
+  if (!confirm('Remove this unit? Any pending applications for this unit will not be automatically declined.')) return;
+  try {
+    await deleteDoc(doc(db, 'properties', propId, 'units', unitId));
+    _unitModalUnits = _unitModalUnits.filter(u => u.id !== unitId);
+    renderUnitList();
+    await loadAvailability();
+  } catch(e) { alert('Error: ' + e.message); }
+};
+
+
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  APPLICATIONS MANAGEMENT                                                ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
+async function loadApplications() {
+  try {
+    const snap = await getDocs(query(collection(db, 'applications'), orderBy('submittedAt', 'desc')));
+    _allApplications = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderApplicationsTable(_allApplications);
+    updateAppStats(_allApplications);
+    updateAppBadge(_allApplications);
+    // Populate property filter
+    const propSel = document.getElementById('app-filter-prop');
+    if (propSel) {
+      const used = [...new Set(_allApplications.map(a => a.propertyId).filter(Boolean))];
+      const existingOpts = Array.from(propSel.options).map(o => o.value);
+      used.forEach(pid => {
+        if (!existingOpts.includes(pid)) {
+          const pName = allProperties.find(p => p.id === pid)?.name || pid;
+          const opt = document.createElement('option');
+          opt.value = pid; opt.text = pName;
+          propSel.appendChild(opt);
+        }
+      });
+    }
+  } catch(e) { console.error('loadApplications:', e); }
+}
+
+function updateAppStats(apps) {
+  document.getElementById('app-stat-total').textContent    = apps.length;
+  document.getElementById('app-stat-pending').textContent  = apps.filter(a => a.status === 'pending').length;
+  document.getElementById('app-stat-approved').textContent = apps.filter(a => a.status === 'approved').length;
+  document.getElementById('app-stat-declined').textContent = apps.filter(a => a.status === 'declined').length;
+}
+
+function updateAppBadge(apps) {
+  const badge = document.getElementById('apps-badge');
+  if (!badge) return;
+  const pending = apps.filter(a => a.status === 'pending').length;
+  badge.textContent = pending;
+  badge.style.display = pending > 0 ? '' : 'none';
+}
+
+window.filterApplications = () => {
+  const statusFilter = document.getElementById('app-filter-status').value;
+  const propFilter   = document.getElementById('app-filter-prop').value;
+  let filtered = _allApplications;
+  if (statusFilter) filtered = filtered.filter(a => a.status === statusFilter);
+  if (propFilter)   filtered = filtered.filter(a => a.propertyId === propFilter);
+  renderApplicationsTable(filtered);
+};
+
+function renderApplicationsTable(apps) {
+  const tbody = document.getElementById('applications-tbody');
+  if (!apps.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">No applications found.</td></tr>';
+    return;
+  }
+  const statusMap = {
+    pending:   { class: 'badge-pending',    label: 'Pending' },
+    approved:  { class: 'badge-active',     label: 'Approved' },
+    declined:  { class: 'badge-failed',     label: 'Declined' },
+    withdrawn: { class: 'badge-pending',    label: 'Withdrawn' },
+  };
+  tbody.innerHTML = apps.map(a => {
+    const date = a.submittedAt?.toDate ? a.submittedAt.toDate().toLocaleDateString() : '—';
+    const s    = statusMap[a.status] || { class: 'badge-pending', label: a.status };
+    const consentIcons = [
+      a.consent?.dataCollection  ? '✓ Data' : '✗ Data',
+      a.consent?.backgroundCheck ? '✓ BGC'  : '— BGC',
+      a.consent?.terms           ? '✓ Terms': '✗ Terms',
+    ].join('  ');
+    return `<tr>
+      <td style="font-size:12px;white-space:nowrap;">${date}</td>
+      <td>
+        <div style="font-weight:500;">${a.firstName || ''} ${a.lastName || ''}</div>
+        <div style="font-size:11px;color:var(--slate);">${a.email || ''}</div>
+      </td>
+      <td style="font-size:12px;">${a.propertyName || '—'}${a.unitLabel ? '<br><span style="color:var(--slate);">' + a.unitLabel + '</span>' : ''}</td>
+      <td style="font-size:12px;">${a.moveInDate || '—'}</td>
+      <td style="font-size:12px;">${a.income ? '$' + Number(a.income).toLocaleString() + '/mo' : '—'}</td>
+      <td style="font-size:11px;font-family:monospace;color:var(--slate);white-space:nowrap;">${consentIcons}</td>
+      <td><span class="badge ${s.class}">${s.label}</span></td>
+      <td>
+        <button onclick="openAppDetail('${a.id}')" class="btn btn-sm btn-outline">Review</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.openAppDetail = (appId) => {
+  _currentAppId = appId;
+  const a = _allApplications.find(x => x.id === appId);
+  if (!a) return;
+
+  document.getElementById('app-modal-name').textContent = `${a.firstName || ''} ${a.lastName || ''}`;
+  document.getElementById('app-modal-prop').textContent = `${a.propertyName || '—'}${a.unitLabel ? ' — ' + a.unitLabel : ''} · Application #${a.applicationId || appId.substring(0, 8).toUpperCase()}`;
+  document.getElementById('app-modal-alert').classList.add('hidden');
+  document.getElementById('app-admin-notes').value = a.adminNotes || '';
+
+  // Details grid
+  const details = [
+    ['Email',            a.email            || '—'],
+    ['Phone',            a.phone            || '—'],
+    ['Desired Move-in',  a.moveInDate       || '—'],
+    ['Monthly Income',   a.income ? '$' + Number(a.income).toLocaleString() : '—'],
+    ['Employer',         a.currentEmployer  || '—'],
+    ['Pets',             a.pets             || 'None'],
+    ['Status',           `<span class="badge badge-${a.status||'pending'}">${a.status||'pending'}</span>`],
+    ['Submitted',        a.submittedAt?.toDate ? a.submittedAt.toDate().toLocaleString() : '—'],
+  ];
+  document.getElementById('app-modal-details').innerHTML = details.map(([k, v]) =>
+    `<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin-bottom:3px;">${k}</div><div style="font-size:13px;">${v}</div></div>`
+  ).join('');
+
+  // Message
+  const msgWrap = document.getElementById('app-modal-message-wrap');
+  if (a.message) {
+    msgWrap.style.display = '';
+    document.getElementById('app-modal-message').textContent = a.message;
+  } else { msgWrap.style.display = 'none'; }
+
+  // Consents
+  const c = a.consent || {};
+  document.getElementById('app-modal-consents').innerHTML = `
+    <div>${c.dataCollection  ? '✅' : '❌'} <strong>Data collection consent</strong></div>
+    <div>${c.backgroundCheck ? '✅' : '—'} Background check authorization</div>
+    <div>${c.terms           ? '✅' : '❌'} <strong>Accuracy certification</strong></div>
+    <div style="margin-top:6px;color:#6B7280;">Recorded: ${c.recordedAt || '—'}</div>
+    <div style="color:#6B7280;">IP: ${c.ipAddress || a.ipAddress || '—'}</div>`;
+
+  openModal('app-detail-modal');
+};
+
+window.updateAppStatus = async (status) => {
+  if (!_currentAppId) return;
+  const notes = document.getElementById('app-admin-notes').value.trim();
+  const label = { approved: 'Approve', declined: 'Decline', pending: 'Reset to Pending' }[status] || status;
+  if (status === 'declined' && !confirm(`Declining will send an Adverse Action Notice email to the applicant as required by law. Continue?`)) return;
+  if (status === 'approved' && !confirm(`Approve this application? An approval email will be sent to the applicant.`)) return;
+  try {
+    const res  = await fetch('/api/update-application', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        applicationId: _currentAppId, status, adminNotes: notes,
+        siteName: document.getElementById('admin-email-label')?.textContent || '',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Update failed');
+    closeModal('app-detail-modal');
+    await loadApplications();
+  } catch(e) {
+    const alertEl = document.getElementById('app-modal-alert');
+    alertEl.className = 'alert alert-error'; alertEl.textContent = e.message; alertEl.classList.remove('hidden');
+  }
+};
+
+window.requestDataDeletion = async () => {
+  if (!_currentAppId) return;
+  const a = _allApplications.find(x => x.id === _currentAppId);
+  if (!confirm(`Delete all personal data for ${a?.firstName} ${a?.lastName}? This logs a deletion request and removes PII. This action cannot be undone.`)) return;
+  try {
+    // Redact PII in-place (safer than hard-delete for audit compliance)
+    await updateDoc(doc(db, 'applications', _currentAppId), {
+      firstName:       '[DELETED]',
+      lastName:        '[DELETED]',
+      email:           '[DELETED]',
+      phone:           null,
+      income:          null,
+      currentEmployer: null,
+      message:         null,
+      'consent.ipAddress': '[DELETED]',
+      'consent.userAgent': '[DELETED]',
+      ipAddress:       '[DELETED]',
+      deletionRequested: true,
+      deletedAt:       serverTimestamp(),
+      updatedAt:       serverTimestamp(),
+    });
+    // Audit log
+    await addDoc(collection(db, 'applicationAuditLog'), {
+      applicationId:  _currentAppId,
+      action:         'pii_deleted_by_admin',
+      applicantEmail: a?.email || '[unknown]',
+      timestamp:      serverTimestamp(),
+    });
+    closeModal('app-detail-modal');
+    await loadApplications();
+    alert('✓ Personal data has been redacted from this application record.');
+  } catch(e) { alert('Error: ' + e.message); }
+};
+
+// ── Hook into section switching ──────────────────────────────────────────────
+// Extend the existing switchSection so availability + applications load on demand
+const _origSwitchSection = window.switchSection;
+window.switchSection = (id, btn) => {
+  _origSwitchSection(id, btn);
+  if (id === 'availability')  loadAvailability();
+  if (id === 'applications')  loadApplications();
+};
+// Add new titles to page-title map by patching the existing titles inside switchSection
+// (already handled by STEP 2 instruction above)
+</script>
+
+<!--
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 5 — Also add the following to loadAll() in admin.html
+         so the pending badge populates on first load:
+
+  async function loadAll() {
+    await Promise.all([..., loadApplicationsCount()]);  // add this
+    ...
+  }
+
+  async function loadApplicationsCount() {
+    try {
+      const snap = await getDocs(query(collection(db,'applications'),where('status','==','pending')));
+      const badge = document.getElementById('apps-badge');
+      if (badge) { badge.textContent = snap.size; badge.style.display = snap.size > 0 ? '' : 'none'; }
+    } catch(_) {}
+  }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 6 — Update netlify.toml to add apply.html clean URL redirect:
+
+[[redirects]]
+  from   = "/apply"
+  to     = "/apply.html"
+  status = 200
+
+Also add the two new functions to your Netlify deployment — they are already
+in netlify/functions/ from the files created above:
+  • submit-application.js
+  • update-application.js
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 7 — Add Firestore security rules for the new collections:
+
+    match /applications/{docId} {
+      allow read, update: if request.auth != null && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data != null;
+      allow create: if true;  // public submission — server validates consent
+      allow delete: if false; // deletion is redaction only, done via admin SDK
+    }
+    match /applicationAuditLog/{docId} {
+      allow read: if request.auth != null && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data != null;
+      allow write: if false; // written by server only
+    }
+    match /properties/{propId}/units/{unitId} {
+      allow read: if true;
+      allow write: if request.auth != null && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data != null;
+    }
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+-->
