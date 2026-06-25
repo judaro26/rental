@@ -596,6 +596,7 @@
   // ── Load available properties ────────────────────────────────────────────
   async function loadListings() {
     const grid = document.getElementById('properties-grid');
+    document.getElementById('empty-state').style.display = 'none';
     try {
       // Load properties where available = true
       const snap = await getDocs(
@@ -618,13 +619,14 @@
         } catch(_) {}
 
         const availableUnits = unitsSnap ? unitsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
+        const propHasUnits = unitsSnap ? unitsSnap.docs.length > 0 : false;
+        const hasUnits = availableUnits.length > 0;
+        if (propHasUnits && !hasUnits) { continue; }
         hasAny = true;
 
         // Images
         const imgs = (p.imageUrls && p.imageUrls.length) ? p.imageUrls : (p.imageUrl ? [p.imageUrl] : []);
         const mainImg = imgs[0] || 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=700&q=80';
-
-        const hasUnits = availableUnits.length > 0;
 
         const unitsHtml = hasUnits
           ? `<div class="card-units">
