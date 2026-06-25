@@ -848,6 +848,26 @@
   </div>
 </div>
 
+<!-- APPLICATION PREVIEW MODAL -->
+<div id="application-preview-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('application-preview-modal')"></div>
+  <div style="display:flex;align-items:flex-start;justify-content:center;min-height:100vh;padding:40px 16px;">
+    <div style="background:#fff;width:100%;max-width:680px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;margin:auto;">
+      <button onclick="closeModal('application-preview-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+        <div>
+          <h3 id="application-preview-title" style="font-size:1.8rem;font-weight:400;margin-bottom:6px;">Application Preview</h3>
+          <p style="margin:0;color:#64748B;font-size:0.95rem;">Review applicant details and update status from one screen.</p>
+        </div>
+        <div id="application-preview-status" style="margin-top:4px;"></div>
+      </div>
+      <div id="application-preview-alert" class="hidden alert" style="margin-top:16px;"></div>
+      <div id="application-preview-details" style="margin-top:24px;color:#334155;"></div>
+      <div id="application-preview-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:28px;"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MAINTENANCE UPDATE MODAL -->
 <div id="maint-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('maint-modal')"></div>
@@ -1028,6 +1048,34 @@
     renderTenantsTable(allTenants);
     populateTenantSelects();
   }
+  function renderTenantsTable(tenants) {
+    const tbody = document.getElementById('tenants-tbody');
+    if (!tenants.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No tenants found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = tenants.map(t => {
+      const name = `${t.firstName||''} ${t.lastName||''}`.trim() || 'Unknown';
+      const property = `${t.propertyName||'—'}${t.unit ? ' / ' + t.unit : ''}`;
+      const rent = t.monthlyRent ? '$' + Number(t.monthlyRent).toLocaleString(undefined,{minimumFractionDigits:2}) : '—';
+      const leaseEnd = t.leaseEnd || '—';
+      const status = t.status || 'pending';
+      return `<tr>
+        <td>${name}</td>
+        <td style="font-size:12px;">${t.email||'—'}</td>
+        <td style="font-size:12px;">${property}</td>
+        <td>${rent}</td>
+        <td>${leaseEnd}</td>
+        <td><span class="badge badge-${status}">${status}</span></td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${status !== 'active' ? `<button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success">Approve</button>` : ''}
+            <button onclick="openEditTenant('${t.id}')" class="btn btn-sm btn-outline">Edit</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
   async function loadApplications() {
     const snap = await getDocs(query(collection(db,'applications'), orderBy('submittedAt','desc')));
     allApplications = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1084,10 +1132,51 @@
 
   window.viewApplicationDetails = (id) => {
     const app = allApplications.find(a => a.id === id);
-    if (!app) return alert('Application details not found.');
+    if (!app) return showAlert ? showAlert('application-preview-alert', 'Application details not found.') : alert('Application details not found.');
     const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : (app.submittedAt || '—');
-    const details = `Applicant: ${app.firstName||''} ${app.lastName||''}\nEmail: ${app.email||''}\nPhone: ${app.phone||'—'}\nProperty: ${app.propertyName||''}${app.unitLabel ? ' — ' + app.unitLabel : ''}\nMove-in Date: ${app.moveInDate||'—'}\nIncome: ${app.income ? '$' + Number(app.income).toLocaleString() : '—'}\nEmployer: ${app.currentEmployer||'—'}\nStatus: ${app.status||'pending'}\nSubmitted: ${submitted}\n\nMessage:\n${app.message||'No message provided.'}`;
-    alert(details);
+    document.getElementById('application-preview-title').textContent = `${app.firstName||''} ${app.lastName||''}`.trim() || 'Application Preview';
+    document.getElementById('application-preview-status').innerHTML = `<span class="badge badge-${app.status||'pending'}">${app.status||'pending'}</span>`;
+    document.getElementById('application-preview-details').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <h4>Applicant</h4>
+          <p><strong>${app.firstName||''} ${app.lastName||''}</strong></p>
+          <p>${app.email||'—'}</p>
+          <p>${app.phone||'—'}</p>
+        </div>
+        <div>
+          <h4>Property</h4>
+          <p>${app.propertyName||'—'}</p>
+          <p>${app.unitLabel || '—'}</p>
+          <p>Move-in: ${app.moveInDate||'—'}</p>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;">
+        <div>
+          <h4>Income</h4>
+          <p>${app.income ? '$' + Number(app.income).toLocaleString() : '—'}</p>
+          <h4 style="margin-top:14px;">Employer</h4>
+          <p>${app.currentEmployer||'—'}</p>
+        </div>
+        <div>
+          <h4>Submitted</h4>
+          <p>${submitted}</p>
+          <h4 style="margin-top:14px;">Status</h4>
+          <p>${app.status||'pending'}</p>
+        </div>
+      </div>
+      <div style="margin-top:22px;">
+        <h4>Message</h4>
+        <p style="white-space:pre-wrap;line-height:1.5;color:#334155;">${app.message ? escapeHtml(app.message) : 'No message provided.'}</p>
+      </div>
+    `;
+    const previewActions = document.getElementById('application-preview-actions');
+    previewActions.innerHTML = `
+      ${app.status !== 'approved' ? `<button onclick="updateApplicationStatus('${app.id}','approved')" class="btn btn-success">Approve</button>` : ''}
+      ${app.status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-danger">Decline</button>` : ''}
+      <button onclick="closeModal('application-preview-modal')" class="btn btn-outline">Close</button>
+    `;
+    openModal('application-preview-modal');
   };
   window.filterTenants = () => {
     const q = document.getElementById('tenant-search').value.toLowerCase();
@@ -1563,6 +1652,14 @@
   function showAlert(elId, msg, type='error') {
     const el = document.getElementById(elId); if (!el) return;
     el.className=`alert alert-${type}`; el.textContent=msg; el.classList.remove('hidden');
+  }
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   // ===== INVITATIONS =====
