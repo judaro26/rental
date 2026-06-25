@@ -90,6 +90,10 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Tenants
     </button>
+    <button class="nav-item" onclick="switchSection('applications',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4z"/><path d="M4 9h16"/><path d="M8 13l4 4 4-4"/></svg>
+      Applications
+    </button>
     <button class="nav-item" onclick="switchSection('invitations',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
       Invitations
@@ -227,6 +231,30 @@
           <table class="data-table">
             <thead><tr><th>Name</th><th>Email</th><th>Property / Unit</th><th>Rent</th><th>Lease End</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="tenants-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- APPLICATIONS -->
+    <section id="section-applications" class="section">
+      <div class="card">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">Applications</h3>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="application-search" class="form-input" style="width:220px;" placeholder="Search applicant, email, property..." oninput="filterApplications()">
+            <select id="application-status-filter" class="form-input" style="width:170px;" onchange="filterApplications()">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="declined">Declined</option>
+            </select>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th>Applicant</th><th>Email</th><th>Property / Unit</th><th>Status</th><th>Submitted</th><th>Actions</th></tr></thead>
+            <tbody id="applications-tbody"><tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -902,7 +930,7 @@
 
   let allTenants = [], allPayments = [], allMaintenance = [], allProperties = [], allDocuments = [],
       allAnnouncements = [], allInvites = [], allSupport = [], allInvoices = [], allFinancials = [],
-      allVendors = [], allConsents = [], allFeatures = [], allAuditLogs = [];
+      allVendors = [], allConsents = [], allFeatures = [], allAuditLogs = [], allApplications = [];
 
   onAuthStateChanged(auth, async user => {
     if (!user) { window.location.href = '/index.html'; return; }
@@ -914,7 +942,7 @@
   });
 
   async function loadAll() {
-    await Promise.all([loadProperties(), loadTenants(), loadPayments(), loadDocuments(), loadMaintenance(),
+    await Promise.all([loadProperties(), loadTenants(), loadApplications(), loadPayments(), loadDocuments(), loadMaintenance(),
       loadAnnouncements(), loadSettings(), loadInvites(), loadSupport(), loadInvoices(),
       loadFinancials(), loadVendors(), loadConsents(), loadFeatures()]);
     updateDashboardStats();
@@ -1000,25 +1028,67 @@
     renderTenantsTable(allTenants);
     populateTenantSelects();
   }
-  function renderTenantsTable(tenants) {
-    const tbody = document.getElementById('tenants-tbody');
-    if (!tenants.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No tenants found.</td></tr>'; return; }
-    tbody.innerHTML = tenants.map(t => {
-      const pName = allProperties.find(p=>p.id===t.propertyId)?.name || t.propertyName || '—';
+  async function loadApplications() {
+    const snap = await getDocs(query(collection(db,'applications'), orderBy('submittedAt','desc')));
+    allApplications = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderApplicationsTable(allApplications);
+  }
+  function renderApplicationsTable(apps) {
+    const tbody = document.getElementById('applications-tbody');
+    if (!apps.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px;">No applications found.</td></tr>'; return; }
+    tbody.innerHTML = apps.map(app => {
+      const applicant = `${app.firstName||''} ${app.lastName||''}`.trim() || 'Applicant';
+      const property = `${app.propertyName||'Unknown property'}${app.unitLabel ? ' — ' + app.unitLabel : ''}`;
+      const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleDateString() : (app.submittedAt || '—');
+      const status = app.status || 'pending';
       return `<tr>
-        <td><strong>${t.firstName||''} ${t.lastName||''}</strong></td>
-        <td style="font-size:12px;">${t.email||'—'}</td>
-        <td style="font-size:12px;">${pName} / ${t.unit||'—'}</td>
-        <td>$${Number(t.monthlyRent||0).toLocaleString()}</td>
-        <td style="font-size:12px;">${t.leaseEnd||'—'}</td>
-        <td><span class="badge badge-${t.status||'pending'}">${t.status||'pending'}</span></td>
+        <td><strong>${applicant}</strong></td>
+        <td style="font-size:12px;">${app.email||'—'}</td>
+        <td style="font-size:12px;">${property}</td>
+        <td><span class="badge badge-${status}">${status}</span></td>
+        <td style="font-size:12px;">${submitted}</td>
         <td>
-          <button onclick="openEditTenant('${t.id}')" class="btn btn-sm btn-outline" style="margin-right:6px;">Edit</button>
-          ${t.status==='pending'?`<button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success">Approve</button>`:''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${status !== 'approved' ? `<button onclick="updateApplicationStatus('${app.id}','approved')" class="btn btn-sm btn-success">Approve</button>` : ''}
+            ${status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-sm btn-danger">Decline</button>` : ''}
+            <button onclick="viewApplicationDetails('${app.id}')" class="btn btn-sm btn-outline">View</button>
+          </div>
         </td>
       </tr>`;
     }).join('');
   }
+  window.filterApplications = () => {
+    const q = document.getElementById('application-search').value.toLowerCase();
+    const status = document.getElementById('application-status-filter').value;
+    const filtered = allApplications.filter(app => {
+      const text = `${app.firstName||''} ${app.lastName||''} ${app.email||''} ${app.propertyName||''} ${app.unitLabel||''}`.toLowerCase();
+      const matchesText = !q || text.includes(q);
+      const matchesStatus = !status || (app.status === status);
+      return matchesText && matchesStatus;
+    });
+    renderApplicationsTable(filtered);
+  };
+
+  window.updateApplicationStatus = async (id, status) => {
+    try {
+      await updateDoc(doc(db, 'applications', id), { status, updatedAt: serverTimestamp() });
+      await loadApplications();
+      if (status === 'approved' || status === 'declined') {
+        // Optionally refresh tenant list if properties / applicant records may change
+        await loadTenants();
+      }
+    } catch (e) {
+      alert('Error updating application status: ' + e.message);
+    }
+  };
+
+  window.viewApplicationDetails = (id) => {
+    const app = allApplications.find(a => a.id === id);
+    if (!app) return alert('Application details not found.');
+    const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : (app.submittedAt || '—');
+    const details = `Applicant: ${app.firstName||''} ${app.lastName||''}\nEmail: ${app.email||''}\nPhone: ${app.phone||'—'}\nProperty: ${app.propertyName||''}${app.unitLabel ? ' — ' + app.unitLabel : ''}\nMove-in Date: ${app.moveInDate||'—'}\nIncome: ${app.income ? '$' + Number(app.income).toLocaleString() : '—'}\nEmployer: ${app.currentEmployer||'—'}\nStatus: ${app.status||'pending'}\nSubmitted: ${submitted}\n\nMessage:\n${app.message||'No message provided.'}`;
+    alert(details);
+  };
   window.filterTenants = () => {
     const q = document.getElementById('tenant-search').value.toLowerCase();
     renderTenantsTable(allTenants.filter(t => `${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(q)));
@@ -2302,7 +2372,7 @@
     document.getElementById('section-'+id).classList.add('active');
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     if(btn) btn.classList.add('active');
-    const titles={dashboard:'Dashboard',properties:'Properties',tenants:'Tenants',payments:'Payments',documents:'Documents',maintenance:'Maintenance',announcements:'Announcements',invitations:'Invitations',invoices:'Invoices & Receipts',consents:'Auto-Pay Consents',features:'Feature Requests',financials:'Financials',vendors:'Vendor Directory',audit:'Audit Log',support:'Support',settings:'Settings'};
+    const titles={dashboard:'Dashboard',properties:'Properties',tenants:'Tenants',applications:'Applications',payments:'Payments',documents:'Documents',maintenance:'Maintenance',announcements:'Announcements',invitations:'Invitations',invoices:'Invoices & Receipts',consents:'Auto-Pay Consents',features:'Feature Requests',financials:'Financials',vendors:'Vendor Directory',audit:'Audit Log',support:'Support',settings:'Settings'};
     document.getElementById('page-title').textContent=titles[id]||id;
     document.getElementById('sidebar').classList.remove('open');
     if(id==='audit'&&!allAuditLogs.length) loadAuditLog(true);
