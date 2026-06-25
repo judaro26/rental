@@ -598,10 +598,8 @@
     const grid = document.getElementById('properties-grid');
     document.getElementById('empty-state').style.display = 'none';
     try {
-      // Load properties where available = true
-      const snap = await getDocs(
-        query(collection(db, 'properties'), where('available', '==', true))
-      );
+      // Load all property records, then show only those that are available or have available units.
+      const snap = await getDocs(collection(db, 'properties'));
 
       grid.innerHTML = '';
       let hasAny = false;
@@ -621,7 +619,8 @@
         const availableUnits = unitsSnap ? unitsSnap.docs.map(d => ({ id: d.id, ...d.data() })) : [];
         const propHasUnits = unitsSnap ? unitsSnap.docs.length > 0 : false;
         const hasUnits = availableUnits.length > 0;
-        if (propHasUnits && !hasUnits) { continue; }
+        if (!p.available && propHasUnits && !hasUnits) { continue; }
+        if (!p.available && !propHasUnits) { continue; }
         hasAny = true;
 
         // Images
