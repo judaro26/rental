@@ -297,24 +297,27 @@ exports.handler = async (event) => {
     // ── Send emails ──────────────────────────────────────────────────────────
     if (process.env.SMTP_HOST) {
       const transporter = getTransporter();
-
-      // Confirmation to applicant
-      await transporter.sendMail({
-        from:    process.env.SMTP_FROM || process.env.SMTP_USER,
-        to:      email,
-        subject: `Application Received — ${propertyName || propData.name} (#${applicationId})`,
-        html:    buildApplicantEmail({ firstName, propertyName: propertyName || propData.name, unitLabel, applicationId, siteName, siteUrl, submittedAt }),
-      });
-
-      // Notification to admin
-      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
-      if (adminEmail) {
+      try {
+        // Confirmation to applicant
         await transporter.sendMail({
           from:    process.env.SMTP_FROM || process.env.SMTP_USER,
-          to:      adminEmail,
-          subject: `📋 New Application — ${firstName} ${lastName} for ${propertyName || propData.name} (#${applicationId})`,
-          html:    buildAdminEmail({ firstName, lastName, email, phone, propertyName: propertyName || propData.name, unitLabel, applicationId, income, currentEmployer, moveInDate, message, consentGiven: true, submittedAt, siteName, siteUrl }),
+          to:      email,
+          subject: `Application Received — ${propertyName || propData.name} (#${applicationId})`,
+          html:    buildApplicantEmail({ firstName, propertyName: propertyName || propData.name, unitLabel, applicationId, siteName, siteUrl, submittedAt }),
         });
+
+        // Notification to admin
+        const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+        if (adminEmail) {
+          await transporter.sendMail({
+            from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+            to:      adminEmail,
+            subject: `📋 New Application — ${firstName} ${lastName} for ${propertyName || propData.name} (#${applicationId})`,
+            html:    buildAdminEmail({ firstName, lastName, email, phone, propertyName: propertyName || propData.name, unitLabel, applicationId, income, currentEmployer, moveInDate, message, consentGiven: true, submittedAt, siteName, siteUrl }),
+          });
+        }
+      } catch (emailErr) {
+        console.error('submit-application email error:', emailErr);
       }
     }
 
