@@ -58,6 +58,17 @@
     .alert { font-size:13px; padding:12px 16px; border-radius:2px; margin-bottom:16px; }
     .alert-error { background:#FEF2F2; border:1px solid #FECACA; color:#DC2626; }
     .alert-success { background:#F0FDF4; border:1px solid #BBF7D0; color:#16A34A; }
+    .preview-card { background:#FDF9F4; border:1px solid #E8E2D8; border-radius:8px; padding:18px; }
+    .preview-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .preview-section-title { font-size:0.95rem; font-weight:700; margin-bottom:12px; color:#0F172A; }
+    .preview-item { display:flex; flex-direction:column; gap:6px; font-size:0.95rem; }
+    .preview-item strong { color:#111827; }
+    .preview-item span { color:#475569; }
+    .review-fieldset { display:grid; gap:12px; }
+    .review-checkbox { display:flex; align-items:center; gap:10px; font-size:0.95rem; color:#334155; }
+    .review-checkbox input { width:16px; height:16px; accent-color:var(--charcoal); }
+    .review-notes { min-height:110px; resize:vertical; }
+    .application-preview-actions { display:flex; gap:12px; flex-wrap:wrap; margin-top:20px; }
     .modal-backdrop { backdrop-filter:blur(4px); background:rgba(26,26,46,0.55); }
     .priority-high { color:#DC2626; font-weight:600; }
     .priority-medium { color:#D97706; font-weight:600; }
@@ -253,8 +264,8 @@
         </div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Applicant</th><th>Email</th><th>Property / Unit</th><th>Status</th><th>Submitted</th><th>Actions</th></tr></thead>
-            <tbody id="applications-tbody"><tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+            <thead><tr><th>Applicant</th><th>Email</th><th>Property / Unit</th><th>Status</th><th>Review</th><th>Submitted</th><th>Actions</th></tr></thead>
+            <tbody id="applications-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1083,17 +1094,22 @@
   }
   function renderApplicationsTable(apps) {
     const tbody = document.getElementById('applications-tbody');
-    if (!apps.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px;">No applications found.</td></tr>'; return; }
+    if (!apps.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No applications found.</td></tr>'; return; }
     tbody.innerHTML = apps.map(app => {
       const applicant = `${app.firstName||''} ${app.lastName||''}`.trim() || 'Applicant';
       const property = `${app.propertyName||'Unknown property'}${app.unitLabel ? ' — ' + app.unitLabel : ''}`;
       const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleDateString() : (app.submittedAt || '—');
       const status = app.status || 'pending';
+      const reviewChecks = app.reviewChecks || {};
+      const reviewStatus = reviewChecks.creditPulled || reviewChecks.referencesVerified || reviewChecks.employmentConfirmed
+        ? (reviewChecks.creditPulled && reviewChecks.referencesVerified && reviewChecks.employmentConfirmed ? 'Review complete' : 'Review in progress')
+        : 'Review not started';
       return `<tr>
         <td><strong>${applicant}</strong></td>
         <td style="font-size:12px;">${app.email||'—'}</td>
         <td style="font-size:12px;">${property}</td>
         <td><span class="badge badge-${status}">${status}</span></td>
+        <td style="font-size:12px;color:#64748B;">${reviewStatus}</td>
         <td style="font-size:12px;">${submitted}</td>
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -1119,10 +1135,15 @@
 
   window.updateApplicationStatus = async (id, status) => {
     try {
-      await updateDoc(doc(db, 'applications', id), { status, updatedAt: serverTimestamp() });
+      const res = await fetch('/api/update-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: id, status }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Unable to update status.');
       await loadApplications();
       if (status === 'approved' || status === 'declined') {
-        // Optionally refresh tenant list if properties / applicant records may change
         await loadTenants();
       }
     } catch (e) {
@@ -1130,52 +1151,104 @@
     }
   };
 
+  window.saveApplicationReview = async () => {
+    const modal = document.getElementById('application-preview-modal');
+    const appId = modal.dataset.appId;
+    if (!appId) return;
+    try {
+      const reviewChecks = {
+        creditPulled: document.getElementById('review-credit-pulled').checked,
+        referencesVerified: document.getElementById('review-references-verified').checked,
+        employmentConfirmed: document.getElementById('review-employment-confirmed').checked,
+      };
+      const notes = document.getElementById('application-review-notes').value.trim() || null;
+      const res = await fetch('/api/update-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: appId,
+          reviewChecks,
+          adminNotes: notes,
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unable to save review.');
+      await loadApplications();
+      showAlert('application-preview-alert', 'Review saved successfully.', 'success');
+    } catch (e) {
+      showAlert('application-preview-alert', e.message);
+    }
+  };
+
   window.viewApplicationDetails = (id) => {
     const app = allApplications.find(a => a.id === id);
     if (!app) return showAlert ? showAlert('application-preview-alert', 'Application details not found.') : alert('Application details not found.');
     const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : (app.submittedAt || '—');
+    const reviewChecks = app.reviewChecks || {};
+    const reviewComplete = reviewChecks.creditPulled && reviewChecks.referencesVerified && reviewChecks.employmentConfirmed;
     document.getElementById('application-preview-title').textContent = `${app.firstName||''} ${app.lastName||''}`.trim() || 'Application Preview';
     document.getElementById('application-preview-status').innerHTML = `<span class="badge badge-${app.status||'pending'}">${app.status||'pending'}</span>`;
     document.getElementById('application-preview-details').innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        <div>
-          <h4>Applicant</h4>
-          <p><strong>${app.firstName||''} ${app.lastName||''}</strong></p>
-          <p>${app.email||'—'}</p>
-          <p>${app.phone||'—'}</p>
+      <div class="preview-grid">
+        <div class="preview-card">
+          <div class="preview-section-title">Applicant</div>
+          <div class="preview-item">
+            <strong>${app.firstName||''} ${app.lastName||''}</strong>
+            <span>${app.email||'No email provided'}</span>
+            <span>${app.phone||'No phone provided'}</span>
+          </div>
         </div>
-        <div>
-          <h4>Property</h4>
-          <p>${app.propertyName||'—'}</p>
-          <p>${app.unitLabel || '—'}</p>
-          <p>Move-in: ${app.moveInDate||'—'}</p>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;">
-        <div>
-          <h4>Income</h4>
-          <p>${app.income ? '$' + Number(app.income).toLocaleString() : '—'}</p>
-          <h4 style="margin-top:14px;">Employer</h4>
-          <p>${app.currentEmployer||'—'}</p>
-        </div>
-        <div>
-          <h4>Submitted</h4>
-          <p>${submitted}</p>
-          <h4 style="margin-top:14px;">Status</h4>
-          <p>${app.status||'pending'}</p>
+        <div class="preview-card">
+          <div class="preview-section-title">Property</div>
+          <div class="preview-item">
+            <span><strong>Location</strong> ${app.propertyName||'Unknown property'}</span>
+            <span><strong>Unit</strong> ${app.unitLabel||'N/A'}</span>
+            <span><strong>Move-in</strong> ${app.moveInDate||'N/A'}</span>
+          </div>
         </div>
       </div>
-      <div style="margin-top:22px;">
-        <h4>Message</h4>
-        <p style="white-space:pre-wrap;line-height:1.5;color:#334155;">${app.message ? escapeHtml(app.message) : 'No message provided.'}</p>
+      <div class="preview-grid" style="margin-top:18px;">
+        <div class="preview-card">
+          <div class="preview-section-title">Financial Details</div>
+          <div class="preview-item">
+            <span><strong>Income</strong> ${app.income ? '$' + Number(app.income).toLocaleString() : 'N/A'}</span>
+            <span><strong>Employer</strong> ${app.currentEmployer||'N/A'}</span>
+          </div>
+        </div>
+        <div class="preview-card">
+          <div class="preview-section-title">Application Info</div>
+          <div class="preview-item">
+            <span><strong>Submitted</strong> ${submitted}</span>
+            <span><strong>Status</strong> ${app.status||'pending'}</span>
+            <span><strong>Review</strong> ${reviewComplete ? 'Complete' : 'Incomplete'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Review Checklist</div>
+        <div class="review-fieldset">
+          <label class="review-checkbox"><input type="checkbox" id="review-credit-pulled" ${reviewChecks.creditPulled ? 'checked' : ''}/> Credit pull completed</label>
+          <label class="review-checkbox"><input type="checkbox" id="review-references-verified" ${reviewChecks.referencesVerified ? 'checked' : ''}/> References verified</label>
+          <label class="review-checkbox"><input type="checkbox" id="review-employment-confirmed" ${reviewChecks.employmentConfirmed ? 'checked' : ''}/> Employment confirmed</label>
+        </div>
+      </div>
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Admin Review Notes</div>
+        <textarea id="application-review-notes" class="form-input review-notes" rows="4" placeholder="Supply verification details or follow-up actions...">${escapeHtml(app.adminNotes || '')}</textarea>
+      </div>
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Message</div>
+        <div style="background:#fff;border:1px solid #E8E2D8;border-radius:8px;padding:16px;color:#334155;white-space:pre-wrap;line-height:1.7;">${app.message ? escapeHtml(app.message) : 'No message provided.'}</div>
       </div>
     `;
     const previewActions = document.getElementById('application-preview-actions');
     previewActions.innerHTML = `
       ${app.status !== 'approved' ? `<button onclick="updateApplicationStatus('${app.id}','approved')" class="btn btn-success">Approve</button>` : ''}
       ${app.status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-danger">Decline</button>` : ''}
+      <button onclick="saveApplicationReview()" class="btn btn-amber">Save Review</button>
       <button onclick="closeModal('application-preview-modal')" class="btn btn-outline">Close</button>
     `;
+    document.getElementById('application-preview-modal').dataset.appId = id;
     openModal('application-preview-modal');
   };
   window.filterTenants = () => {

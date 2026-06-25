@@ -28,11 +28,14 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { applicationId, status, adminNotes, siteName } = body;
-  if (!applicationId || !status) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'applicationId and status are required' }) };
+  const { applicationId, status, reviewChecks, adminNotes, siteName } = body;
+  if (!applicationId) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'applicationId is required' }) };
   }
-  if (!['approved', 'declined', 'withdrawn', 'pending'].includes(status)) {
+  if (!status && reviewChecks === undefined && adminNotes === undefined) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Nothing to update. Provide status, reviewChecks, or adminNotes.' }) };
+  }
+  if (status && !['approved', 'declined', 'withdrawn', 'pending'].includes(status)) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid status value' }) };
   }
 
@@ -47,23 +50,32 @@ exports.handler = async (event) => {
     }
     const app = appSnap.data();
 
-    // Update status
-    await db.collection('applications').doc(applicationId).update({
-      status,
-      adminNotes: adminNotes || null,
+    const updates = {
       updatedAt: a.firestore.FieldValue.serverTimestamp(),
-      ...(status === 'approved' ? { approvedAt: a.firestore.FieldValue.serverTimestamp() } : {}),
-      ...(status === 'declined' ? { declinedAt: a.firestore.FieldValue.serverTimestamp() } : {}),
-    });
+    };
+    if (status) {
+      updates.status = status;
+      if (status === 'approved') updates.approvedAt = a.firestore.FieldValue.serverTimestamp();
+      if (status === 'declined') updates.declinedAt = a.firestore.FieldValue.serverTimestamp();
+    }
+    if (reviewChecks !== undefined) {
+      updates.reviewChecks = reviewChecks;
+    }
+    if (adminNotes !== undefined) {
+      updates.adminNotes = adminNotes || null;
+    }
 
-    // Audit log
+    await db.collection('applications').doc(applicationId).update(updates);
+
+    const action = status ? `status_changed_to_${status}` : 'review_updated';
     await db.collection('applicationAuditLog').add({
       applicationId,
       shortId:       app.applicationId || applicationId.substring(0, 8).toUpperCase(),
-      action:        `status_changed_to_${status}`,
+      action,
       applicantEmail: app.email,
       propertyId:    app.propertyId,
       adminNotes:    adminNotes || null,
+      reviewChecks:  reviewChecks || null,
       timestamp:     a.firestore.FieldValue.serverTimestamp(),
     });
 
