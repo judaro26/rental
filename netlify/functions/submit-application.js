@@ -220,15 +220,22 @@ exports.handler = async (event) => {
       return { statusCode: 409, body: JSON.stringify({ error: 'This property is no longer accepting applications.' }) };
     }
 
-    // ── Check for duplicate application (same email + property, last 30 days) ─
+    // ── Check for duplicate application (same email + property, last 30 days)
+    // Use a single-field Firestore query to avoid requiring a composite index.
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const dupQuery = await db.collection('applications')
+    const dupSnap = await db.collection('applications')
       .where('email', '==', email)
-      .where('propertyId', '==', propertyId)
-      .where('submittedAt', '>=', a.firestore.Timestamp.fromDate(thirtyDaysAgo))
-      .limit(1).get();
+      .get();
 
-    if (!dupQuery.empty) {
+    const duplicateExists = dupSnap.docs.some(doc => {
+      const data = doc.data();
+      const submittedAtTs = data.submittedAt;
+      const isSameProperty = data.propertyId === propertyId;
+      const isRecent = submittedAtTs && submittedAtTs.toDate && submittedAtTs.toDate() >= thirtyDaysAgo;
+      return isSameProperty && isRecent;
+    });
+
+    if (duplicateExists) {
       return {
         statusCode: 409,
         body: JSON.stringify({ error: 'An application from this email address for this property was already submitted within the last 30 days. Please contact us if you need to update your application.' }),
