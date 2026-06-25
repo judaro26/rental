@@ -28,12 +28,12 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { applicationId, status, reviewChecks, adminNotes, siteName } = body;
+  const { applicationId, status, reviewChecks, adminNotes, creditCheckOrder, employmentVerificationOrder, siteName } = body;
   if (!applicationId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'applicationId is required' }) };
   }
-  if (!status && reviewChecks === undefined && adminNotes === undefined) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Nothing to update. Provide status, reviewChecks, or adminNotes.' }) };
+  if (!status && reviewChecks === undefined && adminNotes === undefined && !creditCheckOrder && !employmentVerificationOrder) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Nothing to update. Provide status, reviewChecks, adminNotes, or verification order flags.' }) };
   }
   if (status && !['approved', 'declined', 'withdrawn', 'pending'].includes(status)) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid status value' }) };
@@ -64,10 +64,97 @@ exports.handler = async (event) => {
     if (adminNotes !== undefined) {
       updates.adminNotes = adminNotes || null;
     }
+    if (creditCheckOrder) {
+      const creditProviderUrl = process.env.CREDIT_CHECK_API_URL;
+      const creditProviderKey = process.env.CREDIT_CHECK_API_KEY;
+      updates.creditCheckOrderedAt = a.firestore.FieldValue.serverTimestamp();
+      updates.creditCheckOrderedBy = 'admin';
+      updates.creditCheckStatus = 'ordered';
+      if (creditProviderUrl && creditProviderKey) {
+        try {
+          const providerResponse = await fetch(creditProviderUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${creditProviderKey}`,
+            },
+            body: JSON.stringify({
+              applicationId,
+              firstName: app.firstName,
+              lastName: app.lastName,
+              email: app.email,
+              phone: app.phone,
+              propertyName: app.propertyName,
+              unitLabel: app.unitLabel,
+              reason: 'Rental application credit check',
+              consent: app.consent || {},
+            }),
+          });
+          const providerData = await providerResponse.json();
+          if (providerResponse.ok) {
+            if (providerData.reportUrl) updates.creditReportUrl = providerData.reportUrl;
+            if (providerData.status) updates.creditCheckStatus = providerData.status;
+            updates.creditCheckProviderMessage = providerData.message || providerData.status || 'Credit check requested successfully';
+          } else {
+            updates.creditCheckStatus = 'order_failed';
+            updates.creditCheckProviderMessage = providerData.error || providerData.message || 'Credit provider returned an error';
+          }
+        } catch (err) {
+          updates.creditCheckStatus = 'order_error';
+          updates.creditCheckProviderMessage = err.message;
+        }
+      }
+    }
+    if (employmentVerificationOrder) {
+      const employmentProviderUrl = process.env.EMPLOYMENT_VERIFICATION_API_URL;
+      const employmentProviderKey = process.env.EMPLOYMENT_VERIFICATION_API_KEY;
+      updates.employmentVerificationOrderedAt = a.firestore.FieldValue.serverTimestamp();
+      updates.employmentVerificationOrderedBy = 'admin';
+      updates.employmentVerificationStatus = 'ordered';
+      if (employmentProviderUrl && employmentProviderKey) {
+        try {
+          const providerResponse = await fetch(employmentProviderUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${employmentProviderKey}`,
+            },
+            body: JSON.stringify({
+              applicationId,
+              firstName: app.firstName,
+              lastName: app.lastName,
+              email: app.email,
+              phone: app.phone,
+              currentEmployer: app.currentEmployer,
+              propertyName: app.propertyName,
+              unitLabel: app.unitLabel,
+              reason: 'Rental applicant employment verification',
+              consent: app.consent || {},
+            }),
+          });
+          const providerData = await providerResponse.json();
+          if (providerResponse.ok) {
+            if (providerData.reportUrl) updates.employmentReportUrl = providerData.reportUrl;
+            if (providerData.status) updates.employmentVerificationStatus = providerData.status;
+            updates.employmentVerificationProviderMessage = providerData.message || providerData.status || 'Verification requested successfully';
+          } else {
+            updates.employmentVerificationStatus = 'order_failed';
+            updates.employmentVerificationProviderMessage = providerData.error || providerData.message || 'Employment provider returned an error';
+          }
+        } catch (err) {
+          updates.employmentVerificationStatus = 'order_error';
+          updates.employmentVerificationProviderMessage = err.message;
+        }
+      }
+    }
 
     await db.collection('applications').doc(applicationId).update(updates);
 
-    const action = status ? `status_changed_to_${status}` : 'review_updated';
+    let action = 'review_updated';
+    if (status) action = `status_changed_to_${status}`;
+    else if (creditCheckOrder && employmentVerificationOrder) action = 'credit_and_employment_ordered';
+    else if (creditCheckOrder) action = 'credit_check_ordered';
+    else if (employmentVerificationOrder) action = 'employment_verification_ordered';
     await db.collection('applicationAuditLog').add({
       applicationId,
       shortId:       app.applicationId || applicationId.substring(0, 8).toUpperCase(),
@@ -76,6 +163,8 @@ exports.handler = async (event) => {
       propertyId:    app.propertyId,
       adminNotes:    adminNotes || null,
       reviewChecks:  reviewChecks || null,
+      creditCheckOrdered: !!creditCheckOrder,
+      employmentVerificationOrdered: !!employmentVerificationOrder,
       timestamp:     a.firestore.FieldValue.serverTimestamp(),
     });
 

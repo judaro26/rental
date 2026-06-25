@@ -264,8 +264,8 @@
         </div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Applicant</th><th>Email</th><th>Property / Unit</th><th>Status</th><th>Review</th><th>Submitted</th><th>Actions</th></tr></thead>
-            <tbody id="applications-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+            <thead><tr><th>Applicant</th><th>Email</th><th>Property / Unit</th><th>Status</th><th>Consent</th><th>Review</th><th>Submitted</th><th>Actions</th></tr></thead>
+            <tbody id="applications-tbody"><tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1101,14 +1101,18 @@
       const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleDateString() : (app.submittedAt || '—');
       const status = app.status || 'pending';
       const reviewChecks = app.reviewChecks || {};
+      const consent = app.consent || {};
       const reviewStatus = reviewChecks.creditPulled || reviewChecks.referencesVerified || reviewChecks.employmentConfirmed
         ? (reviewChecks.creditPulled && reviewChecks.referencesVerified && reviewChecks.employmentConfirmed ? 'Review complete' : 'Review in progress')
         : 'Review not started';
+      const consentSummary = consent.dataCollection && consent.backgroundCheck && consent.terms ? 'All consents' :
+        `${consent.dataCollection ? 'Data' : ''}${consent.dataCollection && consent.backgroundCheck ? ' / ' : ''}${consent.backgroundCheck ? 'BG' : ''}${(consent.dataCollection||consent.backgroundCheck) && consent.terms ? ' / ' : ''}${consent.terms ? 'Terms' : ''}` || 'None';
       return `<tr>
         <td><strong>${applicant}</strong></td>
         <td style="font-size:12px;">${app.email||'—'}</td>
         <td style="font-size:12px;">${property}</td>
         <td><span class="badge badge-${status}">${status}</span></td>
+        <td style="font-size:12px;color:#0F766E;">${consentSummary}</td>
         <td style="font-size:12px;color:#64748B;">${reviewStatus}</td>
         <td style="font-size:12px;">${submitted}</td>
         <td>
@@ -1180,12 +1184,50 @@
     }
   };
 
+  window.orderCreditCheck = async (id) => {
+    try {
+      const res = await fetch('/api/update-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: id, creditCheckOrder: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unable to order credit check.');
+      await loadApplications();
+      viewApplicationDetails(id);
+      showAlert('application-preview-alert', 'Credit check order recorded.', 'success');
+    } catch (e) {
+      showAlert('application-preview-alert', e.message);
+    }
+  };
+
+  window.orderEmploymentVerification = async (id) => {
+    try {
+      const res = await fetch('/api/update-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: id, employmentVerificationOrder: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unable to order employment verification.');
+      await loadApplications();
+      viewApplicationDetails(id);
+      showAlert('application-preview-alert', 'Employment verification order recorded.', 'success');
+    } catch (e) {
+      showAlert('application-preview-alert', e.message);
+    }
+  };
+
   window.viewApplicationDetails = (id) => {
     const app = allApplications.find(a => a.id === id);
     if (!app) return showAlert ? showAlert('application-preview-alert', 'Application details not found.') : alert('Application details not found.');
     const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : (app.submittedAt || '—');
     const reviewChecks = app.reviewChecks || {};
     const reviewComplete = reviewChecks.creditPulled && reviewChecks.referencesVerified && reviewChecks.employmentConfirmed;
+    const consent = app.consent || {};
+    const creditOrderedAt = app.creditCheckOrderedAt ? (app.creditCheckOrderedAt.toDate ? app.creditCheckOrderedAt.toDate().toLocaleString() : app.creditCheckOrderedAt) : null;
+    const employmentOrderedAt = app.employmentVerificationOrderedAt ? (app.employmentVerificationOrderedAt.toDate ? app.employmentVerificationOrderedAt.toDate().toLocaleString() : app.employmentVerificationOrderedAt) : null;
+    const canOrderCredit = consent.backgroundCheck === true;
     document.getElementById('application-preview-title').textContent = `${app.firstName||''} ${app.lastName||''}`.trim() || 'Application Preview';
     document.getElementById('application-preview-status').innerHTML = `<span class="badge badge-${app.status||'pending'}">${app.status||'pending'}</span>`;
     document.getElementById('application-preview-details').innerHTML = `
@@ -1221,7 +1263,28 @@
             <span><strong>Submitted</strong> ${submitted}</span>
             <span><strong>Status</strong> ${app.status||'pending'}</span>
             <span><strong>Review</strong> ${reviewComplete ? 'Complete' : 'Incomplete'}</span>
+            <span><strong>Credit order</strong> ${creditOrderedAt || 'Not ordered'}</span>
+            <span><strong>Employment order</strong> ${employmentOrderedAt || 'Not ordered'}</span>
           </div>
+        </div>
+      </div>
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Applicant Consent</div>
+        <div class="preview-item">
+          <span><strong>Data collection</strong> ${consent.dataCollection ? 'Yes' : 'No'}</span>
+          <span><strong>Background check</strong> ${consent.backgroundCheck ? 'Yes' : 'No'}</span>
+          <span><strong>Terms accepted</strong> ${consent.terms ? 'Yes' : 'No'}</span>
+          <span><strong>Recorded</strong> ${consent.recordedAt || '—'}</span>
+          <span><strong>IP</strong> ${consent.ipAddress || '—'}</span>
+          <span><strong>User agent</strong> ${escapeHtml(consent.userAgent || '—')}</span>
+        </div>
+      </div>
+      ${consent.legalText ? `<div class="preview-card" style="margin-top:12px;"><div class="preview-section-title">Consent Agreement</div><div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:6px;padding:14px;white-space:pre-wrap;font-size:12px;color:#334155;">${escapeHtml(consent.legalText)}</div></div>` : ''}
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Hosted Reports</div>
+        <div class="preview-item">
+          <span><strong>Credit report</strong> ${app.creditReportUrl ? `<a href="${app.creditReportUrl}" target="_blank" rel="noreferrer noopener">View hosted report</a>` : (app.creditCheckStatus ? escapeHtml(app.creditCheckStatus) : 'Not available')}</span>
+          <span><strong>Employment report</strong> ${app.employmentReportUrl ? `<a href="${app.employmentReportUrl}" target="_blank" rel="noreferrer noopener">View hosted report</a>` : (app.employmentVerificationStatus ? escapeHtml(app.employmentVerificationStatus) : 'Not available')}</span>
         </div>
       </div>
       <div class="preview-card" style="margin-top:18px;">
@@ -1245,6 +1308,8 @@
     previewActions.innerHTML = `
       ${app.status !== 'approved' ? `<button onclick="updateApplicationStatus('${app.id}','approved')" class="btn btn-success">Approve</button>` : ''}
       ${app.status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-danger">Decline</button>` : ''}
+      ${!creditOrderedAt ? `<button onclick="orderCreditCheck('${app.id}')" class="btn btn-outline" ${canOrderCredit ? '' : 'disabled title="Requires applicant background-check consent"'}>Order credit check</button>` : `<button class="btn btn-success" disabled>Credit check ordered</button>`}
+      ${!employmentOrderedAt ? `<button onclick="orderEmploymentVerification('${app.id}')" class="btn btn-outline">Order employment verification</button>` : `<button class="btn btn-success" disabled>Employment verification ordered</button>`}
       <button onclick="saveApplicationReview()" class="btn btn-amber">Save Review</button>
       <button onclick="closeModal('application-preview-modal')" class="btn btn-outline">Close</button>
     `;
