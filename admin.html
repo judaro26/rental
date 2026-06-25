@@ -1283,7 +1283,7 @@
       <div class="preview-card" style="margin-top:18px;">
         <div class="preview-section-title">Hosted Reports</div>
         <div class="preview-item">
-          <span><strong>Credit report</strong> ${app.creditReportUrl ? `<a href="${app.creditReportUrl}" target="_blank" rel="noreferrer noopener">View hosted report</a>` : (app.creditCheckStatus ? escapeHtml(app.creditCheckStatus) : 'Not available')}</span>
+          <span><strong>SmartMove report</strong> ${app.creditReportUrl ? `<a href="${app.creditReportUrl}" target="_blank" rel="noreferrer noopener">View hosted report</a>` : (app.creditCheckStatus ? escapeHtml(app.creditCheckStatus) : 'Not available')}</span>
           <span><strong>Employment report</strong> ${app.employmentReportUrl ? `<a href="${app.employmentReportUrl}" target="_blank" rel="noreferrer noopener">View hosted report</a>` : (app.employmentVerificationStatus ? escapeHtml(app.employmentVerificationStatus) : 'Not available')}</span>
         </div>
       </div>
@@ -1308,7 +1308,7 @@
     previewActions.innerHTML = `
       ${app.status !== 'approved' ? `<button onclick="updateApplicationStatus('${app.id}','approved')" class="btn btn-success">Approve</button>` : ''}
       ${app.status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-danger">Decline</button>` : ''}
-      ${!creditOrderedAt ? `<button onclick="orderCreditCheck('${app.id}')" class="btn btn-outline" ${canOrderCredit ? '' : 'disabled title="Requires applicant background-check consent"'}>Order credit check</button>` : `<button class="btn btn-success" disabled>Credit check ordered</button>`}
+      ${!creditOrderedAt ? `<button onclick="orderCreditCheck('${app.id}')" class="btn btn-outline" ${canOrderCredit ? '' : 'disabled title="Requires applicant background-check consent"'}>Send SmartMove rental screening invite</button>` : `<button class="btn btn-success" disabled>SmartMove screening requested</button>`}
       ${!employmentOrderedAt ? `<button onclick="orderEmploymentVerification('${app.id}')" class="btn btn-outline">Order employment verification</button>` : `<button class="btn btn-success" disabled>Employment verification ordered</button>`}
       <button onclick="saveApplicationReview()" class="btn btn-amber">Save Review</button>
       <button onclick="closeModal('application-preview-modal')" class="btn btn-outline">Close</button>
