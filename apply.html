@@ -597,6 +597,12 @@
   async function loadListings() {
     const grid = document.getElementById('properties-grid');
     document.getElementById('empty-state').style.display = 'none';
+    const params         = new URLSearchParams(window.location.search);
+    const requestedPropId   = params.get('propertyId');
+    const requestedUnitId   = params.get('unitId');
+    const requestedPropName = params.get('propertyName');
+    let requestedOpen = null;
+
     try {
       // Load all property records, then show only those that are available or have available units.
       const snap = await getDocs(collection(db, 'properties'));
@@ -621,6 +627,9 @@
         const hasUnits = availableUnits.length > 0;
         if (!p.available && propHasUnits && !hasUnits) { continue; }
         if (!p.available && !propHasUnits) { continue; }
+        if (requestedPropId === pid) {
+          requestedOpen = { propId: pid, propName: requestedPropName || p.name, unitId: requestedUnitId, availableUnits };
+        }
         hasAny = true;
 
         // Images
@@ -665,6 +674,13 @@
       if (!hasAny) {
         grid.innerHTML = '';
         document.getElementById('empty-state').style.display = 'block';
+      }
+
+      if (requestedOpen) {
+        const unit = requestedOpen.unitId
+          ? requestedOpen.availableUnits.find(u => u.id === requestedOpen.unitId)
+          : null;
+        openApplication(requestedOpen.propId, requestedOpen.propName, unit ? { id: unit.id, label: 'Unit ' + (unit.unitNumber || unit.id), rent: unit.monthlyRent || null } : null);
       }
 
     } catch(e) {

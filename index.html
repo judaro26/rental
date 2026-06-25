@@ -24,10 +24,13 @@
     .btn-outline:hover { background: var(--charcoal); color: #fff; }
     .form-input { border: 1.5px solid var(--border); background: #FDFBF8; transition: border-color 0.2s; width: 100%; padding: 10px 14px; border-radius: 2px; font-family: 'Jost', sans-serif; font-size: 14px; }
     .form-input:focus { outline: none; border-color: var(--amber); }
-    .property-card { background: var(--card); border-radius: 2px; overflow: hidden; box-shadow: 0 2px 12px rgba(26,26,46,0.07); transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer; }
+    .property-card { background: var(--card); border-radius: 2px; overflow: hidden; box-shadow: 0 2px 12px rgba(26,26,46,0.07); transition: transform 0.3s ease, box-shadow 0.3s ease; }
     .property-card:hover { transform: translateY(-6px); box-shadow: 0 16px 40px rgba(26,26,46,0.14); }
     .property-card img { transition: transform 0.4s ease; }
     .property-card:hover img { transform: scale(1.04); }
+    .badge-status { display: inline-block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; font-weight: 700; }
+    .badge-status.available { background: #D1FAE5; color: #065F46; }
+    .badge-status.unavailable { background: #FEE2E2; color: #991B1B; }
     .modal-backdrop { backdrop-filter: blur(4px); background: rgba(26,26,46,0.55); }
     @keyframes fadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
     .fade-up { animation: fadeUp 0.65s ease forwards; opacity: 0; }
@@ -350,9 +353,22 @@
       if (snap.empty) { grid.classList.add('hidden'); empty.classList.remove('hidden'); return; }
       const carouselTimers = {};
 
-      snap.forEach((docSnap, i) => {
+      for (const [i, docSnap] of snap.docs.entries()) {
         const p   = docSnap.data();
         const cid = docSnap.id;
+        const pAvailable = p.available === true;
+        let availableUnits = [];
+        if (!pAvailable) {
+          try {
+            const unitsSnap = await getDocs(query(collection(db, 'properties', cid, 'units'), where('available', '==', true)));
+            availableUnits = unitsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+          } catch (err) {
+            console.warn('Failed to load unit availability for', cid, err);
+          }
+        }
+        const isAvailable = pAvailable || availableUnits.length > 0;
+        const availableLabel = isAvailable ? 'Available' : 'Not Available';
+
         // Support legacy imageUrl string and new imageUrls array
         const imgs = (p.imageUrls && p.imageUrls.length)
           ? p.imageUrls
@@ -395,11 +411,15 @@
             ${arrowsHtml}
           </div>
           <div style="padding:22px;">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-              <h3 style="font-size:1.4rem;font-weight:500;">${p.name}</h3>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:10px;flex-wrap:wrap;">
+              <div>
+                <h3 style="font-size:1.4rem;font-weight:500;margin-bottom:6px;">${p.name}</h3>
+                <span class="badge-status ${isAvailable ? 'available' : 'unavailable'}">${availableLabel}</span>
+              </div>
               ${p.units ? `<span style="font-size:11px;background:rgba(201,144,58,0.12);color:var(--amber);padding:3px 8px;border-radius:2px;">${p.units} Units</span>` : ''}
             </div>
             <p style="font-size:13px;color:var(--slate);margin-bottom:18px;">📍 ${p.address || ''}</p>
+            ${isAvailable ? `<a href="/apply.html?propertyId=${encodeURIComponent(cid)}&propertyName=${encodeURIComponent(p.name)}" class="btn-outline w-full py-3 text-xs tracking-widest uppercase rounded-sm" style="display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;text-decoration:none;">Apply Now</a>` : ''}
             <button onclick="window._openTenantLogin('${docSnap.id}','${p.name.replace(/'/g,"\'")}',this)"
               class="btn-primary w-full py-3 text-xs tracking-widest uppercase rounded-sm">
               Tenant Login
