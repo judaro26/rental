@@ -260,6 +260,7 @@
               <option value="approved">Approved</option>
               <option value="declined">Declined</option>
             </select>
+            <button onclick="refreshApplications()" class="btn btn-sm btn-outline" style="white-space:nowrap;">↺ Refresh</button>
           </div>
         </div>
         <div style="overflow-x:auto;">
@@ -1137,6 +1138,10 @@
     renderApplicationsTable(filtered);
   };
 
+  window.refreshApplications = async () => {
+    await loadApplications();
+  };
+
   window.updateApplicationStatus = async (id, status) => {
     try {
       const res = await fetch('/api/update-application', {
@@ -1186,10 +1191,11 @@
 
   window.orderCreditCheck = async (id) => {
     try {
+      const reportType = document.getElementById('application-report-type')?.value || 'smartcheck_premium';
       const res = await fetch('/api/update-application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationId: id, creditCheckOrder: true }),
+        body: JSON.stringify({ applicationId: id, creditCheckOrder: true, smartMoveReportType: reportType }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Unable to order credit check.');
@@ -1223,6 +1229,7 @@
     if (!app) return showAlert ? showAlert('application-preview-alert', 'Application details not found.') : alert('Application details not found.');
     const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : (app.submittedAt || '—');
     const reviewChecks = app.reviewChecks || {};
+    const selectedReportType = app.smartMoveReportType || 'smartcheck_premium';
     const reviewComplete = reviewChecks.creditPulled && reviewChecks.referencesVerified && reviewChecks.employmentConfirmed;
     const consent = app.consent || {};
     const creditOrderedAt = app.creditCheckOrderedAt ? (app.creditCheckOrderedAt.toDate ? app.creditCheckOrderedAt.toDate().toLocaleString() : app.creditCheckOrderedAt) : null;
@@ -1293,6 +1300,17 @@
           <label class="review-checkbox"><input type="checkbox" id="review-credit-pulled" ${reviewChecks.creditPulled ? 'checked' : ''}/> Credit pull completed</label>
           <label class="review-checkbox"><input type="checkbox" id="review-references-verified" ${reviewChecks.referencesVerified ? 'checked' : ''}/> References verified</label>
           <label class="review-checkbox"><input type="checkbox" id="review-employment-confirmed" ${reviewChecks.employmentConfirmed ? 'checked' : ''}/> Employment confirmed</label>
+        </div>
+      </div>
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">SmartMove Screening</div>
+        <div class="preview-item">
+          <label class="label" style="margin-bottom:8px;display:block;font-weight:600;">Report type</label>
+          <select id="application-report-type" class="form-input" style="max-width:360px;">
+            <option value="smartcheck_premium"${selectedReportType === 'smartcheck_premium' ? ' selected' : ''}>Smartcheck Premium</option>
+            <option value="smartcheck_noncriminal_standard"${selectedReportType === 'smartcheck_noncriminal_standard' ? ' selected' : ''}>Smartcheck Non-Criminal Standard</option>
+          </select>
+          <span style="font-size:12px;color:#64748B;display:block;margin-top:8px;">This selection is included in the SmartMove invite link.</span>
         </div>
       </div>
       <div class="preview-card" style="margin-top:18px;">

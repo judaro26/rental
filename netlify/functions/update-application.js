@@ -39,6 +39,20 @@ function buildSmartMoveRequestEmail({ firstName, propertyName, unitLabel, applic
   </div>`;
 }
 
+function appendQueryParams(base, params) {
+  try {
+    const url = new URL(base);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.set(key, value);
+      }
+    });
+    return url.toString();
+  } catch (err) {
+    return base;
+  }
+}
+
 function buildSmartMoveAdminNotificationEmail({ applicantName, applicantEmail, propertyName, unitLabel, applicationId, smartMoveLanding, smartMoveStatus, consent, siteName }) {
   const consentRows = [
     ['Data collection', consent.dataCollection ? 'Yes' : 'No'],
@@ -80,7 +94,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { applicationId, status, reviewChecks, adminNotes, creditCheckOrder, employmentVerificationOrder, siteName } = body;
+  const { applicationId, status, reviewChecks, adminNotes, creditCheckOrder, employmentVerificationOrder, smartMoveReportType, siteName } = body;
   if (!applicationId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'applicationId is required' }) };
   }
@@ -120,9 +134,11 @@ exports.handler = async (event) => {
       const smartMoveLanding = process.env.SMARTMOVE_LANDING_PAGE || 'https://rentals-secure.mysmartmove.com/landlord/firstscreening/step-one';
       const smartMoveApiUrl = process.env.SMARTMOVE_API_URL;
       const smartMoveApiKey = process.env.SMARTMOVE_API_KEY;
+      const reportType = smartMoveReportType || 'smartcheck_premium';
       updates.creditCheckOrderedAt = a.firestore.FieldValue.serverTimestamp();
       updates.creditCheckOrderedBy = 'admin';
       updates.creditCheckStatus = 'requested';
+      updates.creditCheckReportType = reportType;
 
       if (smartMoveApiUrl && smartMoveApiKey) {
         try {
@@ -141,6 +157,7 @@ exports.handler = async (event) => {
               currentEmployer: app.currentEmployer,
               propertyName: app.propertyName,
               unitLabel: app.unitLabel,
+              reportType,
               reason: 'Rental screening fee payment and report',
               consent: app.consent || {},
             }),
@@ -195,13 +212,22 @@ exports.handler = async (event) => {
           auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
         });
         try {
+          const smartMoveLandingWithParams = appendQueryParams(smartMoveLanding, {
+            firstName: app.firstName,
+            lastName: app.lastName,
+            email: app.email,
+            propertyName: app.propertyName,
+            unitLabel: app.unitLabel,
+            reportType: reportType,
+            applicationId,
+          });
           const emailHtml = buildSmartMoveRequestEmail({
             firstName: app.firstName || 'Applicant',
             propertyName: app.propertyName || 'your requested property',
             unitLabel: app.unitLabel || '',
             applicationId: app.applicationId || applicationId.substring(0, 8).toUpperCase(),
             siteName: siteName || 'Tenant Portal',
-            smartMoveLanding,
+            smartMoveLanding: smartMoveLandingWithParams,
             submittedAt: app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : new Date().toLocaleString(),
           });
           await transporter.sendMail({
