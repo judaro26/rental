@@ -214,6 +214,7 @@ exports.handler = async (event) => {
     lineItems = [], taxRate = 0, dueDate, paidDate, notes, siteName,
     existingInvoiceId, // if converting invoice→receipt, or sending an existing draft
     sendNow = true,    // when false, an invoice is saved as a draft and no email is sent
+    scheduledSendDate, // optional 'YYYY-MM-DD' — auto-send date for a draft
   } = body;
 
   if (!tenantId || !tenantEmail || !lineItems.length) {
@@ -265,6 +266,8 @@ exports.handler = async (event) => {
       lineItems, subtotal, taxRate: parseFloat(taxRate)||0, taxAmount, total,
       dueDate: dueDate||null, paidDate: paidDate||null, notes: notes||'',
       status: isReceipt ? 'paid' : (willSend ? 'sent' : 'draft'),
+      // Once it's actually sent, drop any pending auto-send date.
+      scheduledSendDate: (isReceipt || willSend) ? null : (scheduledSendDate || null),
       invoiceUrl, blobKey,
       updatedAt: a.firestore.FieldValue.serverTimestamp(),
     };

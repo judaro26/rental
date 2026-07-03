@@ -260,6 +260,7 @@
               <option value="approved">Approved</option>
               <option value="declined">Declined</option>
             </select>
+            <button onclick="openBlankAppModal()" class="btn btn-sm btn-primary" style="white-space:nowrap;">🖨 Print Blank Form</button>
             <button onclick="refreshApplications()" class="btn btn-sm btn-outline" style="white-space:nowrap;">↺ Refresh</button>
           </div>
         </div>
@@ -465,6 +466,19 @@
             <input type="checkbox" id="rem-copy-admin" style="width:16px;height:16px;" checked>
             <span>Send a copy of each reminder to the admin</span>
           </label>
+          <hr style="border:none;border-top:1px solid var(--border);margin:4px 0 14px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:8px;">
+            <input type="checkbox" id="rem-autosend-enabled" style="width:16px;height:16px;">
+            <span>Automatically send <strong>draft</strong> invoices before their due date</span>
+          </label>
+          <div id="rem-autosend-wrap" style="padding-left:24px;margin-bottom:16px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:#374151;">
+              <span>Send each draft</span>
+              <input type="number" id="rem-autosend-days" class="form-input" value="10" min="0" max="90" style="width:70px;padding:6px 8px;">
+              <span>day(s) before its due date.</span>
+            </div>
+            <p style="font-size:11px;color:var(--slate);margin:6px 0 0;">Applies to drafts that don't have their own scheduled send date. A draft with an explicit send date always uses that date instead.</p>
+          </div>
           <button onclick="saveInvoiceReminders()" class="btn btn-primary" id="rem-save-btn">Save Reminder Schedule</button>
         </div>
       </div>
@@ -869,6 +883,18 @@
       <input type="checkbox" id="inv-send-now" style="width:16px;height:16px;" checked onchange="updateInvoiceSubmitLabel()">
       <span>Email this invoice to the tenant now</span>
     </label>
+    <div id="inv-schedule-block" style="display:none;background:#F9FAFB;border:1px solid var(--border);border-radius:3px;padding:12px 14px;margin-bottom:14px;">
+      <label class="label">Schedule automatic send <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional)</span></label>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <input type="date" id="inv-schedule-date" class="form-input" style="width:170px;">
+        <span style="font-size:11px;color:var(--slate);">quick set:</span>
+        <button type="button" class="btn btn-sm btn-outline" onclick="setScheduleFromDue(5)">5d before due</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="setScheduleFromDue(10)">10d</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="setScheduleFromDue(15)">15d</button>
+        <button type="button" class="btn btn-sm btn-outline" onclick="document.getElementById('inv-schedule-date').value=''">clear</button>
+      </div>
+      <p style="font-size:11px;color:var(--slate);margin:8px 0 0;">If left blank, the global auto-send rule applies (when enabled); otherwise it stays a draft until you send it manually.</p>
+    </div>
     <div style="display:flex;gap:10px;">
       <button onclick="submitInvoice()" class="btn btn-primary" style="flex:1;" id="inv-submit-btn">Send Invoice</button>
       <button onclick="closeModal('invoice-modal')" class="btn btn-outline">Cancel</button>
@@ -945,6 +971,22 @@
       <div id="application-preview-alert" class="hidden alert" style="margin-top:16px;"></div>
       <div id="application-preview-details" style="margin-top:24px;color:#334155;"></div>
       <div id="application-preview-actions" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:28px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PRINT BLANK APPLICATION MODAL -->
+<div id="blank-app-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('blank-app-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:460px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('blank-app-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:6px;">Print Blank Application</h3>
+    <p style="font-size:13px;color:var(--slate);margin-bottom:20px;">Generate a printable, fill-by-hand application to hand out. Pick a property to include its address and state-specific disclosures, or leave it generic.</p>
+    <label class="label">Property <span style="font-size:10px;font-weight:400;">(optional)</span></label>
+    <select id="blank-app-property" class="form-input"><option value="">— Generic (no specific property) —</option></select>
+    <div style="display:flex;gap:10px;margin-top:22px;">
+      <button onclick="printBlankApplication()" class="btn btn-primary" style="flex:1;">Print Form</button>
+      <button onclick="closeModal('blank-app-modal')" class="btn btn-outline">Cancel</button>
     </div>
   </div>
 </div>
@@ -1523,6 +1565,121 @@
     if (!win) return alert('Please allow pop-ups to print the application.');
     win.document.write(html);
     win.document.close();
+  };
+
+  // ===== PRINT BLANK (FILL-BY-HAND) APPLICATION =====
+  window.openBlankAppModal = () => {
+    const sel = document.getElementById('blank-app-property');
+    sel.innerHTML = '<option value="">— Generic (no specific property) —</option>' +
+      allProperties.map(p => `<option value="${p.id}">${p.name}${p.state ? ` (${p.state})` : ''}</option>`).join('');
+    sel.value = '';
+    openModal('blank-app-modal');
+  };
+  window.printBlankApplication = async () => {
+    const propId = document.getElementById('blank-app-property').value;
+    const prop = allProperties.find(p => p.id === propId) || {};
+    let site = {};
+    try { const s = await getDoc(doc(db,'settings','site')); if (s.exists()) site = s.data(); } catch {}
+    let disclosures = [];
+    try { const c = await getDoc(doc(db,'settings','compliance')); if (c.exists() && Array.isArray(c.data().templates)) disclosures = c.data().templates; } catch {}
+
+    const esc = escapeHtml;
+    const state = prop.state || '';
+    const applicable = disclosures.filter(d => d.scope !== 'state' || (state && d.state === state));
+    const fullAddress = [prop.address, prop.city, [prop.state, prop.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+
+    const ln = (h) => `<div style="border-bottom:1px solid #9CA3AF;height:${h||22}px;"></div>`;
+    const field = (label, w, h) => `<div style="width:${w||'100%'};box-sizing:border-box;padding-right:14px;margin-bottom:14px;"><div style="font-size:9.5px;text-transform:uppercase;letter-spacing:0.05em;color:#6B7280;margin-bottom:3px;">${label}</div>${ln(h)}</div>`;
+    const rowF = (...f) => `<div style="display:flex;">${f.join('')}</div>`;
+    const consent = (title, req, body) => `<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px;break-inside:avoid;">
+        <span style="font-size:16px;line-height:1.1;">☐</span>
+        <span style="font-size:11px;line-height:1.5;color:#374151;"><strong>${title}</strong>${req?` <span style="font-size:9px;color:#B91C1C;text-transform:uppercase;">Required</span>`:` <span style="font-size:9px;color:#6B7280;text-transform:uppercase;">Optional</span>`}<br>${body}</span>
+      </div>`;
+    const section = (title, inner) => `<h2 style="font-size:14px;margin:20px 0 8px;color:#1A1A2E;border-bottom:2px solid #C9903A;padding-bottom:4px;">${title}</h2>${inner}`;
+
+    const disclosuresHtml = applicable.length
+      ? applicable.map(d => `<div style="margin-bottom:14px;break-inside:avoid;">
+          <h3 style="font-size:12px;margin:0 0 3px;color:#1A1A2E;">${esc(d.title||'Disclosure')} ${d.scope==='state'?`<span style="font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:8px;">${esc(d.state||'')}</span>`:''}</h3>
+          <p style="font-size:10.5px;line-height:1.5;color:#374151;margin:0;white-space:pre-wrap;">${esc(d.body||'')}</p>
+        </div>`).join('')
+      : '<p style="font-size:11px;color:#9CA3AF;">No compliance disclosures configured yet. Add them in Settings → Application Compliance &amp; Disclosures to have them print here.</p>';
+
+    const propertyBlock = propId
+      ? `<table style="width:100%;font-size:12px;"><tr><td style="padding:4px 10px;color:#6B7280;width:32%;">Property</td><td style="padding:4px 10px;font-weight:600;">${esc(prop.name||'')}</td></tr>
+         <tr><td style="padding:4px 10px;color:#6B7280;">Address</td><td style="padding:4px 10px;">${esc(fullAddress||'—')}</td></tr></table>
+         ${rowF(field('Unit / Apartment # applying for','50%'), field('Desired move-in date','50%'))}`
+      : `${rowF(field('Property name','60%'), field('Unit / Apartment #','40%'))}
+         ${rowF(field('Property address','70%'), field('Desired move-in date','30%'))}`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rental Application${prop.name?` — ${esc(prop.name)}`:''}</title>
+      <style>
+        @media print { .no-print{display:none;} @page{margin:16mm;} }
+        body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111827;max-width:820px;margin:24px auto;padding:0 24px;font-size:12px;line-height:1.5;}
+        h2{break-after:avoid;}
+      </style></head><body>
+      <div class="no-print" style="text-align:right;margin-bottom:12px;">
+        <button onclick="window.print()" style="background:#C9903A;color:#fff;border:none;padding:8px 18px;border-radius:3px;font-size:12px;cursor:pointer;">🖨 Print / Save as PDF</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1A1A2E;padding-bottom:12px;">
+        <div>
+          <div style="font-size:20px;font-weight:600;color:#1A1A2E;">${esc(site.siteName||'Rental Application')}</div>
+          <div style="font-size:11px;color:#6B7280;">${esc(site.address||'')}${site.phone?' · '+esc(site.phone):''}${site.email?' · '+esc(site.email):''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:16px;font-weight:600;color:#C9903A;">RENTAL APPLICATION</div>
+          <div style="font-size:11px;color:#6B7280;">Please print clearly in ink.</div>
+        </div>
+      </div>
+
+      ${section('Property & Move-in', propertyBlock)}
+
+      ${section('Applicant', `
+        ${rowF(field('First name','50%'), field('Last name','50%'))}
+        ${rowF(field('Email address','55%'), field('Phone number','45%'))}
+        ${rowF(field('Current mailing address','100%'))}
+        ${rowF(field('Current employer','55%'), field('Gross monthly income ($)','45%'))}
+        <div style="margin-bottom:14px;">
+          <div style="font-size:9.5px;text-transform:uppercase;letter-spacing:0.05em;color:#6B7280;margin-bottom:5px;">Pets</div>
+          <div style="font-size:11px;color:#374151;display:flex;gap:18px;flex-wrap:wrap;">
+            <span>☐ None</span><span>☐ Dog (small)</span><span>☐ Dog (large)</span><span>☐ Cat</span><span>☐ Other</span><span>☐ Multiple</span>
+          </div>
+        </div>`)}
+
+      ${section('Message / Notes to Property Manager', `<div style="border:1px solid #D1D5DB;border-radius:4px;height:80px;"></div>`)}
+
+      ${section('Consent & Authorization', `
+        <p style="font-size:11px;color:#374151;margin:0 0 12px;">Please read and check each box to indicate your consent.</p>
+        ${consent('I consent to collection and use of my personal data', true, 'I authorize this property management company to collect, store, and process the personal information provided in this form for the purpose of evaluating my rental application.')}
+        ${consent('I authorize a background and credit check', false, 'If my application progresses, I authorize the landlord to obtain a consumer report (background and/or credit check) from a third-party consumer reporting agency. My rights under the Fair Credit Reporting Act (FCRA) apply, and I will receive an Adverse Action Notice if a report is used to make an adverse decision.')}
+        ${consent('I certify that all information is accurate', true, 'I certify under penalty of perjury that all information provided in this application is true and complete. I understand that providing false information may result in immediate denial or termination of tenancy.')}`)}
+
+      ${section(`State &amp; Local Compliance Disclosures${state?` — ${esc(state)}`:''}`, `<div style="border:1px solid #E5E7EB;border-radius:4px;padding:12px 14px;background:#FAFAF9;">${disclosuresHtml}</div>`)}
+
+      ${section('Signatures', `
+        <table style="width:100%;margin-top:14px;">
+          <tr>
+            <td style="width:60%;padding-right:24px;">${ln(26)}<div style="font-size:10px;color:#6B7280;">Applicant signature</div></td>
+            <td style="width:40%;">${ln(26)}<div style="font-size:10px;color:#6B7280;">Date</div></td>
+          </tr>
+        </table>
+        <table style="width:100%;margin-top:22px;">
+          <tr>
+            <td style="width:60%;padding-right:24px;">${ln(26)}<div style="font-size:10px;color:#6B7280;">For office use — received by</div></td>
+            <td style="width:40%;">${ln(26)}<div style="font-size:10px;color:#6B7280;">Date received</div></td>
+          </tr>
+        </table>`)}
+
+      <p style="margin-top:24px;font-size:10px;color:#9CA3AF;border-top:1px solid #E5E7EB;padding-top:8px;">
+        Disclaimer: This form and the disclosures it contains are provided as a template only and do not constitute legal advice. Rental application and disclosure requirements vary by state and locality. Review and adapt this document with a licensed attorney before use.
+      </p>
+      <script>window.addEventListener('load',function(){setTimeout(function(){window.print();},300);});<\/script>
+      </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return alert('Please allow pop-ups to print the form.');
+    win.document.write(html);
+    win.document.close();
+    closeModal('blank-app-modal');
   };
 
   window.filterTenants = () => {
@@ -2138,6 +2295,7 @@
         const hasOverdue = rem.some(r=>Number(r.days)<0);
         remInfo = `<div title="Last reminder ${lastDate}${last&&Number(last.days)<0?` — ${-Number(last.days)}d overdue`:last?` — ${Number(last.days)}d before due`:''}" style="font-size:10px;color:${hasOverdue?'#DC2626':'#16A34A'};margin-top:3px;">🔔 ${rem.length} reminder${rem.length===1?'':'s'} sent${lastDate?` · ${lastDate}`:''}</div>`;
       }
+      const schedInfo = (inv.status==='draft'&&inv.scheduledSendDate)?`<div title="This draft will be emailed automatically on its scheduled date" style="font-size:10px;color:#2563EB;margin-top:3px;">⏱ Auto-sends: ${inv.scheduledSendDate}</div>`:'';
       const typeTag = inv.type==='receipt'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:1px 7px;border-radius:2px;">Receipt</span>':'<span style="font-size:10px;background:#EFF6FF;color:#3B82F6;padding:1px 7px;border-radius:2px;">Invoice</span>';
       const statusTag = inv.status==='paid'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:10px;">Paid</span>':inv.status==='overdue'?'<span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:10px;">Overdue</span>':inv.status==='draft'?'<span style="font-size:10px;background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:10px;">Draft</span>':'<span style="font-size:10px;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;">Pending</span>';
       return `<tr>
@@ -2145,7 +2303,7 @@
         <td style="font-size:13px;">${inv.tenantName||'—'}<div style="font-size:11px;color:var(--slate);">${inv.unit?'Unit '+inv.unit:''}</div></td>
         <td style="font-size:14px;font-weight:600;color:var(--amber);">$${parseFloat(inv.total||0).toFixed(2)}</td>
         <td>${typeTag}</td><td>${statusTag}</td>
-        <td style="font-size:12px;color:var(--slate);">${duePaid}${remInfo}</td>
+        <td style="font-size:12px;color:var(--slate);">${duePaid}${schedInfo}${remInfo}</td>
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <a href="${inv.invoiceUrl||'#'}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;font-size:11px;">View</a>
@@ -2171,6 +2329,7 @@
     renderLineItems([{description:'Monthly Rent',quantity:1,unitPrice:'',amount:0}]);
     recalcInvoice();
     document.getElementById('inv-send-now').checked = true;
+    document.getElementById('inv-schedule-date').value = '';
     updateInvoiceSubmitLabel();
     openModal('invoice-modal');
   };
@@ -2246,13 +2405,18 @@
     if (!tenantId||!tenant) { showAlert('invoice-alert','Please select a tenant.'); return; }
     if (!lineItems.length) { showAlert('invoice-alert','Add at least one line item.'); return; }
     const sendNow = document.getElementById('inv-send-now').checked;
+    const scheduledSendDate = sendNow ? '' : document.getElementById('inv-schedule-date').value;
     const btn = document.getElementById('inv-submit-btn'); btn.disabled=true; btn.textContent=sendNow?'Sending...':'Saving...';
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:tenant.propertyName||'',lineItems,taxRate:parseFloat(document.getElementById('inv-tax').value||0),dueDate:document.getElementById('inv-due-date').value,notes:document.getElementById('inv-notes').value.trim(),sendNow,siteName})});
+      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:tenant.propertyName||'',lineItems,taxRate:parseFloat(document.getElementById('inv-tax').value||0),dueDate:document.getElementById('inv-due-date').value,notes:document.getElementById('inv-notes').value.trim(),sendNow,scheduledSendDate,siteName})});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed');
-      showAlert('invoice-alert',sendNow?`✓ Invoice ${data.invoiceNumber} sent to ${tenant.email}`:`✓ Invoice ${data.invoiceNumber} saved as a draft. Send it anytime from the list.`,'success');
+      let msg;
+      if (sendNow) msg=`✓ Invoice ${data.invoiceNumber} sent to ${tenant.email}`;
+      else if (scheduledSendDate) msg=`✓ Invoice ${data.invoiceNumber} saved. It will auto-send on ${scheduledSendDate}.`;
+      else msg=`✓ Invoice ${data.invoiceNumber} saved as a draft. Send it anytime from the list.`;
+      showAlert('invoice-alert',msg,'success');
       setTimeout(()=>{closeModal('invoice-modal');loadInvoices();},1800);
     } catch(e) { showAlert('invoice-alert',e.message); }
     btn.disabled=false; btn.textContent=sendNow?'Send Invoice':'Save Draft';
@@ -2260,6 +2424,14 @@
   window.updateInvoiceSubmitLabel = () => {
     const sendNow = document.getElementById('inv-send-now').checked;
     document.getElementById('inv-submit-btn').textContent = sendNow ? 'Send Invoice' : 'Save Draft';
+    document.getElementById('inv-schedule-block').style.display = sendNow ? 'none' : '';
+  };
+  window.setScheduleFromDue = (days) => {
+    const due = document.getElementById('inv-due-date').value;
+    if (!due) { showAlert('invoice-alert','Set a due date first to use the quick-set buttons.'); return; }
+    const d = new Date(due + 'T00:00:00');
+    d.setDate(d.getDate() - days);
+    document.getElementById('inv-schedule-date').value = d.toISOString().slice(0,10);
   };
   window.generateReceipt = async (invoiceId) => {
     const inv = allInvoices.find(i=>i.id===invoiceId); if (!inv) return;
@@ -2852,6 +3024,10 @@
     const on=document.getElementById('rem-overdue-enabled')?.checked;
     const wrap=document.getElementById('rem-overdue-days-wrap'); if(wrap) wrap.style.display=on?'':'none';
   }
+  function toggleAutoSend(){
+    const on=document.getElementById('rem-autosend-enabled')?.checked;
+    const wrap=document.getElementById('rem-autosend-wrap'); if(wrap) wrap.style.display=on?'':'none';
+  }
   async function loadInvoiceReminders(){
     let cfg={};
     try { const snap=await getDoc(doc(db,'settings','site')); cfg=(snap.exists()&&snap.data().invoiceReminders)||{}; }
@@ -2859,10 +3035,13 @@
     const enabled=document.getElementById('rem-enabled'); if(enabled) enabled.checked=cfg.enabled===true;
     const copy=document.getElementById('rem-copy-admin'); if(copy) copy.checked=cfg.copyAdmin!==false;
     const ov=document.getElementById('rem-overdue-enabled'); if(ov) ov.checked=cfg.overdueEnabled===true;
+    const as=document.getElementById('rem-autosend-enabled'); if(as) as.checked=cfg.autoSendDrafts===true;
+    const asd=document.getElementById('rem-autosend-days'); if(asd) asd.value=(cfg.autoSendDaysBefore!=null?cfg.autoSendDaysBefore:10);
     renderReminderDays(cfg.daysBefore&&cfg.daysBefore.length?cfg.daysBefore:[5,10,15]);
     renderOverdueDays(cfg.daysAfter&&cfg.daysAfter.length?cfg.daysAfter:[1,7,14]);
-    toggleOverdueDays();
+    toggleOverdueDays(); toggleAutoSend();
     document.getElementById('rem-overdue-enabled')?.addEventListener('change',toggleOverdueDays);
+    document.getElementById('rem-autosend-enabled')?.addEventListener('change',toggleAutoSend);
   }
   window.saveInvoiceReminders=async()=>{
     const daysBefore=Array.from(document.querySelectorAll('.rem-day:checked')).map(el=>parseInt(el.value,10)).sort((a,b)=>a-b);
@@ -2870,14 +3049,17 @@
     const enabled=document.getElementById('rem-enabled').checked;
     const overdueEnabled=document.getElementById('rem-overdue-enabled').checked;
     const copyAdmin=document.getElementById('rem-copy-admin').checked;
+    const autoSendDrafts=document.getElementById('rem-autosend-enabled').checked;
+    const autoSendDaysBefore=Math.max(0,parseInt(document.getElementById('rem-autosend-days').value,10)||0);
     if(enabled&&!daysBefore.length&&!(overdueEnabled&&daysAfter.length)){showAlert('reminder-alert','Select at least one before-due or overdue lead time, or turn reminders off.');return;}
     if(enabled&&overdueEnabled&&!daysAfter.length){showAlert('reminder-alert','Select at least one overdue lead time, or turn overdue notices off.');return;}
     const btn=document.getElementById('rem-save-btn'); btn.disabled=true; btn.textContent='Saving...';
     try {
-      await setDoc(doc(db,'settings','site'),{invoiceReminders:{enabled,daysBefore,overdueEnabled,daysAfter,copyAdmin},updatedAt:serverTimestamp()},{merge:true});
+      await setDoc(doc(db,'settings','site'),{invoiceReminders:{enabled,daysBefore,overdueEnabled,daysAfter,copyAdmin,autoSendDrafts,autoSendDaysBefore},updatedAt:serverTimestamp()},{merge:true});
       let msg;
       if(!enabled) msg='✓ Automatic reminders turned off.';
       else { msg=`✓ Reminders on — tenants emailed ${daysBefore.join(', ')||'—'} day(s) before due`; if(overdueEnabled&&daysAfter.length) msg+=`, and ${daysAfter.join(', ')} day(s) after if unpaid`; msg+='.'; }
+      if(autoSendDrafts) msg+=` Draft invoices auto-send ${autoSendDaysBefore} day(s) before their due date.`;
       showAlert('reminder-alert',msg,'success');
       setTimeout(()=>document.getElementById('reminder-alert').classList.add('hidden'),6000);
     } catch(e){ showAlert('reminder-alert','Error saving: '+e.message); }

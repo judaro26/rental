@@ -89,10 +89,10 @@ exports.handler = async () => {
 
   const leadTimes = Array.isArray(cfg.daysBefore) ? cfg.daysBefore.map(Number) : [];
   const overdueTimes = (cfg.overdueEnabled === true && Array.isArray(cfg.daysAfter)) ? cfg.daysAfter.map(Number) : [];
-
-  if (cfg.enabled !== true || (!leadTimes.length && !overdueTimes.length)) {
-    return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: 'disabled' }) };
-  }
+  const remindersActive = cfg.enabled === true && (leadTimes.length > 0 || overdueTimes.length > 0);
+  // Draft auto-send: a per-invoice scheduledSendDate always applies; the global rule is opt-in.
+  const autoSendDrafts = cfg.autoSendDrafts === true;
+  const autoSendDaysBefore = Number(cfg.autoSendDaysBefore) || 0;
 
   const copyAdmin = cfg.copyAdmin !== false;
   const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
@@ -111,13 +111,44 @@ exports.handler = async () => {
   });
 
   const snap = await db.collection('invoices').get();
-  let sent = 0, checked = 0;
+  let sent = 0, checked = 0, autoSent = 0;
 
   for (const docSnap of snap.docs) {
     const inv = docSnap.data();
     if (inv.type === 'receipt') continue;
-    if (inv.status === 'draft') continue; // never delivered to the tenant yet
     if (inv.status === 'paid' || inv.paidDate || inv.paidAt) continue;
+
+    // ── Draft auto-send ───────────────────────────────────────────────────
+    // Send when its scheduled date has arrived (per-invoice date wins; otherwise
+    // the global "N days before due" rule). Delivered via the same endpoint the
+    // admin uses, so the email is identical to a manual send.
+    if (inv.status === 'draft') {
+      if (!inv.tenantEmail) continue;
+      const dueMsDraft = toUtcMidnight(inv.dueDate);
+      let sendMs = null;
+      if (inv.scheduledSendDate) sendMs = toUtcMidnight(inv.scheduledSendDate);
+      else if (autoSendDrafts && dueMsDraft !== null) sendMs = dueMsDraft - autoSendDaysBefore * 86400000;
+      if (sendMs === null) continue;      // no schedule set for this draft
+      if (todayMs < sendMs) continue;     // not time yet
+      if (!siteUrl) { console.warn('send-invoice-reminders: SITE_URL not set — cannot auto-send draft', docSnap.id); continue; }
+      try {
+        const r = await fetch(`${siteUrl}/api/generate-invoice`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'invoice', existingInvoiceId: docSnap.id, sendNow: true,
+            tenantId: inv.tenantId, tenantName: inv.tenantName, tenantEmail: inv.tenantEmail,
+            unit: inv.unit || '', propertyId: inv.propertyId || '', propertyName: inv.propertyName || '',
+            lineItems: inv.lineItems || [], taxRate: inv.taxRate || 0, dueDate: inv.dueDate || '', notes: inv.notes || '', siteName,
+          }),
+        });
+        if (r.ok) { autoSent++; console.log(`send-invoice-reminders: auto-sent draft ${inv.invoiceNumber || docSnap.id}`); }
+        else { console.error(`send-invoice-reminders: auto-send failed for ${inv.invoiceNumber || docSnap.id}:`, await r.text()); }
+      } catch (err) { console.error(`send-invoice-reminders: auto-send error for ${docSnap.id}:`, err.message); }
+      continue;
+    }
+
+    // ── Reminders (for invoices already delivered to the tenant) ───────────
+    if (!remindersActive) continue;
     if (!inv.tenantEmail || !inv.dueDate) continue;
 
     const dueMs = toUtcMidnight(inv.dueDate);
@@ -173,6 +204,6 @@ exports.handler = async () => {
     }
   }
 
-  console.log(`send-invoice-reminders: checked ${checked} unpaid invoice(s), sent ${sent} reminder(s).`);
-  return { statusCode: 200, body: JSON.stringify({ success: true, checked, sent }) };
+  console.log(`send-invoice-reminders: checked ${checked} unpaid invoice(s), sent ${sent} reminder(s), auto-sent ${autoSent} draft(s).`);
+  return { statusCode: 200, body: JSON.stringify({ success: true, checked, sent, autoSent }) };
 };
