@@ -11,7 +11,7 @@
     :root {
       --cream: #F7F4EF; --charcoal: #1A1A2E; --amber: #C9903A;
       --amber-light: #F0C97A; --slate: #5A6475; --border: #E8E2D8;
-      --sidebar-w: 240px;
+      --sidebar-w: 220px;
     }
     * { box-sizing: border-box; }
     body { font-family: 'Jost', sans-serif; background: var(--cream); color: var(--charcoal); margin: 0; display: flex; min-height: 100vh; }
@@ -38,7 +38,7 @@
     /* Main */
     #main { margin-left: var(--sidebar-w); flex: 1; }
     .topbar { background: #fff; border-bottom: 1px solid var(--border); padding: 14px 28px; display:flex; align-items:center; justify-content:space-between; position: sticky; top: 0; z-index: 20; }
-    .content { padding: 32px 28px; width: 100%; box-sizing: border-box; }
+    .content { padding: 28px clamp(14px, 1.4vw, 24px); width: 100%; box-sizing: border-box; }
     /* Cards */
     .stat-card { background:#fff; border-radius:2px; padding:22px; box-shadow:0 2px 12px rgba(26,26,46,0.06); }
     .card { background:#fff; border-radius:2px; box-shadow:0 2px 12px rgba(26,26,46,0.06); overflow:hidden; }

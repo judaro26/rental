@@ -6,6 +6,10 @@
 [functions]
   node_bundler = "esbuild"
 
+# ── Scheduled: daily invoice-reminder sweep (13:00 UTC ≈ 8-9 AM ET) ──────────
+[functions."send-invoice-reminders"]
+  schedule = "0 13 * * *"
+
 # ── API routes → Netlify Functions ──────────────────────────────────────────
 [[redirects]]
   from   = "/api/*"

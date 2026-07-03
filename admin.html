@@ -433,6 +433,42 @@
         </div>
       </div>
 
+      <!-- AUTOMATIC INVOICE REMINDERS -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">🔔 Automatic Invoice Reminders</h3>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--slate);cursor:pointer;">
+            <input type="checkbox" id="rem-enabled" style="width:16px;height:16px;">
+            <span>Enabled</span>
+          </label>
+        </div>
+        <div class="card-body">
+          <div id="reminder-alert" class="hidden alert"></div>
+          <p style="font-size:13px;color:var(--slate);margin-bottom:14px;">
+            When enabled, unpaid invoices with a due date automatically trigger a reminder email to the tenant on each of the selected lead times. A copy of every reminder is also sent to the admin notification address. Reminders are checked once per day and each lead time is sent only once per invoice.
+          </p>
+          <label class="label">Send a reminder this many days before the due date</label>
+          <div id="rem-days-list" style="display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 16px;">
+            <!-- day checkboxes injected here -->
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:10px;">
+            <input type="checkbox" id="rem-overdue-enabled" style="width:16px;height:16px;">
+            <span>Also send overdue notices after an invoice's due date has passed</span>
+          </label>
+          <div id="rem-overdue-days-wrap" style="margin:0 0 16px;padding-left:24px;">
+            <label class="label">Send an overdue notice this many days after the due date</label>
+            <div id="rem-overdue-days-list" style="display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 0;">
+              <!-- overdue day checkboxes injected here -->
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:16px;">
+            <input type="checkbox" id="rem-copy-admin" style="width:16px;height:16px;" checked>
+            <span>Send a copy of each reminder to the admin</span>
+          </label>
+          <button onclick="saveInvoiceReminders()" class="btn btn-primary" id="rem-save-btn">Save Reminder Schedule</button>
+        </div>
+      </div>
+
       <!-- FIX INVOICE LINKS — one-time repair tool, shown when this section is active -->
       <div id="fix-links-card" class="card" style="margin-top:16px;display:none;">
         <div class="card-header">
@@ -633,6 +669,28 @@
           <button onclick="saveSettings()" class="btn btn-primary">Save Settings</button>
         </div>
       </div>
+
+      <!-- APPLICATION COMPLIANCE & DISCLOSURES -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;">📋 Application Compliance &amp; Disclosures</h3>
+          <div style="display:flex;gap:8px;">
+            <button onclick="loadStarterDisclosures()" class="btn btn-sm btn-outline">Load starter templates</button>
+            <button onclick="addDisclosure()" class="btn btn-sm btn-primary">+ Add Disclosure</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="disclosure-alert" class="hidden alert"></div>
+          <p style="font-size:13px;color:var(--slate);margin-bottom:6px;">
+            Disclosures added here are merged into the printable application. <strong>Federal</strong> disclosures print on every application; <strong>state</strong> disclosures print only when the application's property is in that state.
+          </p>
+          <p style="font-size:12px;color:#92400E;background:#FEF3C7;border-radius:3px;padding:10px 12px;margin:0 0 16px;">
+            ⚠️ These templates are provided as a starting point only and are <strong>not legal advice</strong>. Rental application and disclosure requirements vary by state and locality — review and adapt all language with a licensed attorney before use.
+          </p>
+          <div id="disclosures-list" style="display:flex;flex-direction:column;gap:12px;"></div>
+          <button onclick="saveDisclosures()" class="btn btn-primary" id="disclosure-save-btn" style="margin-top:16px;">Save Disclosures</button>
+        </div>
+      </div>
     </section>
 
   </div>
@@ -755,6 +813,12 @@
       </div>
       <div><label class="label">Units</label><input type="number" id="prop-units" class="form-input" placeholder="12" min="1"></div>
       <div><label class="label">Type</label><select id="prop-type" class="form-input"><option>Apartment Complex</option><option>Single Family</option><option>Duplex / Triplex</option><option>Commercial</option><option>Other</option></select></div>
+      <div><label class="label">City</label><input type="text" id="prop-city" class="form-input" placeholder="Austin"></div>
+      <div><label class="label">ZIP</label><input type="text" id="prop-zip" class="form-input" placeholder="78701"></div>
+      <div class="col-span-2">
+        <label class="label">State <span style="font-size:10px;font-weight:400;">(drives which compliance disclosures print on applications)</span></label>
+        <select id="prop-state" class="form-input"><option value="">— Select state —</option></select>
+      </div>
       <div class="col-span-2">
         <label class="label">Property Images <span style="font-size:10px;font-weight:400;">(one URL per line)</span></label>
         <div id="prop-images-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
@@ -976,7 +1040,7 @@
   async function loadAll() {
     await Promise.all([loadProperties(), loadTenants(), loadApplications(), loadPayments(), loadDocuments(), loadMaintenance(),
       loadAnnouncements(), loadSettings(), loadInvites(), loadSupport(), loadInvoices(),
-      loadFinancials(), loadVendors(), loadConsents(), loadFeatures()]);
+      loadFinancials(), loadVendors(), loadConsents(), loadFeatures(), loadInvoiceReminders(), loadDisclosures()]);
     updateDashboardStats();
   }
 
@@ -1010,8 +1074,16 @@
       el.innerHTML = first + opts;
     });
   }
+  const US_STATES=['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
+  function ensureStateOptions(){
+    const sel=document.getElementById('prop-state'); if(!sel||sel.dataset.filled) return;
+    sel.insertAdjacentHTML('beforeend', US_STATES.map(s=>`<option value="${s}">${s}</option>`).join(''));
+    sel.dataset.filled='1';
+  }
   window.openPropertyModal = () => {
-    ['prop-id','prop-name','prop-address','prop-units'].forEach(id => document.getElementById(id).value = '');
+    ensureStateOptions();
+    ['prop-id','prop-name','prop-address','prop-units','prop-city','prop-zip'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('prop-state').value = '';
     document.getElementById('prop-available').checked = false;
     document.getElementById('prop-modal-title').textContent = 'Add Property';
     document.getElementById('prop-alert').classList.add('hidden');
@@ -1020,12 +1092,16 @@
   };
   window.editProperty = id => {
     const p = allProperties.find(x => x.id === id); if (!p) return;
+    ensureStateOptions();
     document.getElementById('prop-id').value = id;
     document.getElementById('prop-name').value = p.name||'';
     document.getElementById('prop-address').value = p.address||'';
     document.getElementById('prop-available').checked = p.available === true;
     document.getElementById('prop-units').value = p.units||'';
     document.getElementById('prop-type').value = p.type||'Apartment Complex';
+    document.getElementById('prop-city').value = p.city||'';
+    document.getElementById('prop-state').value = p.state||'';
+    document.getElementById('prop-zip').value = p.zip||'';
     document.getElementById('prop-modal-title').textContent = 'Edit Property';
     document.getElementById('prop-alert').classList.add('hidden');
     const imgs = p.imageUrls || (p.imageUrl ? [p.imageUrl] : []);
@@ -1039,7 +1115,7 @@
     const available = document.getElementById('prop-available').checked;
     if (!name || !addr) { showAlert('prop-alert','Name and address are required.'); return; }
     const imageUrls = Array.from(document.querySelectorAll('.prop-img-input')).map(i => i.value.trim()).filter(Boolean);
-    const data = { name, address: addr, available, units: parseInt(document.getElementById('prop-units').value)||0, type: document.getElementById('prop-type').value, imageUrls, updatedAt: serverTimestamp() };
+    const data = { name, address: addr, available, units: parseInt(document.getElementById('prop-units').value)||0, type: document.getElementById('prop-type').value, city: document.getElementById('prop-city').value.trim(), state: document.getElementById('prop-state').value, zip: document.getElementById('prop-zip').value.trim(), imageUrls, updatedAt: serverTimestamp() };
     const btn = document.getElementById('prop-save-btn'); btn.disabled=true; btn.textContent='Saving...';
     try {
       if (id) { await updateDoc(doc(db,'properties',id), data); }
@@ -1328,12 +1404,122 @@
       ${app.status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-danger">Decline</button>` : ''}
       ${!creditOrderedAt ? `<button onclick="orderCreditCheck('${app.id}')" class="btn btn-outline" ${canOrderCredit ? '' : 'disabled title="Requires applicant background-check consent"'}>Send SmartMove rental screening invite</button>` : `<button class="btn btn-success" disabled>SmartMove screening requested</button>`}
       ${!employmentOrderedAt ? `<button onclick="orderEmploymentVerification('${app.id}')" class="btn btn-outline">Order employment verification</button>` : `<button class="btn btn-success" disabled>Employment verification ordered</button>`}
+      <button onclick="printApplication('${app.id}')" class="btn btn-outline">🖨 Print Application</button>
       <button onclick="saveApplicationReview()" class="btn btn-amber">Save Review</button>
       <button onclick="closeModal('application-preview-modal')" class="btn btn-outline">Close</button>
     `;
     document.getElementById('application-preview-modal').dataset.appId = id;
     openModal('application-preview-modal');
   };
+
+  // ===== PRINT PROPERTY-TAILORED APPLICATION =====
+  window.printApplication = async (id) => {
+    const app = allApplications.find(a => a.id === id);
+    if (!app) return alert('Application not found.');
+    const prop = allProperties.find(p => p.id === app.propertyId) || {};
+    let site = {};
+    try { const s = await getDoc(doc(db,'settings','site')); if (s.exists()) site = s.data(); } catch {}
+    let disclosures = [];
+    try { const c = await getDoc(doc(db,'settings','compliance')); if (c.exists() && Array.isArray(c.data().templates)) disclosures = c.data().templates; } catch {}
+
+    const state = prop.state || '';
+    const applicable = disclosures.filter(d => d.scope !== 'state' || (state && d.state === state));
+
+    const esc = escapeHtml;
+    const submitted = app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : (app.submittedAt || '—');
+    const consent = app.consent || {};
+    const fullAddress = [prop.address, prop.city, [prop.state, prop.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || app.propertyName || '—';
+    const money = app.income ? '$' + Number(app.income).toLocaleString() : 'N/A';
+
+    const row = (label, val) => `<tr><td style="padding:6px 10px;color:#6B7280;width:38%;vertical-align:top;">${label}</td><td style="padding:6px 10px;color:#111827;font-weight:500;">${val||'—'}</td></tr>`;
+    const section = (title, inner) => `<h2 style="font-size:15px;margin:22px 0 8px;color:#1A1A2E;border-bottom:2px solid #C9903A;padding-bottom:4px;">${title}</h2>${inner}`;
+
+    const disclosuresHtml = applicable.length
+      ? applicable.map(d => `<div style="margin-bottom:16px;break-inside:avoid;">
+          <h3 style="font-size:13px;margin:0 0 4px;color:#1A1A2E;">${esc(d.title||'Disclosure')} ${d.scope==='state'?`<span style="font-size:10px;color:#92400E;background:#FEF3C7;padding:1px 6px;border-radius:8px;">${esc(d.state||'')}</span>`:''}</h3>
+          <p style="font-size:11px;line-height:1.6;color:#374151;margin:0;white-space:pre-wrap;">${esc(d.body||'')}</p>
+        </div>`).join('')
+      : '<p style="font-size:12px;color:#9CA3AF;">No compliance disclosures configured. Add them in Settings → Application Compliance &amp; Disclosures.</p>';
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Rental Application — ${esc(app.firstName||'')} ${esc(app.lastName||'')}</title>
+      <style>
+        @media print { .no-print{display:none;} @page{margin:18mm;} }
+        body{font-family:'Helvetica Neue',Arial,sans-serif;color:#111827;max-width:820px;margin:24px auto;padding:0 24px;font-size:12px;line-height:1.5;}
+        table{width:100%;border-collapse:collapse;}
+        .meta{font-size:11px;color:#6B7280;}
+        .box{border:1px solid #E5E7EB;border-radius:4px;padding:12px 14px;background:#FAFAF9;}
+        .sig{margin-top:6px;border-top:1px solid #111827;padding-top:4px;font-size:11px;color:#6B7280;}
+      </style></head><body>
+      <div class="no-print" style="text-align:right;margin-bottom:12px;">
+        <button onclick="window.print()" style="background:#C9903A;color:#fff;border:none;padding:8px 18px;border-radius:3px;font-size:12px;cursor:pointer;">🖨 Print / Save as PDF</button>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1A1A2E;padding-bottom:12px;">
+        <div>
+          <div style="font-size:20px;font-weight:600;color:#1A1A2E;">${esc(site.siteName||'Rental Application')}</div>
+          <div class="meta">${esc(site.address||'')}${site.phone?' · '+esc(site.phone):''}${site.email?' · '+esc(site.email):''}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:16px;font-weight:600;color:#C9903A;">RENTAL APPLICATION</div>
+          <div class="meta">Application ID: ${esc(app.applicationId||app.id)}<br>Printed: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}</div>
+        </div>
+      </div>
+
+      ${section('Property Applied For', `<table class="box">
+        ${row('Property', esc(prop.name||app.propertyName||'—'))}
+        ${row('Address', esc(fullAddress))}
+        ${row('Unit', esc(app.unitLabel||'N/A'))}
+        ${row('Requested move-in', esc(app.moveInDate||'N/A'))}
+      </table>`)}
+
+      ${section('Applicant', `<table class="box">
+        ${row('Name', esc(`${app.firstName||''} ${app.lastName||''}`.trim()))}
+        ${row('Email', esc(app.email||'—'))}
+        ${row('Phone', esc(app.phone||'—'))}
+        ${row('Submitted', esc(submitted))}
+      </table>`)}
+
+      ${section('Financial Information', `<table class="box">
+        ${row('Gross monthly income', esc(money))}
+        ${row('Current employer', esc(app.currentEmployer||'N/A'))}
+      </table>`)}
+
+      ${app.message ? section('Applicant Message', `<div class="box" style="white-space:pre-wrap;">${esc(app.message)}</div>`) : ''}
+
+      ${section('Consent & Authorization Record', `<table class="box">
+        ${row('Data collection consent', consent.dataCollection?'Yes':'No')}
+        ${row('Background/credit check consent', consent.backgroundCheck?'Yes':'No')}
+        ${row('Terms accepted', consent.terms?'Yes':'No')}
+        ${row('Recorded at', esc(consent.recordedAt||'—'))}
+        ${row('IP address', esc(consent.ipAddress||'—'))}
+      </table>`)}
+
+      ${section(`State & Local Compliance Disclosures${state?` — ${esc(state)}`:''}`, `<div class="box">${disclosuresHtml}</div>`)}
+
+      ${section('Certification & Signatures', `
+        <p style="font-size:11px;color:#374151;">The applicant certifies that the information provided in this application is true and complete to the best of their knowledge, and acknowledges receipt and review of the disclosures above.</p>
+        <table style="margin-top:22px;">
+          <tr>
+            <td style="width:50%;padding-right:24px;"><div class="sig">Applicant signature</div></td>
+            <td style="width:50%;"><div class="sig">Date</div></td>
+          </tr>
+          <tr>
+            <td style="padding-top:28px;padding-right:24px;"><div class="sig">Landlord / Agent signature</div></td>
+            <td style="padding-top:28px;"><div class="sig">Date</div></td>
+          </tr>
+        </table>`)}
+
+      <p style="margin-top:26px;font-size:10px;color:#9CA3AF;border-top:1px solid #E5E7EB;padding-top:8px;">
+        Disclaimer: This document and the disclosures it contains are provided as a template only and do not constitute legal advice. Rental application and disclosure requirements vary by state and locality. Review and adapt this document with a licensed attorney before use.
+      </p>
+      <script>window.addEventListener('load',function(){setTimeout(function(){window.print();},300);});<\/script>
+      </body></html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) return alert('Please allow pop-ups to print the application.');
+    win.document.write(html);
+    win.document.close();
+  };
+
   window.filterTenants = () => {
     const q = document.getElementById('tenant-search').value.toLowerCase();
     renderTenantsTable(allTenants.filter(t => `${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(q)));
@@ -1938,6 +2124,14 @@
     tbody.innerHTML = items.map(inv => {
       const date = inv.createdAt?.toDate ? inv.createdAt.toDate().toLocaleDateString() : '—';
       const duePaid = inv.status==='paid'&&inv.paidDate?`Paid: ${inv.paidDate}`:(inv.dueDate?`Due: ${inv.dueDate}`:'—');
+      const rem = Array.isArray(inv.remindersSent)?inv.remindersSent:[];
+      let remInfo = '';
+      if (rem.length) {
+        const last = rem.reduce((a,b)=>((a?.sentAt||'')>(b?.sentAt||'')?a:b));
+        const lastDate = last?.sentAt ? new Date(last.sentAt).toLocaleDateString() : '';
+        const hasOverdue = rem.some(r=>Number(r.days)<0);
+        remInfo = `<div title="Last reminder ${lastDate}${last&&Number(last.days)<0?` — ${-Number(last.days)}d overdue`:last?` — ${Number(last.days)}d before due`:''}" style="font-size:10px;color:${hasOverdue?'#DC2626':'#16A34A'};margin-top:3px;">🔔 ${rem.length} reminder${rem.length===1?'':'s'} sent${lastDate?` · ${lastDate}`:''}</div>`;
+      }
       const typeTag = inv.type==='receipt'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:1px 7px;border-radius:2px;">Receipt</span>':'<span style="font-size:10px;background:#EFF6FF;color:#3B82F6;padding:1px 7px;border-radius:2px;">Invoice</span>';
       const statusTag = inv.status==='paid'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:10px;">Paid</span>':inv.status==='overdue'?'<span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:10px;">Overdue</span>':'<span style="font-size:10px;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;">Pending</span>';
       return `<tr>
@@ -1945,7 +2139,7 @@
         <td style="font-size:13px;">${inv.tenantName||'—'}<div style="font-size:11px;color:var(--slate);">${inv.unit?'Unit '+inv.unit:''}</div></td>
         <td style="font-size:14px;font-weight:600;color:var(--amber);">$${parseFloat(inv.total||0).toFixed(2)}</td>
         <td>${typeTag}</td><td>${statusTag}</td>
-        <td style="font-size:12px;color:var(--slate);">${duePaid}</td>
+        <td style="font-size:12px;color:var(--slate);">${duePaid}${remInfo}</td>
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <a href="${inv.invoiceUrl||'#'}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;font-size:11px;">View</a>
@@ -2605,6 +2799,145 @@
       alert.className='alert alert-success';alert.textContent='✓ Settings saved. Changes will appear on the live site immediately.';alert.classList.remove('hidden');
       setTimeout(()=>alert.classList.add('hidden'),4000);
     } catch(e){alert.className='alert alert-error';alert.textContent='Error saving: '+e.message;alert.classList.remove('hidden');}
+  };
+
+  // ===== INVOICE REMINDER SCHEDULE =====
+  const REMINDER_DAY_OPTIONS=[1,3,5,7,10,14,15,21,30];
+  const OVERDUE_DAY_OPTIONS=[1,3,5,7,14,30];
+  function renderReminderDays(selected){
+    const list=document.getElementById('rem-days-list'); if(!list) return;
+    const sel=new Set((selected||[]).map(Number));
+    list.innerHTML=REMINDER_DAY_OPTIONS.map(d=>`
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer;">
+        <input type="checkbox" class="rem-day" value="${d}" style="width:15px;height:15px;" ${sel.has(d)?'checked':''}>
+        <span>${d} day${d===1?'':'s'}</span>
+      </label>`).join('');
+  }
+  function renderOverdueDays(selected){
+    const list=document.getElementById('rem-overdue-days-list'); if(!list) return;
+    const sel=new Set((selected||[]).map(Number));
+    list.innerHTML=OVERDUE_DAY_OPTIONS.map(d=>`
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;cursor:pointer;">
+        <input type="checkbox" class="rem-overdue-day" value="${d}" style="width:15px;height:15px;" ${sel.has(d)?'checked':''}>
+        <span>${d} day${d===1?'':'s'}</span>
+      </label>`).join('');
+  }
+  function toggleOverdueDays(){
+    const on=document.getElementById('rem-overdue-enabled')?.checked;
+    const wrap=document.getElementById('rem-overdue-days-wrap'); if(wrap) wrap.style.display=on?'':'none';
+  }
+  async function loadInvoiceReminders(){
+    let cfg={};
+    try { const snap=await getDoc(doc(db,'settings','site')); cfg=(snap.exists()&&snap.data().invoiceReminders)||{}; }
+    catch(e){ console.error('loadInvoiceReminders:',e); }
+    const enabled=document.getElementById('rem-enabled'); if(enabled) enabled.checked=cfg.enabled===true;
+    const copy=document.getElementById('rem-copy-admin'); if(copy) copy.checked=cfg.copyAdmin!==false;
+    const ov=document.getElementById('rem-overdue-enabled'); if(ov) ov.checked=cfg.overdueEnabled===true;
+    renderReminderDays(cfg.daysBefore&&cfg.daysBefore.length?cfg.daysBefore:[5,10,15]);
+    renderOverdueDays(cfg.daysAfter&&cfg.daysAfter.length?cfg.daysAfter:[1,7,14]);
+    toggleOverdueDays();
+    document.getElementById('rem-overdue-enabled')?.addEventListener('change',toggleOverdueDays);
+  }
+  window.saveInvoiceReminders=async()=>{
+    const daysBefore=Array.from(document.querySelectorAll('.rem-day:checked')).map(el=>parseInt(el.value,10)).sort((a,b)=>a-b);
+    const daysAfter=Array.from(document.querySelectorAll('.rem-overdue-day:checked')).map(el=>parseInt(el.value,10)).sort((a,b)=>a-b);
+    const enabled=document.getElementById('rem-enabled').checked;
+    const overdueEnabled=document.getElementById('rem-overdue-enabled').checked;
+    const copyAdmin=document.getElementById('rem-copy-admin').checked;
+    if(enabled&&!daysBefore.length&&!(overdueEnabled&&daysAfter.length)){showAlert('reminder-alert','Select at least one before-due or overdue lead time, or turn reminders off.');return;}
+    if(enabled&&overdueEnabled&&!daysAfter.length){showAlert('reminder-alert','Select at least one overdue lead time, or turn overdue notices off.');return;}
+    const btn=document.getElementById('rem-save-btn'); btn.disabled=true; btn.textContent='Saving...';
+    try {
+      await setDoc(doc(db,'settings','site'),{invoiceReminders:{enabled,daysBefore,overdueEnabled,daysAfter,copyAdmin},updatedAt:serverTimestamp()},{merge:true});
+      let msg;
+      if(!enabled) msg='✓ Automatic reminders turned off.';
+      else { msg=`✓ Reminders on — tenants emailed ${daysBefore.join(', ')||'—'} day(s) before due`; if(overdueEnabled&&daysAfter.length) msg+=`, and ${daysAfter.join(', ')} day(s) after if unpaid`; msg+='.'; }
+      showAlert('reminder-alert',msg,'success');
+      setTimeout(()=>document.getElementById('reminder-alert').classList.add('hidden'),6000);
+    } catch(e){ showAlert('reminder-alert','Error saving: '+e.message); }
+    btn.disabled=false; btn.textContent='Save Reminder Schedule';
+  };
+
+  // ===== APPLICATION COMPLIANCE DISCLOSURES =====
+  let allDisclosures=[];
+  async function loadDisclosures(){
+    try {
+      const snap=await getDoc(doc(db,'settings','compliance'));
+      allDisclosures=(snap.exists()&&Array.isArray(snap.data().templates))?snap.data().templates:[];
+    } catch(e){ console.error('loadDisclosures:',e); allDisclosures=[]; }
+    renderDisclosures();
+  }
+  function renderDisclosures(){
+    const list=document.getElementById('disclosures-list'); if(!list) return;
+    if(!allDisclosures.length){ list.innerHTML='<p style="font-size:13px;color:var(--slate);padding:8px 0;">No disclosures yet. Add one or load the starter templates.</p>'; return; }
+    const stateOpts=US_STATES.map(s=>`<option value="${s}">${s}</option>`).join('');
+    list.innerHTML=allDisclosures.map((d,i)=>`
+      <div class="disc-row" style="border:1px solid var(--border);border-radius:4px;padding:14px;background:#FDFBF8;">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:10px;">
+          <div style="width:150px;">
+            <label class="label">Scope</label>
+            <select class="form-input disc-scope" onchange="onDiscScopeChange(${i})">
+              <option value="federal"${d.scope!=='state'?' selected':''}>Federal (all)</option>
+              <option value="state"${d.scope==='state'?' selected':''}>State-specific</option>
+            </select>
+          </div>
+          <div style="width:120px;${d.scope==='state'?'':'display:none;'}" class="disc-state-wrap">
+            <label class="label">State</label>
+            <select class="form-input disc-state"><option value="">—</option>${stateOpts}</select>
+          </div>
+          <div style="flex:1;min-width:180px;">
+            <label class="label">Title</label>
+            <input type="text" class="form-input disc-title" value="${escapeHtml(d.title||'')}" placeholder="e.g. Lead-Based Paint Disclosure">
+          </div>
+          <button onclick="removeDisclosure(${i})" class="btn btn-sm btn-danger">Remove</button>
+        </div>
+        <label class="label">Disclosure text</label>
+        <textarea class="form-input disc-body" rows="4" placeholder="Enter the disclosure language...">${escapeHtml(d.body||'')}</textarea>
+      </div>`).join('');
+    // restore selected state values (can't set via template attr on dynamic select reliably)
+    document.querySelectorAll('#disclosures-list .disc-row').forEach((row,i)=>{
+      const stateSel=row.querySelector('.disc-state'); if(stateSel) stateSel.value=allDisclosures[i].state||'';
+    });
+  }
+  function collectDisclosuresFromDom(){
+    return Array.from(document.querySelectorAll('#disclosures-list .disc-row')).map(row=>{
+      const scope=row.querySelector('.disc-scope').value;
+      return {
+        scope,
+        state: scope==='state'?(row.querySelector('.disc-state').value||''):'',
+        title: row.querySelector('.disc-title').value.trim(),
+        body:  row.querySelector('.disc-body').value.trim(),
+      };
+    });
+  }
+  window.onDiscScopeChange=(i)=>{ allDisclosures=collectDisclosuresFromDom(); renderDisclosures(); };
+  window.addDisclosure=()=>{ allDisclosures=collectDisclosuresSafe(); allDisclosures.push({scope:'federal',state:'',title:'',body:''}); renderDisclosures(); };
+  function collectDisclosuresSafe(){ return document.querySelectorAll('#disclosures-list .disc-row').length?collectDisclosuresFromDom():allDisclosures; }
+  window.removeDisclosure=(i)=>{ allDisclosures=collectDisclosuresFromDom(); allDisclosures.splice(i,1); renderDisclosures(); };
+  window.saveDisclosures=async()=>{
+    allDisclosures=collectDisclosuresSafe().filter(d=>d.title||d.body);
+    const btn=document.getElementById('disclosure-save-btn'); btn.disabled=true; btn.textContent='Saving...';
+    try {
+      await setDoc(doc(db,'settings','compliance'),{templates:allDisclosures,updatedAt:serverTimestamp()},{merge:true});
+      renderDisclosures();
+      showAlert('disclosure-alert',`✓ Saved ${allDisclosures.length} disclosure${allDisclosures.length===1?'':'s'}.`,'success');
+      setTimeout(()=>document.getElementById('disclosure-alert').classList.add('hidden'),4000);
+    } catch(e){ showAlert('disclosure-alert','Error saving: '+e.message); }
+    btn.disabled=false; btn.textContent='Save Disclosures';
+  };
+  window.loadStarterDisclosures=()=>{
+    const starters=[
+      {scope:'federal',state:'',title:'Fair Housing / Equal Opportunity',body:'This property is offered in compliance with the federal Fair Housing Act. We do not discriminate against any applicant on the basis of race, color, religion, sex, national origin, familial status, or disability. Reasonable accommodations for persons with disabilities are available upon request.'},
+      {scope:'federal',state:'',title:'Lead-Based Paint Disclosure (housing built before 1978)',body:'Housing built before 1978 may contain lead-based paint. Lead from paint, paint chips, and dust can pose health hazards if not managed properly. Landlords must disclose the presence of known lead-based paint and provide the EPA pamphlet "Protect Your Family From Lead in Your Home." Applicant acknowledges receipt of any required lead-based paint disclosures for pre-1978 housing.'},
+      {scope:'federal',state:'',title:'Background & Credit Check Authorization (FCRA)',body:'By signing this application, the applicant authorizes the landlord or its agent to obtain a consumer report, including credit history, rental history, and background/criminal records, for the purpose of evaluating this rental application, in accordance with the Fair Credit Reporting Act (FCRA). If the application is denied based wholly or partly on information in a consumer report, the applicant will be provided an adverse action notice identifying the reporting agency.'},
+      {scope:'federal',state:'',title:'Application & Screening Fee Notice',body:'Any application or screening fee charged is used to cover the actual cost of processing this application and obtaining consumer/background reports. The amount and refundability of any fee will be disclosed to the applicant before it is collected, consistent with applicable state and local law.'},
+    ];
+    const existing=collectDisclosuresSafe();
+    // Avoid duplicating starters already present (by title)
+    const titles=new Set(existing.map(d=>(d.title||'').toLowerCase()));
+    allDisclosures=existing.concat(starters.filter(s=>!titles.has(s.title.toLowerCase())));
+    renderDisclosures();
+    showAlert('disclosure-alert','Starter federal templates loaded. Review, edit, add any state-specific disclosures, then click Save Disclosures.','info');
   };
 
   // ===== IMAGE ROWS =====
