@@ -116,6 +116,7 @@ exports.handler = async () => {
   for (const docSnap of snap.docs) {
     const inv = docSnap.data();
     if (inv.type === 'receipt') continue;
+    if (inv.status === 'draft') continue; // never delivered to the tenant yet
     if (inv.status === 'paid' || inv.paidDate || inv.paidAt) continue;
     if (!inv.tenantEmail || !inv.dueDate) continue;
 

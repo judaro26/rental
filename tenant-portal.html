@@ -1443,7 +1443,7 @@
     try {
       const q    = query(collection(db,'invoices'), where('tenantId','==',currentUser.uid));
       const snap = await getDocs(q);
-      let items  = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      let items  = snap.docs.map(d => ({ id:d.id, ...d.data() })).filter(inv => inv.status !== 'draft');
       items.sort((a,b) => {
         const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
         const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);

@@ -212,7 +212,8 @@ exports.handler = async (event) => {
     type = 'invoice', // 'invoice' | 'receipt'
     tenantId, tenantName, tenantEmail, unit, propertyId, propertyName,
     lineItems = [], taxRate = 0, dueDate, paidDate, notes, siteName,
-    existingInvoiceId, // if converting invoice→receipt
+    existingInvoiceId, // if converting invoice→receipt, or sending an existing draft
+    sendNow = true,    // when false, an invoice is saved as a draft and no email is sent
   } = body;
 
   if (!tenantId || !tenantEmail || !lineItems.length) {
@@ -254,36 +255,43 @@ exports.handler = async (event) => {
     await store.set(blobKey, Buffer.from(html, 'utf8'), { metadata: { contentType: 'text/html', fileName: `${blobKey}` } });
     const invoiceUrl = `${siteUrl}/api/view-invoice?key=${encodeURIComponent(blobKey)}`;
 
+    // Receipts always send; invoices send only when sendNow is true (otherwise saved as a draft).
+    const willSend = isReceipt || sendNow !== false;
+
     // Save / update Firestore
     const invoiceData = {
       type, invoiceNumber, tenantId, tenantName, tenantEmail, unit: unit||'',
       propertyId: propertyId||null, propertyName: propertyName||'',
       lineItems, subtotal, taxRate: parseFloat(taxRate)||0, taxAmount, total,
       dueDate: dueDate||null, paidDate: paidDate||null, notes: notes||'',
-      status: isReceipt ? 'paid' : 'sent',
+      status: isReceipt ? 'paid' : (willSend ? 'sent' : 'draft'),
       invoiceUrl, blobKey,
       updatedAt: a.firestore.FieldValue.serverTimestamp(),
     };
 
     let invoiceId;
     if (existingInvoiceId) {
-      await db.collection('invoices').doc(existingInvoiceId).update({
-        ...invoiceData,
-        status: 'paid',
-        paidAt: a.firestore.FieldValue.serverTimestamp(),
-      });
+      const update = { ...invoiceData };
+      if (isReceipt) {
+        update.status = 'paid';
+        update.paidAt = a.firestore.FieldValue.serverTimestamp();
+      } else if (willSend) {
+        update.sentAt = a.firestore.FieldValue.serverTimestamp();
+      }
+      await db.collection('invoices').doc(existingInvoiceId).update(update);
       invoiceId = existingInvoiceId;
     } else {
-      const ref = await db.collection('invoices').add({
+      const newDoc = {
         ...invoiceData,
         createdAt: a.firestore.FieldValue.serverTimestamp(),
-        sentAt:    a.firestore.FieldValue.serverTimestamp(),
-      });
+      };
+      if (willSend) newDoc.sentAt = a.firestore.FieldValue.serverTimestamp();
+      const ref = await db.collection('invoices').add(newDoc);
       invoiceId = ref.id;
     }
 
-    // Email tenant
-    if (process.env.SMTP_HOST && tenantEmail) {
+    // Email tenant (skipped for drafts)
+    if (willSend && process.env.SMTP_HOST && tenantEmail) {
       const transporter = nodemailer.createTransport({
         host:   process.env.SMTP_HOST,
         port:   parseInt(process.env.SMTP_PORT || '587'),
@@ -298,7 +306,7 @@ exports.handler = async (event) => {
       });
     }
 
-    return { statusCode: 200, body: JSON.stringify({ success: true, invoiceId, invoiceUrl, invoiceNumber }) };
+    return { statusCode: 200, body: JSON.stringify({ success: true, invoiceId, invoiceUrl, invoiceNumber, sent: willSend }) };
   } catch (err) {
     console.error('generate-invoice error:', err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };

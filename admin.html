@@ -420,7 +420,7 @@
           <div style="display:flex;gap:8px;">
             <select id="inv-filter" class="form-input" style="width:160px;font-size:12px;" onchange="filterInvoices()">
               <option value="">All</option><option value="invoice">Invoices</option><option value="receipt">Receipts</option>
-              <option value="sent">Pending</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
+              <option value="draft">Drafts</option><option value="sent">Pending</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
             </select>
             <button onclick="openInvoiceModal()" class="btn btn-primary">+ New Invoice</button>
           </div>
@@ -865,10 +865,15 @@
         </table>
       </div>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-bottom:14px;">
+      <input type="checkbox" id="inv-send-now" style="width:16px;height:16px;" checked onchange="updateInvoiceSubmitLabel()">
+      <span>Email this invoice to the tenant now</span>
+    </label>
     <div style="display:flex;gap:10px;">
       <button onclick="submitInvoice()" class="btn btn-primary" style="flex:1;" id="inv-submit-btn">Send Invoice</button>
       <button onclick="closeModal('invoice-modal')" class="btn btn-outline">Cancel</button>
     </div>
+    <p id="inv-send-hint" style="font-size:11px;color:var(--slate);margin:10px 0 0;">Leave unchecked to save it as a draft — you can send it from the invoices list whenever you're ready.</p>
   </div>
 </div>
 
@@ -2114,6 +2119,7 @@
     if (f==='invoice') filtered=filtered.filter(i=>i.type==='invoice');
     if (f==='receipt') filtered=filtered.filter(i=>i.type==='receipt');
     if (f==='sent') filtered=filtered.filter(i=>i.status==='sent');
+    if (f==='draft') filtered=filtered.filter(i=>i.status==='draft');
     if (f==='paid') filtered=filtered.filter(i=>i.status==='paid');
     if (f==='overdue') filtered=filtered.filter(i=>i.status==='overdue');
     renderInvoicesTable(filtered);
@@ -2133,7 +2139,7 @@
         remInfo = `<div title="Last reminder ${lastDate}${last&&Number(last.days)<0?` — ${-Number(last.days)}d overdue`:last?` — ${Number(last.days)}d before due`:''}" style="font-size:10px;color:${hasOverdue?'#DC2626':'#16A34A'};margin-top:3px;">🔔 ${rem.length} reminder${rem.length===1?'':'s'} sent${lastDate?` · ${lastDate}`:''}</div>`;
       }
       const typeTag = inv.type==='receipt'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:1px 7px;border-radius:2px;">Receipt</span>':'<span style="font-size:10px;background:#EFF6FF;color:#3B82F6;padding:1px 7px;border-radius:2px;">Invoice</span>';
-      const statusTag = inv.status==='paid'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:10px;">Paid</span>':inv.status==='overdue'?'<span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:10px;">Overdue</span>':'<span style="font-size:10px;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;">Pending</span>';
+      const statusTag = inv.status==='paid'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:2px 8px;border-radius:10px;">Paid</span>':inv.status==='overdue'?'<span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:2px 8px;border-radius:10px;">Overdue</span>':inv.status==='draft'?'<span style="font-size:10px;background:#F3F4F6;color:#6B7280;padding:2px 8px;border-radius:10px;">Draft</span>':'<span style="font-size:10px;background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:10px;">Pending</span>';
       return `<tr>
         <td style="font-size:12px;font-weight:500;">${inv.invoiceNumber||'—'}</td>
         <td style="font-size:13px;">${inv.tenantName||'—'}<div style="font-size:11px;color:var(--slate);">${inv.unit?'Unit '+inv.unit:''}</div></td>
@@ -2143,8 +2149,9 @@
         <td>
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <a href="${inv.invoiceUrl||'#'}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;font-size:11px;">View</a>
-            ${inv.status!=='paid'&&inv.type==='invoice'?`<button onclick="markInvoicePaid('${inv.id}')" class="btn btn-sm" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;font-size:11px;">Mark Paid</button>`:''}
-            ${inv.status!=='paid'?`<button onclick="generateReceipt('${inv.id}')" class="btn btn-sm btn-primary" style="font-size:11px;">Receipt</button>`:''}
+            ${inv.status==='draft'&&inv.type==='invoice'?`<button onclick="sendInvoiceNow('${inv.id}')" class="btn btn-sm btn-primary" style="font-size:11px;">Send</button>`:''}
+            ${inv.status!=='paid'&&inv.status!=='draft'&&inv.type==='invoice'?`<button onclick="markInvoicePaid('${inv.id}')" class="btn btn-sm" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;font-size:11px;">Mark Paid</button>`:''}
+            ${inv.status!=='paid'&&inv.status!=='draft'?`<button onclick="generateReceipt('${inv.id}')" class="btn btn-sm btn-primary" style="font-size:11px;">Receipt</button>`:''}
             <button onclick="deleteInvoice('${inv.id}')" class="btn btn-sm btn-danger" style="font-size:11px;">×</button>
           </div>
         </td>
@@ -2163,6 +2170,8 @@
     document.getElementById('inv-notes').value='';
     renderLineItems([{description:'Monthly Rent',quantity:1,unitPrice:'',amount:0}]);
     recalcInvoice();
+    document.getElementById('inv-send-now').checked = true;
+    updateInvoiceSubmitLabel();
     openModal('invoice-modal');
   };
   window.updateInvTenantInfo = () => {
@@ -2236,16 +2245,21 @@
     const lineItems = collectLineItems();
     if (!tenantId||!tenant) { showAlert('invoice-alert','Please select a tenant.'); return; }
     if (!lineItems.length) { showAlert('invoice-alert','Add at least one line item.'); return; }
-    const btn = document.getElementById('inv-submit-btn'); btn.disabled=true; btn.textContent='Sending...';
+    const sendNow = document.getElementById('inv-send-now').checked;
+    const btn = document.getElementById('inv-submit-btn'); btn.disabled=true; btn.textContent=sendNow?'Sending...':'Saving...';
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:tenant.propertyName||'',lineItems,taxRate:parseFloat(document.getElementById('inv-tax').value||0),dueDate:document.getElementById('inv-due-date').value,notes:document.getElementById('inv-notes').value.trim(),siteName})});
+      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:tenant.propertyName||'',lineItems,taxRate:parseFloat(document.getElementById('inv-tax').value||0),dueDate:document.getElementById('inv-due-date').value,notes:document.getElementById('inv-notes').value.trim(),sendNow,siteName})});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed');
-      showAlert('invoice-alert',`✓ Invoice ${data.invoiceNumber} sent to ${tenant.email}`,'success');
+      showAlert('invoice-alert',sendNow?`✓ Invoice ${data.invoiceNumber} sent to ${tenant.email}`:`✓ Invoice ${data.invoiceNumber} saved as a draft. Send it anytime from the list.`,'success');
       setTimeout(()=>{closeModal('invoice-modal');loadInvoices();},1800);
     } catch(e) { showAlert('invoice-alert',e.message); }
-    btn.disabled=false; btn.textContent='Send Invoice';
+    btn.disabled=false; btn.textContent=sendNow?'Send Invoice':'Save Draft';
+  };
+  window.updateInvoiceSubmitLabel = () => {
+    const sendNow = document.getElementById('inv-send-now').checked;
+    document.getElementById('inv-submit-btn').textContent = sendNow ? 'Send Invoice' : 'Save Draft';
   };
   window.generateReceipt = async (invoiceId) => {
     const inv = allInvoices.find(i=>i.id===invoiceId); if (!inv) return;
@@ -2265,6 +2279,18 @@
     const paidDate = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
     await updateDoc(doc(db,'invoices',invoiceId),{status:'paid',paidDate,paidAt:serverTimestamp()});
     loadInvoices();
+  };
+  window.sendInvoiceNow = async (invoiceId) => {
+    const inv = allInvoices.find(i=>i.id===invoiceId); if (!inv) return;
+    if (!confirm(`Email invoice ${inv.invoiceNumber||''} to ${inv.tenantEmail||'the tenant'} now?`)) return;
+    const btn = event?.target; if (btn){ btn.disabled=true; btn.textContent='Sending...'; }
+    try {
+      let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
+      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',existingInvoiceId:invoiceId,sendNow:true,tenantId:inv.tenantId,tenantName:inv.tenantName,tenantEmail:inv.tenantEmail,unit:inv.unit||'',propertyId:inv.propertyId||'',propertyName:inv.propertyName||'',lineItems:inv.lineItems||[],taxRate:inv.taxRate||0,dueDate:inv.dueDate||'',notes:inv.notes||'',siteName})});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error||'Failed');
+      loadInvoices();
+    } catch(e) { alert('Error sending invoice: '+e.message); if (btn){ btn.disabled=false; btn.textContent='Send'; } }
   };
   window.deleteInvoice = async (invoiceId) => {
     if (!confirm('Delete this invoice/receipt permanently?')) return;
