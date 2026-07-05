@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload Your Documents</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --cream:#F7F4EF; --charcoal:#1A1A2E; --amber:#C9903A; --slate:#5A6475; --border:#E8E2D8; }
+    * { box-sizing:border-box; }
+    body { font-family:'Jost',sans-serif; background:var(--cream); color:var(--charcoal); margin:0; padding:32px 16px; }
+    h1,h2 { font-family:'Cormorant Garamond',serif; font-weight:500; }
+    .wrap { max-width:640px; margin:0 auto; }
+    .card { background:#fff; border-radius:4px; box-shadow:0 4px 24px rgba(26,26,46,0.08); overflow:hidden; }
+    .card-head { background:var(--charcoal); color:#fff; padding:26px 32px; }
+    .card-head .brand { font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:#E8D5B0; }
+    .card-head h1 { font-size:1.9rem; margin:8px 0 0; font-weight:400; }
+    .card-body { padding:28px 32px; }
+    .intro { font-size:14px; color:var(--slate); line-height:1.7; margin:0 0 20px; }
+    .prop { background:#F7F4EF; border-left:3px solid var(--amber); border-radius:0 3px 3px 0; padding:12px 14px; font-size:13px; margin-bottom:22px; }
+    .section-title { font-size:1.25rem; margin:24px 0 6px; }
+    .req-list { font-size:13px; color:#374151; line-height:1.7; margin:0 0 8px; padding-left:20px; }
+    .label { display:block; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--slate); margin-bottom:6px; }
+    .input { width:100%; border:1.5px solid var(--border); background:#FDFBF8; padding:10px 12px; border-radius:2px; font-family:'Jost',sans-serif; font-size:14px; }
+    .input:focus { outline:none; border-color:var(--amber); }
+    .consent { background:#F0F9FF; border:1px solid #BFDBFE; border-radius:3px; padding:14px 16px; margin:6px 0 20px; }
+    .consent label { display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#1D4ED8; line-height:1.6; cursor:pointer; }
+    .consent input { width:17px; height:17px; margin-top:2px; flex-shrink:0; }
+    .consent .legal { font-size:11px; color:#3B82F6; margin:10px 0 0; line-height:1.6; }
+    .uprow { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+    .uprow .grow { flex:1; min-width:150px; }
+    .btn { display:inline-block; padding:12px 24px; border-radius:2px; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; border:none; font-family:'Jost',sans-serif; font-weight:500; }
+    .btn-primary { background:var(--charcoal); color:#fff; }
+    .btn-primary:hover { background:var(--amber); }
+    .btn-primary:disabled { opacity:0.55; cursor:default; }
+    .uploaded { list-style:none; padding:0; margin:16px 0 0; }
+    .uploaded li { display:flex; align-items:center; gap:8px; font-size:13px; color:#065F46; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:3px; padding:9px 12px; margin-bottom:8px; }
+    .rm-btn { background:none; border:1px solid #FCA5A5; color:#DC2626; border-radius:2px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:'Jost',sans-serif; flex-shrink:0; }
+    .rm-btn:hover { background:#FEF2F2; }
+    .rm-btn:disabled { opacity:0.6; cursor:default; }
+    .msg { padding:13px 16px; border-radius:2px; font-size:13px; margin-bottom:14px; line-height:1.6; }
+    .msg-error { background:#FEF2F2; border:1px solid #FECACA; color:#DC2626; }
+    .foot { text-align:center; font-size:11px; color:var(--slate); padding:18px; }
+    .center { text-align:center; padding:20px 0; }
+    .hidden { display:none; }
+    .note { font-size:11px; color:var(--slate); margin-top:8px; }
+    .spinner { border:2px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; width:15px; height:15px; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:6px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="card-head">
+        <div class="brand" id="brand">Tenant Portal</div>
+        <h1>Upload Your Documents</h1>
+      </div>
+      <div class="card-body">
+        <div id="loading" class="center" style="color:var(--slate);font-size:14px;">Loading…</div>
+
+        <div id="error-state" class="hidden">
+          <div class="msg msg-error" id="error-text">This link is invalid or has expired.</div>
+          <p style="font-size:13px;color:var(--slate);">If you believe this is a mistake, please reply to the email we sent you and we'll send a fresh link.</p>
+        </div>
+
+        <div id="main" class="hidden">
+          <p class="intro" id="intro"></p>
+          <div class="prop" id="prop-line"></div>
+
+          <h2 class="section-title">Requested documents</h2>
+          <ul class="req-list" id="req-list"></ul>
+
+          <h2 class="section-title">Your consent</h2>
+          <div class="consent">
+            <label>
+              <input type="checkbox" id="consent-box">
+              <span>I consent to the collection, storage, and use of the documents I upload for the purpose of evaluating my rental application and, if my application proceeds, for lease processing.</span>
+            </label>
+            <p class="legal">Your consent is recorded with a timestamp and IP address. Documents are stored securely and used only for the purposes above. You may request deletion at any time before a lease is signed.</p>
+          </div>
+          <div id="consent-recorded" class="hidden" style="font-size:12px;color:#16A34A;margin:-10px 0 16px;">✓ Your consent has been recorded.</div>
+
+          <h2 class="section-title">Upload a document</h2>
+          <div class="uprow">
+            <div class="grow">
+              <label class="label">Document type</label>
+              <select id="doc-type" class="input"></select>
+            </div>
+            <div class="grow">
+              <label class="label">File (PDF, image, or Word — max 15 MB)</label>
+              <input type="file" id="doc-file" class="input" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.doc,.docx">
+            </div>
+          </div>
+          <div id="upload-error" class="msg msg-error hidden" style="margin-top:14px;"></div>
+          <div style="margin-top:16px;">
+            <button type="button" id="upload-btn" class="btn btn-primary" onclick="uploadDoc()">Upload document</button>
+            <p class="note">You can upload several files — repeat for each document. To replace a file, remove it below and upload the new version. When you're done, you can simply close this page.</p>
+          </div>
+
+          <h2 class="section-title" id="uploaded-title" style="display:none;">Uploaded</h2>
+          <ul class="uploaded" id="uploaded-list"></ul>
+        </div>
+      </div>
+    </div>
+    <div class="foot" id="foot"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const APP = params.get('app');
+    const TOKEN = params.get('token');
+    const $ = id => document.getElementById(id);
+    const show = id => $(id).classList.remove('hidden');
+    const hide = id => $(id).classList.add('hidden');
+    let consentRecorded = false;
+
+    function addUploadedRow(name, storagePath) {
+      $('uploaded-title').style.display = '';
+      const li = document.createElement('li');
+      li.dataset.path = storagePath || '';
+      li.innerHTML = `<span>✓</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(name||'Document').replace(/</g,'&lt;')}</span>`
+        + (storagePath ? `<button type="button" class="rm-btn" onclick="removeUploaded(this)">Remove</button>` : '');
+      $('uploaded-list').appendChild(li);
+    }
+    async function removeUploaded(btn) {
+      const li = btn.closest('li'); const path = li.dataset.path; if (!path) return;
+      if (!confirm('Remove this document? You can upload a replacement afterwards.')) return;
+      btn.disabled = true; btn.textContent = 'Removing…';
+      try {
+        const res = await fetch('/api/delete-application-document', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ app: APP, token: TOKEN, storagePath: path }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not remove the document.');
+        li.remove();
+        if (!$('uploaded-list').children.length) $('uploaded-title').style.display = 'none';
+      } catch (e) { alert(e.message); btn.disabled = false; btn.textContent = 'Remove'; }
+    }
+
+    async function load() {
+      if (!APP || !TOKEN) { hide('loading'); show('error-state'); return; }
+      try {
+        const res = await fetch(`/api/get-application-documents?app=${encodeURIComponent(APP)}&token=${encodeURIComponent(TOKEN)}`);
+        const data = await res.json();
+        if (!res.ok) { $('error-text').textContent = data.error || 'This link is invalid or has expired.'; hide('loading'); show('error-state'); return; }
+
+        $('brand').textContent = data.siteName || 'Tenant Portal';
+        $('foot').textContent = data.siteName || '';
+        $('intro').textContent = `Hi ${data.firstName || 'there'}, please upload the documents below so we can continue reviewing your application.`;
+        const propBits = [data.propertyName, data.unitLabel].filter(Boolean).join(' — ');
+        if (propBits) $('prop-line').innerHTML = `<strong>Application for:</strong> ${propBits}`; else $('prop-line').style.display = 'none';
+
+        const requested = (data.requested && data.requested.length) ? data.requested : ['Any supporting documents'];
+        $('req-list').innerHTML = requested.map(d => `<li>${String(d).replace(/</g,'&lt;')}</li>`).join('');
+        $('doc-type').innerHTML = requested.map(d => `<option>${String(d).replace(/</g,'&lt;')}</option>`).join('') + '<option>Other</option>';
+
+        if (data.consentGiven) { consentRecorded = true; $('consent-box').checked = true; show('consent-recorded'); }
+        (data.uploaded || []).forEach(u => addUploadedRow(u.label || u.name, u.storagePath));
+
+        hide('loading'); show('main');
+      } catch (e) {
+        $('error-text').textContent = 'We could not load your upload page. Please try again shortly.';
+        hide('loading'); show('error-state');
+      }
+    }
+
+    async function uploadDoc() {
+      hide('upload-error');
+      const file = $('doc-file').files[0];
+      if (!file) { $('upload-error').textContent = 'Please choose a file to upload.'; show('upload-error'); return; }
+      if (!consentRecorded && !$('consent-box').checked) { $('upload-error').textContent = 'Please check the consent box before uploading.'; show('upload-error'); return; }
+
+      const btn = $('upload-btn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Uploading…';
+      try {
+        const fd = new FormData();
+        fd.append('app', APP);
+        fd.append('token', TOKEN);
+        fd.append('label', $('doc-type').value);
+        fd.append('consent', (consentRecorded || $('consent-box').checked) ? 'true' : 'false');
+        fd.append('file', file);
+        const res = await fetch('/api/upload-application-document', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed.');
+        if (!consentRecorded) { consentRecorded = true; show('consent-recorded'); }
+        addUploadedRow(data.name || file.name, data.storagePath);
+        $('doc-file').value = '';
+      } catch (e) {
+        $('upload-error').textContent = e.message; show('upload-error');
+      }
+      btn.disabled = false; btn.textContent = 'Upload document';
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -94,12 +94,12 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { applicationId, status, reviewChecks, adminNotes, creditCheckOrder, employmentVerificationOrder, smartMoveReportType, siteName } = body;
+  const { applicationId, status, reviewChecks, adminNotes, creditCheckOrder, employmentVerificationOrder, smartMoveReportType, siteName, archived } = body;
   if (!applicationId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'applicationId is required' }) };
   }
-  if (!status && reviewChecks === undefined && adminNotes === undefined && !creditCheckOrder && !employmentVerificationOrder) {
-    return { statusCode: 400, body: JSON.stringify({ error: 'Nothing to update. Provide status, reviewChecks, adminNotes, or verification order flags.' }) };
+  if (!status && reviewChecks === undefined && adminNotes === undefined && !creditCheckOrder && !employmentVerificationOrder && archived === undefined) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'Nothing to update. Provide status, reviewChecks, adminNotes, archived, or verification order flags.' }) };
   }
   if (status && !['approved', 'declined', 'withdrawn', 'pending'].includes(status)) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid status value' }) };
@@ -129,6 +129,10 @@ exports.handler = async (event) => {
     }
     if (adminNotes !== undefined) {
       updates.adminNotes = adminNotes || null;
+    }
+    if (archived !== undefined) {
+      updates.archived = !!archived;
+      updates.archivedAt = archived ? a.firestore.FieldValue.serverTimestamp() : null;
     }
     if (creditCheckOrder) {
       const smartMoveLanding = process.env.SMARTMOVE_LANDING_PAGE || 'https://rentals-secure.mysmartmove.com/landlord/firstscreening/step-one';

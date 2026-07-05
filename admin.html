@@ -259,6 +259,7 @@
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="declined">Declined</option>
+              <option value="archived">Archived</option>
             </select>
             <button onclick="openBlankAppModal()" class="btn btn-sm btn-primary" style="white-space:nowrap;">🖨 Print Blank Form</button>
             <button onclick="refreshApplications()" class="btn btn-sm btn-outline" style="white-space:nowrap;">↺ Refresh</button>
@@ -975,6 +976,28 @@
   </div>
 </div>
 
+<!-- REQUEST DOCUMENTS MODAL -->
+<div id="doc-request-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('doc-request-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('doc-request-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;">Request Documents</h3>
+    <p id="doc-request-to" style="font-size:13px;color:var(--slate);margin-bottom:18px;"></p>
+    <div id="doc-request-alert" class="hidden alert"></div>
+    <label class="label">Documents to request</label>
+    <div id="doc-request-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+    <label class="label">Add custom items <span style="font-size:10px;font-weight:400;">(comma-separated)</span></label>
+    <input type="text" id="doc-request-custom" class="form-input" placeholder="e.g. Proof of renters insurance, Co-signer form">
+    <label class="label" style="margin-top:14px;">Note to applicant <span style="font-size:10px;font-weight:400;">(optional)</span></label>
+    <textarea id="doc-request-note" class="form-input" rows="3" placeholder="Optional message included in the email..."></textarea>
+    <p style="font-size:11px;color:var(--slate);margin-top:10px;line-height:1.6;">The applicant receives a secure upload link. They must give consent to how their documents are used before they can upload — that consent is recorded with a timestamp and IP address.</p>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="sendDocRequest()" class="btn btn-primary" style="flex:1;" id="doc-request-btn">Send Request</button>
+      <button onclick="closeModal('doc-request-modal')" class="btn btn-outline">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- MESSAGE APPLICANT MODAL -->
 <div id="message-applicant-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('message-applicant-modal')"></div>
@@ -1239,7 +1262,7 @@
   async function loadApplications() {
     const snap = await getDocs(query(collection(db,'applications'), orderBy('submittedAt','desc')));
     allApplications = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderApplicationsTable(allApplications);
+    filterApplications();
   }
   function renderApplicationsTable(apps) {
     const tbody = document.getElementById('applications-tbody');
@@ -1260,7 +1283,7 @@
         <td><strong>${applicant}</strong></td>
         <td style="font-size:12px;">${app.email||'—'}</td>
         <td style="font-size:12px;">${property}</td>
-        <td><span class="badge badge-${status}">${status}</span></td>
+        <td><span class="badge badge-${status}">${status}</span>${app.archived?'<span style="font-size:9px;background:#F3F4F6;color:#6B7280;padding:2px 6px;border-radius:8px;margin-left:4px;">Archived</span>':''}${(app.applicationDocuments&&app.applicationDocuments.length)?`<span title="Documents uploaded" style="font-size:9px;background:#EFF6FF;color:#2563EB;padding:2px 6px;border-radius:8px;margin-left:4px;">📎 ${app.applicationDocuments.length}</span>`:''}</td>
         <td style="font-size:12px;color:#0F766E;">${consentSummary}</td>
         <td style="font-size:12px;color:#64748B;">${reviewStatus}</td>
         <td style="font-size:12px;">${submitted}</td>
@@ -1269,6 +1292,7 @@
             ${status !== 'approved' ? `<button onclick="updateApplicationStatus('${app.id}','approved')" class="btn btn-sm btn-success">Approve</button>` : ''}
             ${status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-sm btn-danger">Decline</button>` : ''}
             <button onclick="viewApplicationDetails('${app.id}')" class="btn btn-sm btn-outline">View</button>
+            ${app.archived ? `<button onclick="setApplicationArchived('${app.id}',false)" class="btn btn-sm btn-outline">Unarchive</button>` : `<button onclick="setApplicationArchived('${app.id}',true)" class="btn btn-sm btn-outline">Archive</button>`}
           </div>
         </td>
       </tr>`;
@@ -1280,7 +1304,10 @@
     const filtered = allApplications.filter(app => {
       const text = `${app.firstName||''} ${app.lastName||''} ${app.email||''} ${app.propertyName||''} ${app.unitLabel||''}`.toLowerCase();
       const matchesText = !q || text.includes(q);
-      const matchesStatus = !status || (app.status === status);
+      // "archived" filter shows only archived; every other view hides archived.
+      const matchesStatus = status === 'archived'
+        ? !!app.archived
+        : (!app.archived && (!status || app.status === status));
       return matchesText && matchesStatus;
     });
     renderApplicationsTable(filtered);
@@ -1482,6 +1509,20 @@
           ${app.messagesSent.slice().reverse().map(m=>`<span>${m.sentAt?escapeHtml(new Date(m.sentAt).toLocaleString()):''} — ${escapeHtml(m.subject||'(no subject)')}${m.includeForm?' <span style="font-size:10px;color:#2563EB;">[form link]</span>':''}</span>`).join('')}
         </div>
       </div>`:''}
+      ${(app.docRequest || (app.applicationDocuments&&app.applicationDocuments.length) || app.docConsent || app.documentsPurgedAt || app.responseToken) ? `
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Supporting Documents ${app.docConsent&&app.docConsent.given?`<span style="font-size:11px;color:#16A34A;font-weight:600;">✓ consent recorded${app.docConsent.recordedAt?' '+escapeHtml(new Date(app.docConsent.recordedAt).toLocaleString()):''}</span>`:''}</div>
+        <div class="preview-item">
+          ${app.responseToken?`<span><strong>Secure upload page</strong> <a href="${applicantUploadLink(app)}" target="_blank" rel="noreferrer noopener">open</a> · <button type="button" class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:10px;" onclick="copyText('${applicantUploadLink(app)}',this)">Copy link</button> <span style="font-size:11px;color:#9CA3AF;">(this is the page the applicant uses to upload)</span></span>`:''}
+          ${app.docRequest&&app.docRequest.requested&&app.docRequest.requested.length?`<span><strong>Requested</strong> ${app.docRequest.requested.map(d=>escapeHtml(d)).join('; ')}</span>`:''}
+          ${(app.applicationDocuments&&app.applicationDocuments.length)
+            ? app.applicationDocuments.map(d=>`<span><strong>${escapeHtml(d.label||d.name||'Document')}</strong> — <a href="${d.url||'#'}" target="_blank" rel="noreferrer noopener">view file</a>${d.uploadedAt?` <span style="color:#9CA3AF;font-size:11px;">(${escapeHtml(new Date(d.uploadedAt).toLocaleDateString())})</span>`:''}</span>`).join('')
+            : (app.documentsPurgedAt
+                ? `<span style="color:#B45309;">🗑 Documents were permanently purged per the retention policy${app.documentsPurgedAt.toDate?' on '+escapeHtml(app.documentsPurgedAt.toDate().toLocaleDateString()):''}${app.documentsPurgedCount?` (${app.documentsPurgedCount} file${app.documentsPurgedCount===1?'':'s'})`:''}.</span>`
+                : '<span style="color:#9CA3AF;">No documents uploaded yet.</span>')}
+          ${app.docConsent&&app.docConsent.given?`<span style="font-size:11px;color:#64748B;">Consent recorded from IP ${escapeHtml(app.docConsent.ipAddress||'—')}</span>`:''}
+        </div>
+      </div>` : ''}
       <div class="preview-card" style="margin-top:18px;">
         <div class="preview-section-title">Message</div>
         <div style="background:#fff;border:1px solid #E8E2D8;border-radius:8px;padding:16px;color:#334155;white-space:pre-wrap;line-height:1.7;">${app.message ? escapeHtml(app.message) : 'No message provided.'}</div>
@@ -1494,8 +1535,10 @@
       ${!creditOrderedAt ? `<button onclick="orderCreditCheck('${app.id}')" class="btn btn-outline" ${canOrderCredit ? '' : 'disabled title="Requires applicant background-check consent"'}>Send SmartMove rental screening invite</button>` : `<button class="btn btn-success" disabled>SmartMove screening requested</button>`}
       ${!employmentOrderedAt ? `<button onclick="orderEmploymentVerification('${app.id}')" class="btn btn-outline">Order employment verification</button>` : `<button class="btn btn-success" disabled>Employment verification ordered</button>`}
       <button onclick="openMessageModal('${app.id}')" class="btn btn-outline">✉️ Message Applicant</button>
+      <button onclick="openDocRequestModal('${app.id}')" class="btn btn-outline">📄 Request Documents</button>
       <button onclick="printApplication('${app.id}')" class="btn btn-outline">🖨 Print Application</button>
       <button onclick="saveApplicationReview()" class="btn btn-amber">Save Review</button>
+      ${app.archived ? `<button onclick="setApplicationArchived('${app.id}',false)" class="btn btn-outline">Unarchive</button>` : `<button onclick="setApplicationArchived('${app.id}',true)" class="btn btn-outline">Archive</button>`}
       <button onclick="closeModal('application-preview-modal')" class="btn btn-outline">Close</button>
     `;
     document.getElementById('application-preview-modal').dataset.appId = id;
@@ -1793,6 +1836,78 @@
       setTimeout(()=>closeModal('message-applicant-modal'),1600);
     } catch(e) { showAlert('message-alert',e.message); }
     btn.disabled=false; btn.textContent='Send Message';
+  };
+
+  // ===== CLIPBOARD HELPER =====
+  window.copyText = (text, btn) => {
+    const done = () => { if (btn) { const o = btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = o, 1500); } };
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).then(done).catch(() => prompt('Copy this link:', text));
+    else prompt('Copy this link:', text);
+  };
+  // Build the applicant's secure upload-page URL (works on the live site or locally).
+  window.applicantUploadLink = (app) => app.responseToken ? `${location.origin}/documents.html?app=${app.id}&token=${app.responseToken}` : '';
+
+  // ===== REQUEST DOCUMENTS =====
+  const COMMON_DOC_TYPES = [
+    'Recent pay stubs (last 2–3)',
+    'Government-issued photo ID',
+    'Proof of employment / offer letter',
+    'Bank statements (last 2 months)',
+    'Previous landlord reference / contact',
+    'Proof of additional income',
+  ];
+  window.openDocRequestModal = (id) => {
+    const app = allApplications.find(a=>a.id===id); if(!app) return;
+    const modal = document.getElementById('doc-request-modal');
+    modal.dataset.appId = id;
+    document.getElementById('doc-request-to').textContent =
+      `To: ${`${app.firstName||''} ${app.lastName||''}`.trim()||'Applicant'}${app.email?` <${app.email}>`:' (no email on file)'}`;
+    const preset = new Set((app.docRequest&&app.docRequest.requested&&app.docRequest.requested.length)
+      ? app.docRequest.requested
+      : ['Recent pay stubs (last 2–3)','Government-issued photo ID','Proof of employment / offer letter']);
+    document.getElementById('doc-request-list').innerHTML = COMMON_DOC_TYPES.map(d=>`
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:#374151;cursor:pointer;">
+        <input type="checkbox" class="doc-req-item" value="${d.replace(/"/g,'&quot;')}" style="width:15px;height:15px;" ${preset.has(d)?'checked':''}>
+        <span>${d}</span>
+      </label>`).join('');
+    document.getElementById('doc-request-custom').value='';
+    document.getElementById('doc-request-note').value='';
+    document.getElementById('doc-request-alert').classList.add('hidden');
+    openModal('doc-request-modal');
+  };
+  window.sendDocRequest = async () => {
+    const id = document.getElementById('doc-request-modal').dataset.appId;
+    const checked = Array.from(document.querySelectorAll('.doc-req-item:checked')).map(el=>el.value);
+    const custom = document.getElementById('doc-request-custom').value.split(',').map(s=>s.trim()).filter(Boolean);
+    const requestedDocs = [...checked, ...custom];
+    const message = document.getElementById('doc-request-note').value.trim();
+    if (!requestedDocs.length) { showAlert('doc-request-alert','Select at least one document to request.'); return; }
+    const btn = document.getElementById('doc-request-btn'); btn.disabled=true; btn.textContent='Sending...';
+    try {
+      let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
+      const res = await fetch('/api/request-documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applicationId:id,requestedDocs,message,siteName})});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error||'Failed to send');
+      const alertEl = document.getElementById('doc-request-alert');
+      alertEl.className = 'alert alert-success';
+      alertEl.innerHTML = `✓ Secure document request emailed to ${escapeHtml(data.sentTo)}.`
+        + (data.formUrl ? `<div style="margin-top:8px;font-size:12px;">Upload page: <a href="${data.formUrl}" target="_blank" rel="noreferrer noopener">open</a> · <button type="button" class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:10px;" onclick="copyText('${data.formUrl}',this)">Copy link</button></div>` : '');
+      alertEl.classList.remove('hidden');
+      await loadApplications();
+    } catch(e){ showAlert('doc-request-alert',e.message); }
+    btn.disabled=false; btn.textContent='Send Request';
+  };
+
+  // ===== ARCHIVE APPLICATIONS =====
+  window.setApplicationArchived = async (id, archived) => {
+    if (archived && !confirm('Archive this application? It will be hidden from the default list — use the "Archived" filter to see it again.')) return;
+    try {
+      const res = await fetch('/api/update-application',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applicationId:id,archived})});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error||'Failed');
+      closeModal('application-preview-modal');
+      await loadApplications();
+    } catch(e){ alert('Error updating application: '+e.message); }
   };
 
   window.filterTenants = () => {

@@ -10,6 +10,14 @@
 [functions."send-invoice-reminders"]
   schedule = "0 13 * * *"
 
+# ── Scheduled: daily retention purge of declined/archived application docs ────
+[functions."purge-expired-applications"]
+  schedule = "0 3 * * *"
+
+# ── Scheduled: monthly data-retention compliance report (1st, 08:00 UTC) ──────
+[functions."purge-summary-report"]
+  schedule = "0 8 1 * *"
+
 # ── API routes → Netlify Functions ──────────────────────────────────────────
 [[redirects]]
   from   = "/api/*"
