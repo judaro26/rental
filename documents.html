@@ -38,6 +38,11 @@
     .rm-btn { background:none; border:1px solid #FCA5A5; color:#DC2626; border-radius:2px; padding:4px 10px; font-size:11px; cursor:pointer; font-family:'Jost',sans-serif; flex-shrink:0; }
     .rm-btn:hover { background:#FEF2F2; }
     .rm-btn:disabled { opacity:0.6; cursor:default; }
+    .up-item { border:1px solid var(--border); border-radius:3px; padding:12px 14px; margin-bottom:10px; background:#FDFBF8; }
+    .up-item .grow { flex:1; min-width:150px; }
+    .up-item .done { display:flex; align-items:center; gap:8px; font-size:13px; color:#065F46; }
+    .up-status { font-size:12px; margin-top:6px; }
+    .up-status.err { color:#DC2626; }
     .msg { padding:13px 16px; border-radius:2px; font-size:13px; margin-bottom:14px; line-height:1.6; }
     .msg-error { background:#FEF2F2; border:1px solid #FECACA; color:#DC2626; }
     .foot { text-align:center; font-size:11px; color:var(--slate); padding:18px; }
@@ -80,25 +85,12 @@
           </div>
           <div id="consent-recorded" class="hidden" style="font-size:12px;color:#16A34A;margin:-10px 0 16px;">✓ Your consent has been recorded.</div>
 
-          <h2 class="section-title">Upload a document</h2>
-          <div class="uprow">
-            <div class="grow">
-              <label class="label">Document type</label>
-              <select id="doc-type" class="input"></select>
-            </div>
-            <div class="grow">
-              <label class="label">File (PDF, image, or Word — max 15 MB)</label>
-              <input type="file" id="doc-file" class="input" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.doc,.docx">
-            </div>
-          </div>
+          <h2 class="section-title">Upload your documents</h2>
+          <p class="section-hint">Add a file for each requested document below. Use “Add another document” if you have more to include.</p>
+          <div id="upload-rows"></div>
+          <button type="button" class="btn-add" onclick="addUploadRow()">+ Add another document</button>
           <div id="upload-error" class="msg msg-error hidden" style="margin-top:14px;"></div>
-          <div style="margin-top:16px;">
-            <button type="button" id="upload-btn" class="btn btn-primary" onclick="uploadDoc()">Upload document</button>
-            <p class="note">You can upload several files — repeat for each document. To replace a file, remove it below and upload the new version. When you're done, you can simply close this page.</p>
-          </div>
-
-          <h2 class="section-title" id="uploaded-title" style="display:none;">Uploaded</h2>
-          <ul class="uploaded" id="uploaded-list"></ul>
+          <p class="note" style="margin-top:14px;">Accepted: PDF, image, or Word — max 15 MB each. To replace a file, remove it and upload again. When you're done, you can simply close this page.</p>
         </div>
       </div>
     </div>
@@ -113,25 +105,66 @@
     const show = id => $(id).classList.remove('hidden');
     const hide = id => $(id).classList.add('hidden');
     let consentRecorded = false;
+    let REQUESTED = [];
+    const ACCEPT = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.doc,.docx';
 
-    function addUploadedRow(name, storagePath) {
-      $('uploaded-title').style.display = '';
-      const li = document.createElement('li');
-      li.dataset.path = storagePath || '';
-      li.innerHTML = `<span>✓</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${(name||'Document').replace(/</g,'&lt;')}</span>`
-        + (storagePath ? `<button type="button" class="rm-btn" onclick="removeUploaded(this)">Remove</button>` : '');
-      $('uploaded-list').appendChild(li);
+    function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+    function typeOptions(selected){
+      return [...REQUESTED, 'Other'].map(o => `<option ${o===selected?'selected':''}>${escAttr(o)}</option>`).join('');
     }
-    async function removeUploaded(btn) {
-      const li = btn.closest('li'); const path = li.dataset.path; if (!path) return;
+    function addUploadRow(presetLabel){
+      const row = document.createElement('div');
+      row.className = 'up-item';
+      row.innerHTML = `
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div class="grow"><label class="label">Document type</label><select class="input up-type">${typeOptions(presetLabel)}</select></div>
+          <div class="grow"><label class="label">File</label><input type="file" class="input up-file" accept="${ACCEPT}"></div>
+          <button type="button" class="btn btn-primary up-btn" style="padding:10px 18px;" onclick="uploadRow(this)">Upload</button>
+        </div>
+        <div class="up-status"></div>`;
+      $('upload-rows').appendChild(row);
+    }
+    function addDoneRow(label, storagePath){
+      const row = document.createElement('div');
+      row.className = 'up-item';
+      row.dataset.path = storagePath || '';
+      row.innerHTML = `<div class="done"><span>✓</span><span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escAttr(label||'Document')}</span>${storagePath?`<button type="button" class="rm-btn" onclick="removeRow(this)">Remove</button>`:''}</div>`;
+      $('upload-rows').appendChild(row);
+    }
+    async function uploadRow(btn){
+      hide('upload-error');
+      const row = btn.closest('.up-item');
+      const file = row.querySelector('.up-file').files[0];
+      const status = row.querySelector('.up-status'); status.className = 'up-status'; status.textContent = '';
+      if (!file) { status.textContent = 'Please choose a file.'; status.classList.add('err'); return; }
+      if (!consentRecorded && !$('consent-box').checked) { status.textContent = 'Please check the consent box above first.'; status.classList.add('err'); return; }
+      const label = row.querySelector('.up-type').value;
+      btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Uploading…';
+      try {
+        const fd = new FormData();
+        fd.append('app', APP); fd.append('token', TOKEN); fd.append('label', label);
+        fd.append('consent', (consentRecorded || $('consent-box').checked) ? 'true' : 'false');
+        fd.append('file', file);
+        const res = await fetch('/api/upload-application-document', { method:'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed.');
+        if (!consentRecorded) { consentRecorded = true; show('consent-recorded'); }
+        row.dataset.path = data.storagePath || '';
+        row.innerHTML = `<div class="done"><span>✓</span><span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escAttr(label)} — ${escAttr(file.name)}</span><button type="button" class="rm-btn" onclick="removeRow(this)">Remove</button></div>`;
+      } catch (e) {
+        status.textContent = e.message; status.classList.add('err');
+        btn.disabled = false; btn.textContent = 'Upload';
+      }
+    }
+    async function removeRow(btn){
+      const row = btn.closest('.up-item'); const path = row.dataset.path; if (!path) return;
       if (!confirm('Remove this document? You can upload a replacement afterwards.')) return;
       btn.disabled = true; btn.textContent = 'Removing…';
       try {
         const res = await fetch('/api/delete-application-document', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ app: APP, token: TOKEN, storagePath: path }) });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not remove the document.');
-        li.remove();
-        if (!$('uploaded-list').children.length) $('uploaded-title').style.display = 'none';
+        row.remove();
       } catch (e) { alert(e.message); btn.disabled = false; btn.textContent = 'Remove'; }
     }
 
@@ -148,44 +181,23 @@
         const propBits = [data.propertyName, data.unitLabel].filter(Boolean).join(' — ');
         if (propBits) $('prop-line').innerHTML = `<strong>Application for:</strong> ${propBits}`; else $('prop-line').style.display = 'none';
 
-        const requested = (data.requested && data.requested.length) ? data.requested : ['Any supporting documents'];
-        $('req-list').innerHTML = requested.map(d => `<li>${String(d).replace(/</g,'&lt;')}</li>`).join('');
-        $('doc-type').innerHTML = requested.map(d => `<option>${String(d).replace(/</g,'&lt;')}</option>`).join('') + '<option>Other</option>';
+        REQUESTED = (data.requested && data.requested.length) ? data.requested : [];
+        const reqForList = REQUESTED.length ? REQUESTED : ['Any supporting documents'];
+        $('req-list').innerHTML = reqForList.map(d => `<li>${String(d).replace(/</g,'&lt;')}</li>`).join('');
 
         if (data.consentGiven) { consentRecorded = true; $('consent-box').checked = true; show('consent-recorded'); }
-        (data.uploaded || []).forEach(u => addUploadedRow(u.label || u.name, u.storagePath));
+
+        // One upload row per requested document (or a single blank row if none were specified).
+        if (REQUESTED.length) REQUESTED.forEach(d => addUploadRow(d));
+        else addUploadRow();
+        // Show anything already uploaded as completed rows.
+        (data.uploaded || []).forEach(u => addDoneRow(u.label || u.name, u.storagePath));
 
         hide('loading'); show('main');
       } catch (e) {
         $('error-text').textContent = 'We could not load your upload page. Please try again shortly.';
         hide('loading'); show('error-state');
       }
-    }
-
-    async function uploadDoc() {
-      hide('upload-error');
-      const file = $('doc-file').files[0];
-      if (!file) { $('upload-error').textContent = 'Please choose a file to upload.'; show('upload-error'); return; }
-      if (!consentRecorded && !$('consent-box').checked) { $('upload-error').textContent = 'Please check the consent box before uploading.'; show('upload-error'); return; }
-
-      const btn = $('upload-btn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Uploading…';
-      try {
-        const fd = new FormData();
-        fd.append('app', APP);
-        fd.append('token', TOKEN);
-        fd.append('label', $('doc-type').value);
-        fd.append('consent', (consentRecorded || $('consent-box').checked) ? 'true' : 'false');
-        fd.append('file', file);
-        const res = await fetch('/api/upload-application-document', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Upload failed.');
-        if (!consentRecorded) { consentRecorded = true; show('consent-recorded'); }
-        addUploadedRow(data.name || file.name, data.storagePath);
-        $('doc-file').value = '';
-      } catch (e) {
-        $('upload-error').textContent = e.message; show('upload-error');
-      }
-      btn.disabled = false; btn.textContent = 'Upload document';
     }
 
     load();
