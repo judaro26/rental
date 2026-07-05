@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Confirm Your Application Details</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --cream:#F7F4EF; --charcoal:#1A1A2E; --amber:#C9903A; --slate:#5A6475; --border:#E8E2D8; }
+    * { box-sizing:border-box; }
+    body { font-family:'Jost',sans-serif; background:var(--cream); color:var(--charcoal); margin:0; padding:32px 16px; }
+    h1,h2 { font-family:'Cormorant Garamond',serif; font-weight:500; }
+    .wrap { max-width:640px; margin:0 auto; }
+    .card { background:#fff; border-radius:4px; box-shadow:0 4px 24px rgba(26,26,46,0.08); overflow:hidden; }
+    .card-head { background:var(--charcoal); color:#fff; padding:26px 32px; }
+    .card-head .brand { font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:#E8D5B0; }
+    .card-head h1 { font-size:1.9rem; margin:8px 0 0; font-weight:400; }
+    .card-body { padding:28px 32px; }
+    .intro { font-size:14px; color:var(--slate); line-height:1.7; margin:0 0 22px; }
+    .prop { background:#F7F4EF; border-left:3px solid var(--amber); border-radius:0 3px 3px 0; padding:12px 14px; font-size:13px; margin-bottom:24px; }
+    .label { display:block; font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--slate); margin-bottom:6px; }
+    .section-title { font-size:1.25rem; margin:26px 0 4px; }
+    .section-hint { font-size:12px; color:var(--slate); margin:0 0 12px; line-height:1.6; }
+    .input { width:100%; border:1.5px solid var(--border); background:#FDFBF8; padding:10px 12px; border-radius:2px; font-family:'Jost',sans-serif; font-size:14px; }
+    .input:focus { outline:none; border-color:var(--amber); }
+    textarea.input { resize:vertical; }
+    .row { display:flex; gap:10px; margin-bottom:10px; align-items:flex-start; }
+    .row .grow { flex:1; min-width:0; }
+    .btn { display:inline-block; padding:12px 26px; border-radius:2px; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; cursor:pointer; border:none; font-family:'Jost',sans-serif; font-weight:500; }
+    .btn-primary { background:var(--charcoal); color:#fff; }
+    .btn-primary:hover { background:var(--amber); }
+    .btn-primary:disabled { opacity:0.6; cursor:default; }
+    .btn-add { background:none; border:1px dashed var(--amber); color:var(--amber); padding:8px 14px; border-radius:2px; font-size:12px; cursor:pointer; font-family:'Jost',sans-serif; }
+    .btn-x { background:none; border:1px solid var(--border); color:var(--slate); width:38px; height:40px; border-radius:2px; cursor:pointer; font-size:16px; flex-shrink:0; }
+    .msg { padding:14px 16px; border-radius:2px; font-size:13px; margin-bottom:16px; line-height:1.6; }
+    .msg-error { background:#FEF2F2; border:1px solid #FECACA; color:#DC2626; }
+    .msg-info { background:#EFF6FF; border:1px solid #BFDBFE; color:#1D4ED8; }
+    .foot { text-align:center; font-size:11px; color:var(--slate); padding:18px; }
+    .center { text-align:center; padding:20px 0; }
+    .hidden { display:none; }
+    .spinner { border:2px solid rgba(255,255,255,0.4); border-top-color:#fff; border-radius:50%; width:15px; height:15px; animation:spin 0.7s linear infinite; display:inline-block; vertical-align:middle; margin-right:6px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="card-head">
+        <div class="brand" id="brand">Tenant Portal</div>
+        <h1 id="head-title">Confirm Your Application Details</h1>
+      </div>
+      <div class="card-body">
+        <div id="loading" class="center" style="color:var(--slate);font-size:14px;">Loading your form…</div>
+
+        <div id="error-state" class="hidden">
+          <div class="msg msg-error" id="error-text">This link is invalid or has expired.</div>
+          <p style="font-size:13px;color:var(--slate);">If you believe this is a mistake, please reply to the email we sent you and we'll send a fresh link.</p>
+        </div>
+
+        <div id="success-state" class="hidden center">
+          <div style="font-size:44px;">✓</div>
+          <h2 style="font-size:1.6rem;margin:8px 0;">Thank you!</h2>
+          <p style="font-size:14px;color:var(--slate);line-height:1.7;">Your details have been received and added to your application. Our team will be in touch soon.</p>
+        </div>
+
+        <form id="form" class="hidden" onsubmit="return false;">
+          <p class="intro" id="intro"></p>
+          <div class="prop" id="prop-line"></div>
+
+          <div id="resubmit-note" class="msg msg-info hidden">You've already submitted these details once — you can review and update them below if anything has changed.</div>
+
+          <h2 class="section-title">Prospective Residents</h2>
+          <p class="section-hint">Please list everyone who will be living in the home, including yourself, with their age.</p>
+          <div id="occupants-list"></div>
+          <button type="button" class="btn-add" onclick="addOccupant()">+ Add resident</button>
+
+          <h2 class="section-title">Desired Move-in Date</h2>
+          <input type="date" id="move-in" class="input" style="max-width:220px;">
+
+          <h2 class="section-title">References</h2>
+          <p class="section-hint">Previous landlords, employers, or personal references we may contact.</p>
+          <div id="references-list"></div>
+          <button type="button" class="btn-add" onclick="addReference()">+ Add reference</button>
+
+          <h2 class="section-title">Anything else?</h2>
+          <p class="section-hint">Optional — anything you'd like us to know.</p>
+          <textarea id="notes" class="input" rows="3" placeholder="Optional notes…"></textarea>
+
+          <div id="submit-error" class="msg msg-error hidden" style="margin-top:18px;"></div>
+          <div style="margin-top:24px;">
+            <button type="button" id="submit-btn" class="btn btn-primary" onclick="submitForm()">Submit Details</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="foot" id="foot"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const APP = params.get('app');
+    const TOKEN = params.get('token');
+
+    const $ = id => document.getElementById(id);
+    function show(id){ $(id).classList.remove('hidden'); }
+    function hide(id){ $(id).classList.add('hidden'); }
+
+    function occupantRow(o={}) {
+      const div = document.createElement('div');
+      div.className = 'row';
+      div.innerHTML = `
+        <input class="input grow occ-name" placeholder="Full name" value="${(o.name||'').replace(/"/g,'&quot;')}">
+        <input class="input occ-age" style="width:90px;" placeholder="Age" inputmode="numeric" value="${(o.age||'').toString().replace(/"/g,'&quot;')}">
+        <button type="button" class="btn-x" onclick="this.parentElement.remove()">×</button>`;
+      return div;
+    }
+    function referenceRow(r={}) {
+      const div = document.createElement('div');
+      div.className = 'row';
+      div.style.flexWrap = 'wrap';
+      div.innerHTML = `
+        <input class="input grow ref-name" style="min-width:150px;" placeholder="Reference name" value="${(r.name||'').replace(/"/g,'&quot;')}">
+        <input class="input grow ref-rel" style="min-width:120px;" placeholder="Relationship" value="${(r.relationship||'').replace(/"/g,'&quot;')}">
+        <input class="input grow ref-contact" style="min-width:150px;" placeholder="Phone or email" value="${(r.contact||'').replace(/"/g,'&quot;')}">
+        <button type="button" class="btn-x" onclick="this.parentElement.remove()">×</button>`;
+      return div;
+    }
+    function addOccupant(o){ $('occupants-list').appendChild(occupantRow(o)); }
+    function addReference(r){ $('references-list').appendChild(referenceRow(r)); }
+
+    async function load() {
+      if (!APP || !TOKEN) { hide('loading'); show('error-state'); return; }
+      try {
+        const res = await fetch(`/api/get-application-response?app=${encodeURIComponent(APP)}&token=${encodeURIComponent(TOKEN)}`);
+        const data = await res.json();
+        if (!res.ok) { $('error-text').textContent = data.error || 'This link is invalid or has expired.'; hide('loading'); show('error-state'); return; }
+
+        $('brand').textContent = data.siteName || 'Tenant Portal';
+        $('foot').textContent = data.siteName || '';
+        $('intro').textContent = `Hi ${data.firstName || 'there'}, thanks for applying! We're reviewing your application and are very interested. Please confirm the details below so we can move forward.`;
+        const propBits = [data.propertyName, data.unitLabel].filter(Boolean).join(' — ');
+        $('prop-line').innerHTML = propBits ? `<strong>Applying for:</strong> ${propBits}` : '';
+        if (!propBits) $('prop-line').style.display = 'none';
+
+        if (data.alreadySubmitted) show('resubmit-note');
+
+        // Prefill
+        (data.occupants && data.occupants.length ? data.occupants : [{}]).forEach(addOccupant);
+        (data.references && data.references.length ? data.references : [{}]).forEach(addReference);
+        if (data.moveInDate && /^\d{4}-\d{2}-\d{2}$/.test(data.moveInDate)) $('move-in').value = data.moveInDate;
+        $('notes').value = data.responseNotes || '';
+
+        hide('loading'); show('form');
+      } catch (e) {
+        $('error-text').textContent = 'We could not load your form. Please try again shortly.';
+        hide('loading'); show('error-state');
+      }
+    }
+
+    async function submitForm() {
+      const occupants = Array.from(document.querySelectorAll('#occupants-list .row')).map(r => ({
+        name: r.querySelector('.occ-name').value.trim(),
+        age:  r.querySelector('.occ-age').value.trim(),
+      })).filter(o => o.name || o.age);
+      const references = Array.from(document.querySelectorAll('#references-list .row')).map(r => ({
+        name: r.querySelector('.ref-name').value.trim(),
+        relationship: r.querySelector('.ref-rel').value.trim(),
+        contact: r.querySelector('.ref-contact').value.trim(),
+      })).filter(r => r.name || r.contact);
+      const moveInDate = $('move-in').value;
+      const notes = $('notes').value.trim();
+
+      hide('submit-error');
+      if (!occupants.length) { $('submit-error').textContent = 'Please add at least one prospective resident.'; show('submit-error'); return; }
+
+      const btn = $('submit-btn'); btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Submitting…';
+      try {
+        const res = await fetch('/api/submit-application-response', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ app: APP, token: TOKEN, occupants, references, moveInDate, notes }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Submission failed.');
+        hide('form'); show('success-state');
+      } catch (e) {
+        $('submit-error').textContent = e.message; show('submit-error');
+        btn.disabled = false; btn.textContent = 'Submit Details';
+      }
+    }
+
+    load();
+  </script>
+</body>
+</html>

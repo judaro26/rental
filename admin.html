@@ -975,6 +975,31 @@
   </div>
 </div>
 
+<!-- MESSAGE APPLICANT MODAL -->
+<div id="message-applicant-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('message-applicant-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('message-applicant-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;">Message Applicant</h3>
+    <p id="message-applicant-to" style="font-size:13px;color:var(--slate);margin-bottom:18px;"></p>
+    <div id="message-alert" class="hidden alert"></div>
+    <label class="label">Template</label>
+    <select id="msg-template" class="form-input" onchange="applyMessageTemplate()"></select>
+    <label class="label" style="margin-top:14px;">Subject</label>
+    <input type="text" id="msg-subject" class="form-input" placeholder="Subject line">
+    <label class="label" style="margin-top:14px;">Message</label>
+    <textarea id="msg-body" class="form-input" rows="10" placeholder="Write your message..."></textarea>
+    <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-top:14px;background:#F9FAFB;border:1px solid var(--border);border-radius:3px;padding:12px 14px;">
+      <input type="checkbox" id="msg-include-form" style="width:16px;height:16px;margin-top:2px;flex-shrink:0;">
+      <span>Include a secure form link so the applicant can confirm the <strong>names and ages of prospective residents</strong>, their <strong>desired move-in date</strong>, and <strong>references</strong>. Their answers update this application automatically.</span>
+    </label>
+    <div style="display:flex;gap:10px;margin-top:22px;">
+      <button onclick="sendApplicantMessage()" class="btn btn-primary" style="flex:1;" id="msg-send-btn">Send Message</button>
+      <button onclick="closeModal('message-applicant-modal')" class="btn btn-outline">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- PRINT BLANK APPLICATION MODAL -->
 <div id="blank-app-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('blank-app-modal')"></div>
@@ -1440,6 +1465,23 @@
         <div class="preview-section-title">Admin Review Notes</div>
         <textarea id="application-review-notes" class="form-input review-notes" rows="4" placeholder="Supply verification details or follow-up actions...">${escapeHtml(app.adminNotes || '')}</textarea>
       </div>
+      ${(app.responseSubmittedAt || (app.occupants&&app.occupants.length) || (app.references&&app.references.length)) ? `
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Applicant-Provided Details ${app.responseSubmittedAt?`<span style="font-size:11px;color:#16A34A;font-weight:600;">✓ submitted${app.responseSubmittedAt.toDate?' '+escapeHtml(app.responseSubmittedAt.toDate().toLocaleString()):''}</span>`:''}</div>
+        <div class="preview-item">
+          <span><strong>Prospective residents</strong> ${(app.occupants&&app.occupants.length)?app.occupants.map(o=>escapeHtml(`${o.name||'—'}${o.age?` (age ${o.age})`:''}`)).join('; '):'—'}</span>
+          <span><strong>Desired move-in</strong> ${escapeHtml(app.moveInDate||'—')}</span>
+          <span><strong>References</strong> ${(app.references&&app.references.length)?app.references.map(r=>escapeHtml(`${r.name||'—'}${r.relationship?` (${r.relationship})`:''}${r.contact?` — ${r.contact}`:''}`)).join('; '):'—'}</span>
+          ${app.responseNotes?`<span><strong>Applicant notes</strong> ${escapeHtml(app.responseNotes)}</span>`:''}
+        </div>
+      </div>` : ''}
+      ${(app.messagesSent&&app.messagesSent.length)?`
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Message History</div>
+        <div class="preview-item">
+          ${app.messagesSent.slice().reverse().map(m=>`<span>${m.sentAt?escapeHtml(new Date(m.sentAt).toLocaleString()):''} — ${escapeHtml(m.subject||'(no subject)')}${m.includeForm?' <span style="font-size:10px;color:#2563EB;">[form link]</span>':''}</span>`).join('')}
+        </div>
+      </div>`:''}
       <div class="preview-card" style="margin-top:18px;">
         <div class="preview-section-title">Message</div>
         <div style="background:#fff;border:1px solid #E8E2D8;border-radius:8px;padding:16px;color:#334155;white-space:pre-wrap;line-height:1.7;">${app.message ? escapeHtml(app.message) : 'No message provided.'}</div>
@@ -1451,6 +1493,7 @@
       ${app.status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-danger">Decline</button>` : ''}
       ${!creditOrderedAt ? `<button onclick="orderCreditCheck('${app.id}')" class="btn btn-outline" ${canOrderCredit ? '' : 'disabled title="Requires applicant background-check consent"'}>Send SmartMove rental screening invite</button>` : `<button class="btn btn-success" disabled>SmartMove screening requested</button>`}
       ${!employmentOrderedAt ? `<button onclick="orderEmploymentVerification('${app.id}')" class="btn btn-outline">Order employment verification</button>` : `<button class="btn btn-success" disabled>Employment verification ordered</button>`}
+      <button onclick="openMessageModal('${app.id}')" class="btn btn-outline">✉️ Message Applicant</button>
       <button onclick="printApplication('${app.id}')" class="btn btn-outline">🖨 Print Application</button>
       <button onclick="saveApplicationReview()" class="btn btn-amber">Save Review</button>
       <button onclick="closeModal('application-preview-modal')" class="btn btn-outline">Close</button>
@@ -1680,6 +1723,76 @@
     win.document.write(html);
     win.document.close();
     closeModal('blank-app-modal');
+  };
+
+  // ===== MESSAGE APPLICANT (with templates + response form) =====
+  let _msgSiteName = '';
+  const MESSAGE_TEMPLATES = [
+    { key:'', label:'— Choose a template (or write your own) —', subject:'', body:'', includeForm:false },
+    { key:'review_info', label:'Under review — request details & references', includeForm:true,
+      subject:'Your application with {siteName} — a few details to move forward',
+      body:`Hi {firstName},\n\nThank you for applying for {propertyName}. We're currently reviewing your application and are very interested in moving forward.\n\nTo help us finalize our review, could you please confirm a few details using the secure form linked below:\n\n• The full names and ages of everyone who will be living in the home\n• Your desired move-in date\n• Any references (previous landlords, employers, or personal references) we may contact\n\nJust tap the button below — it only takes a couple of minutes.\n\nThank you,\n{siteName}` },
+    { key:'received', label:'Application received / under review', includeForm:false,
+      subject:'We received your application — {propertyName}',
+      body:`Hi {firstName},\n\nThank you for applying for {propertyName}. This is a quick note to let you know we've received your application and it's currently under review. We'll be in touch within 2–5 business days.\n\nWarm regards,\n{siteName}` },
+    { key:'viewing', label:'Invite to schedule a viewing', includeForm:false,
+      subject:'Schedule a viewing — {propertyName}',
+      body:`Hi {firstName},\n\nThanks for your interest in {propertyName}! We'd love to have you see the place in person. Please reply with a few days and times that work for you, and we'll get a viewing scheduled.\n\nBest,\n{siteName}` },
+    { key:'approved', label:'Approved — next steps', includeForm:false,
+      subject:'Good news about your application — {propertyName}',
+      body:`Hi {firstName},\n\nWe're pleased to let you know your application for {propertyName} has been approved! Our team will follow up shortly with the lease agreement and next steps.\n\nCongratulations and welcome,\n{siteName}` },
+    { key:'declined', label:'Respectful decline', includeForm:false,
+      subject:'Update on your application — {propertyName}',
+      body:`Hi {firstName},\n\nThank you for your interest in {propertyName} and for the time you put into your application. After careful consideration, we're unable to move forward at this time. We truly appreciate the opportunity and wish you the very best in your search.\n\nSincerely,\n{siteName}` },
+  ];
+  function fillTemplate(str, app) {
+    return String(str||'')
+      .replace(/{firstName}/g, app.firstName||'there')
+      .replace(/{lastName}/g, app.lastName||'')
+      .replace(/{propertyName}/g, app.propertyName||'the property')
+      .replace(/{siteName}/g, _msgSiteName||'our team');
+  }
+  window.openMessageModal = async (id) => {
+    const app = allApplications.find(a=>a.id===id); if(!app) return;
+    const modal = document.getElementById('message-applicant-modal');
+    modal.dataset.appId = id;
+    document.getElementById('message-applicant-to').textContent =
+      `To: ${`${app.firstName||''} ${app.lastName||''}`.trim()||'Applicant'}${app.email?` <${app.email}>`:' (no email on file)'}`;
+    const sel = document.getElementById('msg-template');
+    sel.innerHTML = MESSAGE_TEMPLATES.map(t=>`<option value="${t.key}">${t.label}</option>`).join('');
+    sel.value = '';
+    document.getElementById('msg-subject').value = '';
+    document.getElementById('msg-body').value = '';
+    document.getElementById('msg-include-form').checked = false;
+    document.getElementById('message-alert').classList.add('hidden');
+    try { const s = await getDoc(doc(db,'settings','site')); _msgSiteName = s.data()?.siteName || ''; } catch { _msgSiteName = ''; }
+    openModal('message-applicant-modal');
+  };
+  window.applyMessageTemplate = () => {
+    const key = document.getElementById('msg-template').value;
+    const tpl = MESSAGE_TEMPLATES.find(t=>t.key===key); if(!tpl||!key) return;
+    const app = allApplications.find(a=>a.id===document.getElementById('message-applicant-modal').dataset.appId) || {};
+    document.getElementById('msg-subject').value = fillTemplate(tpl.subject, app);
+    document.getElementById('msg-body').value = fillTemplate(tpl.body, app);
+    document.getElementById('msg-include-form').checked = !!tpl.includeForm;
+  };
+  window.sendApplicantMessage = async () => {
+    const id = document.getElementById('message-applicant-modal').dataset.appId;
+    const subject = document.getElementById('msg-subject').value.trim();
+    const bodyText = document.getElementById('msg-body').value.trim();
+    const includeForm = document.getElementById('msg-include-form').checked;
+    if (!subject || !bodyText) { showAlert('message-alert','Please provide a subject and a message.'); return; }
+    const btn = document.getElementById('msg-send-btn'); btn.disabled=true; btn.textContent='Sending...';
+    try {
+      const res = await fetch('/api/send-applicant-message',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({applicationId:id,subject,body:bodyText,includeForm,siteName:_msgSiteName})});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error||'Failed to send');
+      showAlert('message-alert',`✓ Message sent to ${data.sentTo}.`+(includeForm?' A response form link was included.':''),'success');
+      await loadApplications();
+      setTimeout(()=>closeModal('message-applicant-modal'),1600);
+    } catch(e) { showAlert('message-alert',e.message); }
+    btn.disabled=false; btn.textContent='Send Message';
   };
 
   window.filterTenants = () => {
