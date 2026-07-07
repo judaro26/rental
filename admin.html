@@ -976,6 +976,38 @@
   </div>
 </div>
 
+<!-- GENERATE LEASE MODAL -->
+<div id="lease-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('lease-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('lease-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;">Generate Lease Agreement</h3>
+    <p id="lease-modal-to" style="font-size:13px;color:var(--slate);margin-bottom:16px;"></p>
+    <div id="lease-alert" class="hidden alert"></div>
+    <div class="grid grid-cols-2 gap-4">
+      <div class="col-span-2"><label class="label">Landlord / lessor name</label><input type="text" id="lease-landlord-name" class="form-input" placeholder="Defaults to your site/brand name"></div>
+      <div class="col-span-2"><label class="label">Landlord email (for countersigning)</label><input type="email" id="lease-landlord-email" class="form-input" placeholder="Defaults to your Settings contact email"></div>
+      <div><label class="label">Lease start</label><input type="date" id="lease-start" class="form-input"></div>
+      <div><label class="label">Lease end</label><input type="date" id="lease-end" class="form-input"></div>
+      <div><label class="label">Monthly rent ($)</label><input type="number" id="lease-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label class="label">Security deposit ($)</label><input type="number" id="lease-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label class="label">Rent due day of month</label><input type="number" id="lease-due-day" class="form-input" min="1" max="31" placeholder="1"></div>
+      <div><label class="label">Late fee ($)</label><input type="number" id="lease-late-fee" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label class="label">Late fee after (days)</label><input type="number" id="lease-late-days" class="form-input" min="0" placeholder="5"></div>
+      <div><label class="label">Pet deposit ($)</label><input type="number" id="lease-pet-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="col-span-2"><label class="label">Utilities responsibility</label><input type="text" id="lease-utilities" class="form-input" placeholder="e.g. Tenant pays electric & gas; Landlord pays water"></div>
+      <div class="col-span-2"><label class="label">Parking</label><input type="text" id="lease-parking" class="form-input" placeholder="e.g. One assigned space, #12"></div>
+      <div class="col-span-2"><label class="label">Pet policy</label><input type="text" id="lease-pet-policy" class="form-input" placeholder="e.g. One cat allowed; no dogs"></div>
+      <div class="col-span-2"><label class="label">Additional terms</label><textarea id="lease-additional" class="form-input" rows="3" placeholder="Any extra clauses to include..."></textarea></div>
+    </div>
+    <p style="font-size:11px;color:var(--slate);margin-top:12px;line-height:1.6;">These details are prefilled into your Documenso lease template. The applicant (Tenant) and you (Landlord) will receive signing invitations from Documenso by email.</p>
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button onclick="generateLease()" class="btn btn-primary" style="flex:1;" id="lease-generate-btn">Generate &amp; Send for Signature</button>
+      <button onclick="closeModal('lease-modal')" class="btn btn-outline">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- REQUEST DOCUMENTS MODAL -->
 <div id="doc-request-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('doc-request-modal')"></div>
@@ -1509,6 +1541,23 @@
           ${app.messagesSent.slice().reverse().map(m=>`<span>${m.sentAt?escapeHtml(new Date(m.sentAt).toLocaleString()):''} — ${escapeHtml(m.subject||'(no subject)')}${m.includeForm?' <span style="font-size:10px;color:#2563EB;">[form link]</span>':''}</span>`).join('')}
         </div>
       </div>`:''}
+      ${app.leaseAgreement ? (() => {
+        const la = app.leaseAgreement;
+        const st = la.status || 'sent';
+        const color = (st==='completed'||st==='signed') ? '#16A34A' : st==='opened' ? '#2563EB' : '#92400E';
+        const created = la.createdAt ? escapeHtml(new Date(la.createdAt).toLocaleString()) : '—';
+        return `
+      <div class="preview-card" style="margin-top:18px;">
+        <div class="preview-section-title">Lease Agreement <span style="font-size:11px;color:${color};font-weight:600;text-transform:capitalize;">${escapeHtml(st)}</span></div>
+        <div class="preview-item">
+          <span><strong>Provider</strong> Documenso</span>
+          <span><strong>Sent</strong> ${created}</span>
+          ${la.tenantSigningUrl?`<span><strong>Tenant signing link</strong> <a href="${la.tenantSigningUrl}" target="_blank" rel="noreferrer noopener">open</a> · <button type="button" class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:10px;" onclick="copyText('${la.tenantSigningUrl}',this)">Copy</button></span>`:''}
+          ${la.landlordSigningUrl?`<span><strong>Landlord signing link</strong> <a href="${la.landlordSigningUrl}" target="_blank" rel="noreferrer noopener">open</a></span>`:''}
+          ${la.completedAt?`<span><strong>Completed</strong> ${escapeHtml(new Date(la.completedAt).toLocaleString())}</span>`:''}
+          ${la.signedDocumentUrl?`<span><strong>Signed document</strong> <a href="${la.signedDocumentUrl}" target="_blank" rel="noreferrer noopener">download</a></span>`:''}
+        </div>
+      </div>`; })() : ''}
       ${(app.docRequest || (app.applicationDocuments&&app.applicationDocuments.length) || app.docConsent || app.documentsPurgedAt || app.responseToken) ? `
       <div class="preview-card" style="margin-top:18px;">
         <div class="preview-section-title">Supporting Documents ${app.docConsent&&app.docConsent.given?`<span style="font-size:11px;color:#16A34A;font-weight:600;">✓ consent recorded${app.docConsent.recordedAt?' '+escapeHtml(new Date(app.docConsent.recordedAt).toLocaleString()):''}</span>`:''}</div>
@@ -1534,6 +1583,7 @@
       ${app.status !== 'declined' ? `<button onclick="updateApplicationStatus('${app.id}','declined')" class="btn btn-danger">Decline</button>` : ''}
       ${!creditOrderedAt ? `<button onclick="orderCreditCheck('${app.id}')" class="btn btn-outline" ${canOrderCredit ? '' : 'disabled title="Requires applicant background-check consent"'}>Send SmartMove rental screening invite</button>` : `<button class="btn btn-success" disabled>SmartMove screening requested</button>`}
       ${!employmentOrderedAt ? `<button onclick="orderEmploymentVerification('${app.id}')" class="btn btn-outline">Order employment verification</button>` : `<button class="btn btn-success" disabled>Employment verification ordered</button>`}
+      ${app.status==='approved' ? `<button onclick="openLeaseModal('${app.id}')" class="btn btn-success">📝 ${app.leaseAgreement?'Re-send Lease':'Generate Lease'}</button>` : ''}
       <button onclick="openMessageModal('${app.id}')" class="btn btn-outline">✉️ Message Applicant</button>
       <button onclick="openDocRequestModal('${app.id}')" class="btn btn-outline">📄 Request Documents</button>
       <button onclick="printApplication('${app.id}')" class="btn btn-outline">🖨 Print Application</button>
@@ -1896,6 +1946,59 @@
       await loadApplications();
     } catch(e){ showAlert('doc-request-alert',e.message); }
     btn.disabled=false; btn.textContent='Send Request';
+  };
+
+  // ===== GENERATE LEASE (Documenso) =====
+  window.openLeaseModal = async (id) => {
+    const app = allApplications.find(a=>a.id===id); if(!app) return;
+    const modal = document.getElementById('lease-modal');
+    modal.dataset.appId = id;
+    const propName = allProperties.find(p=>p.id===app.propertyId)?.name || app.propertyName || '';
+    document.getElementById('lease-modal-to').textContent =
+      `Tenant: ${`${app.firstName||''} ${app.lastName||''}`.trim()||'Applicant'}${app.email?` <${app.email}>`:''}${propName?` · Property: ${propName}`:''}`;
+    document.getElementById('lease-alert').classList.add('hidden');
+    const t = (app.leaseAgreement && app.leaseAgreement.terms) || {};
+    const set = (elId, v) => { document.getElementById(elId).value = v != null ? v : ''; };
+    set('lease-start', t.leaseStart); set('lease-end', t.leaseEnd);
+    set('lease-rent', t.monthlyRent); set('lease-deposit', t.securityDeposit);
+    set('lease-due-day', t.rentDueDay || 1); set('lease-late-fee', t.lateFee);
+    set('lease-late-days', t.lateFeeAfterDays || 5); set('lease-pet-deposit', t.petDeposit);
+    set('lease-utilities', t.utilities); set('lease-parking', t.parking);
+    set('lease-pet-policy', t.petPolicy); set('lease-additional', t.additionalTerms);
+    // Landlord defaults from settings.
+    let sn='', se='';
+    try { const s=await getDoc(doc(db,'settings','site')); sn=s.data()?.siteName||''; se=s.data()?.email||''; } catch {}
+    set('lease-landlord-name', t.landlordName || sn);
+    set('lease-landlord-email', t.landlordEmail || se);
+    openModal('lease-modal');
+  };
+  window.generateLease = async () => {
+    const id = document.getElementById('lease-modal').dataset.appId;
+    const num = elId => { const v = document.getElementById(elId).value; return v===''?undefined:Number(v); };
+    const str = elId => { const v = document.getElementById(elId).value.trim(); return v||undefined; };
+    const terms = {
+      landlordName: str('lease-landlord-name'), landlordEmail: str('lease-landlord-email'),
+      leaseStart: str('lease-start'), leaseEnd: str('lease-end'),
+      monthlyRent: num('lease-rent'), securityDeposit: num('lease-deposit'),
+      rentDueDay: num('lease-due-day'), lateFee: num('lease-late-fee'), lateFeeAfterDays: num('lease-late-days'),
+      petDeposit: num('lease-pet-deposit'), utilities: str('lease-utilities'), parking: str('lease-parking'),
+      petPolicy: str('lease-pet-policy'), additionalTerms: str('lease-additional'),
+    };
+    const btn = document.getElementById('lease-generate-btn'); btn.disabled=true; btn.textContent='Generating...';
+    try {
+      let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
+      const res = await fetch('/api/generate-lease',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applicationId:id,terms,siteName})});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error||'Failed to generate lease');
+      const alertEl = document.getElementById('lease-alert');
+      alertEl.className='alert alert-success';
+      alertEl.innerHTML = `✓ Lease generated and sent for signature via Documenso.`
+        + (data.tenantSigningUrl?`<div style="margin-top:8px;font-size:12px;">Tenant signing link: <a href="${data.tenantSigningUrl}" target="_blank" rel="noreferrer noopener">open</a> · <button type="button" class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:10px;" onclick="copyText('${data.tenantSigningUrl}',this)">Copy</button></div>`:'')
+        + (data.landlordSigningUrl?`<div style="margin-top:6px;font-size:12px;">Your (landlord) signing link: <a href="${data.landlordSigningUrl}" target="_blank" rel="noreferrer noopener">open</a></div>`:'');
+      alertEl.classList.remove('hidden');
+      await loadApplications();
+    } catch(e){ showAlert('lease-alert', e.message); }
+    btn.disabled=false; btn.textContent='Generate & Send for Signature';
   };
 
   // ===== ARCHIVE APPLICATIONS =====
