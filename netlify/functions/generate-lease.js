@@ -132,19 +132,11 @@ exports.handler = async (event) => {
       };
           const marks = { property_type_mark_single: terms.propertyType === 'single', property_type_mark_multi: terms.propertyType === 'multi', rent_control_exempt_mark: terms.rentControl === 'exempt', rent_control_subject_mark: terms.rentControl === 'subject', utilities_option_a_mark: terms.utilitiesOption === 'a', utilities_option_b_mark: terms.utilitiesOption === 'b', utilities_option_c_mark: terms.utilitiesOption === 'c', utilities_b_electricity_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('electricity'), utilities_b_gas_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('gas'), utilities_b_water_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('water'), utilities_b_trash_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('trash'), shared_meter_electricity_mark: terms.utilitiesOption === 'c' && terms.sharedMeterUtility === 'electricity', shared_meter_gas_mark: terms.utilitiesOption === 'c' && terms.sharedMeterUtility === 'gas', shared_meter_billing_absorbed_mark: terms.utilitiesOption === 'c' && terms.sharedMeterBilling === 'absorbed', shared_meter_billing_prorated_mark: terms.utilitiesOption === 'c' && terms.sharedMeterBilling === 'prorated', pets_none_mark: terms.pets !== 'allowed', pets_allowed_mark: terms.pets === 'allowed', }; const fieldByLabel = {};
           for (const f of tplFields) {
-                  const label = f.fieldMeta?.label || f.fieldMeta?.text || f.name || '';
-                  if (label) fieldByLabel[norm(label)] = f;
-          }
-          const prefillFields = [];
-          for (const [key, val] of Object.entries(values)) {
-                  if (val === undefined || val === null || val === '') continue;
-                  const f = fieldByLabel[norm(key)];
-                  if (!f) continue; // template doesn't have this field — skip silently
-            const type = String(f.type || 'TEXT').toLowerCase();
-                  prefillFields.push({ id: f.id, type: type === 'number' ? 'number' : 'text', value: String(val) });
-          }
+                  const label = f.fieldMeta?.label || f.fieldMeta?.text || f.name || ''; if (!label) continue; const key = norm(label); (fieldByLabel[key] = fieldByLabel[key] || []).push(f); }
+        const prefillFields = [];
+        for (const [key, val] of Object.entries(values)) { if (val === undefined || val === null || val === '') continue; const fs = fieldByLabel[norm(key)]; if (!fs) continue; for (const f of fs) { const type = String(f.type || 'TEXT').toLowerCase(); prefillFields.push({ id: f.id, type: type === 'number' ? 'number' : 'text', value: String(val) }); } }
 
-      for (const [key, checked] of Object.entries(marks)) { if (!checked) continue; const f = fieldByLabel[norm(key)]; if (!f) continue; prefillFields.push({ id: f.id, type: 'text', value: 'X' }); } // 2) Create + immediately send the document from the template (v2 template/use).
+        for (const [key, checked] of Object.entries(marks)) { if (!checked) continue; const fs = fieldByLabel[norm(key)]; if (!fs) continue; for (const f of fs) { prefillFields.push({ id: f.id, type: 'text', value: 'X' }); } } // 2) Create + immediately send the document from the template (v2 template/use).
       const gen = await documenso('/template/use', apiUrl, apiKey, 'POST', {
               templateId: Number(templateId) || templateId,
               recipients,
