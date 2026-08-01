@@ -10,9 +10,9 @@
 // 2. Create a lease Template (upload your lease PDF) with:
 //    • Recipients named "Tenant" and "Landlord" (add SIGNATURE + DATE fields for each).
 //    • TEXT fields whose labels match any of these (spaces/underscores/case ignored):
-//      property_address, unit, tenant_name, occupants, lease_start, lease_end,
-//      monthly_rent, security_deposit, rent_due_day, late_fee, late_fee_after_days,
-//      utilities, parking, pet_policy, pet_deposit, state, additional_terms, landlord_name
+//      property_address, minor_occupants, lease_start, lease_end, monthly_rent, security_deposit, late_fee_day, late_fee, shared_meter_pct, pet_breed, pet_weight, pet_name, pet_rent, additional_terms
+//      and checkbox-mark fields (write 'X' to mark true): property_type_mark_single/multi,
+//      rent_control_exempt/subject_mark, utilities_option_a/b/c_mark, utilities_b_electricity/gas/water/trash_mark, shared_meter_electricity/gas_mark, shared_meter_billing_absorbed/prorated_mark, pets_none/allowed_mark
 //    Copy the template's numeric `id` (NOT the "envelope_..." string) → set DOCUMENSO_TEMPLATE_ID.
 //    (Optional: a property can override with its own `documensoTemplateId` field.)
 //
@@ -103,11 +103,10 @@ exports.handler = async (event) => {
 
       const tenantName = `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Tenant';
           const fullAddress = [prop.address, prop.city, [prop.state, prop.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || prop.name || '';
-          const occupants = Array.isArray(app.occupants) && app.occupants.length
-            ? app.occupants.map(o => `${o.name || ''}${o.age ? ' (age ' + o.age + ')' : ''}`).join(', ')
-                  : tenantName;
+          
+                  
 
-      // 1) Read the template to discover recipient + field IDs.
+      const minorOccupants = Array.isArray(app.occupants) ? app.occupants.filter(o => o && Number(o.age) < 18).map(o => `${o.name || ''}${o.age ? ' (age ' + o.age + ')' : ''}`).join(', ') : ''; // 1) Read the template to discover recipient + field IDs.
       const tpl = await documenso(`/template/${templateId}`, apiUrl, apiKey);
           if (!tpl.ok) {
                   console.error('Documenso get template error:', tpl.status, tpl.data);
@@ -129,14 +128,9 @@ exports.handler = async (event) => {
 
       // Build the value map, then match to template text fields by normalized label.
       const values = {
-              property_address: fullAddress, unit: app.unitLabel || '', tenant_name: tenantName, occupants,
-              lease_start: terms.leaseStart, lease_end: terms.leaseEnd, monthly_rent: terms.monthlyRent,
-              security_deposit: terms.securityDeposit, rent_due_day: terms.rentDueDay, late_fee: terms.lateFee,
-              late_fee_after_days: terms.lateFeeAfterDays, utilities: terms.utilities, parking: terms.parking,
-              pet_policy: terms.petPolicy, pet_deposit: terms.petDeposit, state: prop.state || '',
-              additional_terms: terms.additionalTerms, landlord_name: landlordName,
+              property_address: fullAddress, minor_occupants: minorOccupants, lease_start: terms.leaseStart, lease_end: terms.leaseEnd, monthly_rent: terms.monthlyRent, security_deposit: terms.securityDeposit, late_fee_day: terms.lateFeeDay, late_fee: terms.lateFee, shared_meter_pct: terms.sharedMeterBilling === 'prorated' ? terms.sharedMeterPct : undefined, pet_breed: terms.pets === 'allowed' ? terms.petBreed : undefined, pet_weight: terms.pets === 'allowed' ? terms.petWeight : undefined, pet_name: terms.pets === 'allowed' ? terms.petName : undefined, pet_rent: terms.pets === 'allowed' ? terms.petRent : undefined, additional_terms: terms.additionalTerms,
       };
-          const fieldByLabel = {};
+          const marks = { property_type_mark_single: terms.propertyType === 'single', property_type_mark_multi: terms.propertyType === 'multi', rent_control_exempt_mark: terms.rentControl === 'exempt', rent_control_subject_mark: terms.rentControl === 'subject', utilities_option_a_mark: terms.utilitiesOption === 'a', utilities_option_b_mark: terms.utilitiesOption === 'b', utilities_option_c_mark: terms.utilitiesOption === 'c', utilities_b_electricity_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('electricity'), utilities_b_gas_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('gas'), utilities_b_water_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('water'), utilities_b_trash_mark: terms.utilitiesOption === 'b' && (terms.utilitiesIncluded||[]).includes('trash'), shared_meter_electricity_mark: terms.utilitiesOption === 'c' && terms.sharedMeterUtility === 'electricity', shared_meter_gas_mark: terms.utilitiesOption === 'c' && terms.sharedMeterUtility === 'gas', shared_meter_billing_absorbed_mark: terms.utilitiesOption === 'c' && terms.sharedMeterBilling === 'absorbed', shared_meter_billing_prorated_mark: terms.utilitiesOption === 'c' && terms.sharedMeterBilling === 'prorated', pets_none_mark: terms.pets !== 'allowed', pets_allowed_mark: terms.pets === 'allowed', }; const fieldByLabel = {};
           for (const f of tplFields) {
                   const label = f.fieldMeta?.label || f.fieldMeta?.text || f.name || '';
                   if (label) fieldByLabel[norm(label)] = f;
@@ -150,7 +144,7 @@ exports.handler = async (event) => {
                   prefillFields.push({ id: f.id, type: type === 'number' ? 'number' : 'text', value: String(val) });
           }
 
-      // 2) Create + immediately send the document from the template (v2 template/use).
+      for (const [key, checked] of Object.entries(marks)) { if (!checked) continue; const f = fieldByLabel[norm(key)]; if (!f) continue; prefillFields.push({ id: f.id, type: 'text', value: 'X' }); } // 2) Create + immediately send the document from the template (v2 template/use).
       const gen = await documenso('/template/use', apiUrl, apiKey, 'POST', {
               templateId: Number(templateId) || templateId,
               recipients,
