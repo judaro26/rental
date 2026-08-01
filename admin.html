@@ -991,13 +991,9 @@
       <div><label class="label">Lease end</label><input type="date" id="lease-end" class="form-input"></div>
       <div><label class="label">Monthly rent ($)</label><input type="number" id="lease-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
       <div><label class="label">Security deposit ($)</label><input type="number" id="lease-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
-      <div><label class="label">Rent due day of month</label><input type="number" id="lease-due-day" class="form-input" min="1" max="31" placeholder="1"></div>
+      <div class="col-span-2"><label class="label">Property type</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="single" onchange="updateLeaseVisibility()" checked> Single-Family Home / Condo</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="multi" onchange="updateLeaseVisibility()"> Multi-Family / Studio Unit</label></div></div><div class="col-span-2"><label class="label">Rent control (AB 1482)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="exempt" checked> Exempt</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="subject"> Subject to rent control</label></div></div><div><label class="label">Late fee day of month</label><input type="number" id="lease-late-fee-day" class="form-input" min="1" max="31" placeholder="5"></div>
       <div><label class="label">Late fee ($)</label><input type="number" id="lease-late-fee" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
-      <div><label class="label">Late fee after (days)</label><input type="number" id="lease-late-days" class="form-input" min="0" placeholder="5"></div>
-      <div><label class="label">Pet deposit ($)</label><input type="number" id="lease-pet-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="col-span-2"><label class="label">Utilities responsibility</label><input type="text" id="lease-utilities" class="form-input" placeholder="e.g. Tenant pays electric & gas; Landlord pays water"></div>
-      <div class="col-span-2"><label class="label">Parking</label><input type="text" id="lease-parking" class="form-input" placeholder="e.g. One assigned space, #12"></div>
-      <div class="col-span-2"><label class="label">Pet policy</label><input type="text" id="lease-pet-policy" class="form-input" placeholder="e.g. One cat allowed; no dogs"></div>
+      <div class="col-span-2"><label class="label">Pets</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="none" onchange="updateLeaseVisibility()" checked> No pets allowed</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="allowed" onchange="updateLeaseVisibility()"> Pet allowed (with restriction)</label></div></div><div id="lease-pets-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><div class="grid grid-cols-2 gap-4"><div><label class="label">Pet breed</label><input type="text" id="lease-pet-breed" class="form-input" placeholder="e.g. Labrador"></div><div><label class="label">Pet weight</label><input type="text" id="lease-pet-weight" class="form-input" placeholder="e.g. 45 lbs"></div><div><label class="label">Pet name</label><input type="text" id="lease-pet-name" class="form-input" placeholder="e.g. Max"></div><div><label class="label">Pet rent ($/mo)</label><input type="number" id="lease-pet-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div></div></div>
       <div class="col-span-2"><label class="label">Additional terms</label><textarea id="lease-additional" class="form-input" rows="3" placeholder="Any extra clauses to include..."></textarea></div>
     </div>
     <p style="font-size:11px;color:var(--slate);margin-top:12px;line-height:1.6;">These details are prefilled into your Documenso lease template. The applicant (Tenant) and you (Landlord) will receive signing invitations from Documenso by email.</p>
@@ -1949,7 +1945,7 @@
   };
 
   // ===== GENERATE LEASE (Documenso) =====
-  window.openLeaseModal = async (id) => {
+  window.updateLeaseVisibility = () => { const opt = (document.querySelector('input[name="lease-utilities-option"]:checked')||{}).value; document.getElementById('lease-utilities-b-panel').classList.toggle('hidden', opt !== 'b'); document.getElementById('lease-utilities-c-panel').classList.toggle('hidden', opt !== 'c'); const billing = (document.querySelector('input[name="lease-shared-meter-billing"]:checked')||{}).value; document.getElementById('lease-shared-meter-pct-row').classList.toggle('hidden', !(opt === 'c' && billing === 'prorated')); const pets = (document.querySelector('input[name="lease-pets"]:checked')||{}).value; document.getElementById('lease-pets-panel').classList.toggle('hidden', pets !== 'allowed'); }; window.openLeaseModal = async (id) => {
     const app = allApplications.find(a=>a.id===id); if(!app) return;
     const modal = document.getElementById('lease-modal');
     modal.dataset.appId = id;
@@ -1958,13 +1954,13 @@
       `Tenant: ${`${app.firstName||''} ${app.lastName||''}`.trim()||'Applicant'}${app.email?` <${app.email}>`:''}${propName?` · Property: ${propName}`:''}`;
     document.getElementById('lease-alert').classList.add('hidden');
     const t = (app.leaseAgreement && app.leaseAgreement.terms) || {};
-    const set = (elId, v) => { document.getElementById(elId).value = v != null ? v : ''; };
+    const set = (elId, v) => { document.getElementById(elId).value = v != null ? v : ''; }; const setRadio = (name, val) => { const el = document.querySelector(`input[name="${name}"][value="${val}"]`); if (el) el.checked = true; }; const setChecks = (name, vals) => { document.querySelectorAll(`input[name="${name}"]`).forEach(el => { el.checked = (vals||[]).includes(el.value); }); };
     set('lease-start', t.leaseStart); set('lease-end', t.leaseEnd);
     set('lease-rent', t.monthlyRent); set('lease-deposit', t.securityDeposit);
-    set('lease-due-day', t.rentDueDay || 1); set('lease-late-fee', t.lateFee);
-    set('lease-late-days', t.lateFeeAfterDays || 5); set('lease-pet-deposit', t.petDeposit);
-    set('lease-utilities', t.utilities); set('lease-parking', t.parking);
-    set('lease-pet-policy', t.petPolicy); set('lease-additional', t.additionalTerms);
+    set('lease-late-fee-day', t.lateFeeDay || 5); set('lease-late-fee', t.lateFee);
+    setRadio('lease-property-type', t.propertyType || 'single'); setRadio('lease-rent-control', t.rentControl || 'exempt');
+    setRadio('lease-utilities-option', t.utilitiesOption || 'a'); setChecks('lease-utilities-included', t.utilitiesIncluded);
+    setRadio('lease-shared-meter-utility', t.sharedMeterUtility || 'electricity'); setRadio('lease-shared-meter-billing', t.sharedMeterBilling || 'absorbed'); set('lease-shared-meter-pct', t.sharedMeterPct); setRadio('lease-pets', t.pets || 'none'); set('lease-pet-breed', t.petBreed); set('lease-pet-weight', t.petWeight); set('lease-pet-name', t.petName); set('lease-pet-rent', t.petRent); set('lease-additional', t.additionalTerms); updateLeaseVisibility();
     // Landlord defaults from settings.
     let sn='', se='';
     try { const s=await getDoc(doc(db,'settings','site')); sn=s.data()?.siteName||''; se=s.data()?.email||''; } catch {}
@@ -1975,14 +1971,13 @@
   window.generateLease = async () => {
     const id = document.getElementById('lease-modal').dataset.appId;
     const num = elId => { const v = document.getElementById(elId).value; return v===''?undefined:Number(v); };
-    const str = elId => { const v = document.getElementById(elId).value.trim(); return v||undefined; };
+    const str = elId => { const v = document.getElementById(elId).value.trim(); return v||undefined; }; const radioVal = name => { const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : undefined; }; const checkedVals = name => Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map(el => el.value);
     const terms = {
       landlordName: str('lease-landlord-name'), landlordEmail: str('lease-landlord-email'),
       leaseStart: str('lease-start'), leaseEnd: str('lease-end'),
       monthlyRent: num('lease-rent'), securityDeposit: num('lease-deposit'),
-      rentDueDay: num('lease-due-day'), lateFee: num('lease-late-fee'), lateFeeAfterDays: num('lease-late-days'),
-      petDeposit: num('lease-pet-deposit'), utilities: str('lease-utilities'), parking: str('lease-parking'),
-      petPolicy: str('lease-pet-policy'), additionalTerms: str('lease-additional'),
+      lateFeeDay: num('lease-late-fee-day'), lateFee: num('lease-late-fee'), propertyType: radioVal('lease-property-type'), rentControl: radioVal('lease-rent-control'), utilitiesOption: radioVal('lease-utilities-option'), utilitiesIncluded: checkedVals('lease-utilities-included'), sharedMeterUtility: radioVal('lease-shared-meter-utility'), sharedMeterBilling: radioVal('lease-shared-meter-billing'), sharedMeterPct: num('lease-shared-meter-pct'), pets: radioVal('lease-pets'), petBreed: str('lease-pet-breed'), petWeight: str('lease-pet-weight'), petName: str('lease-pet-name'), petRent: num('lease-pet-rent'),
+            additionalTerms: str('lease-additional'),
     };
     const btn = document.getElementById('lease-generate-btn'); btn.disabled=true; btn.textContent='Generating...';
     try {
