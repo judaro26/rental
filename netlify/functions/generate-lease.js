@@ -136,7 +136,7 @@ exports.handler = async (event) => {
         const prefillFields = [];
         for (const [key, val] of Object.entries(values)) { if (val === undefined || val === null || val === '') continue; const fs = fieldByLabel[norm(key)]; if (!fs) continue; for (const f of fs) { const type = String(f.type || 'TEXT').toLowerCase(); prefillFields.push({ id: f.id, type: type === 'number' ? 'number' : 'text', value: String(val) }); } }
 
-        for (const [key, checked] of Object.entries(marks)) { if (!checked) continue; const fs = fieldByLabel[norm(key)]; if (!fs) continue; for (const f of fs) { prefillFields.push({ id: f.id, type: 'text', value: 'X' }); } } // 2) Create + immediately send the document from the template (v2 template/use).
+        for (const [key, checked] of Object.entries(marks)) { const fs = fieldByLabel[norm(key)]; if (!fs) continue; for (const f of fs) { prefillFields.push({ id: f.id, type: 'text', value: checked ? 'X' : ' ' }); } } // 2) Create + immediately send the document from the template (v2 template/use).
       const gen = await documenso('/template/use', apiUrl, apiKey, 'POST', {
               templateId: Number(templateId) || templateId,
               recipients,
