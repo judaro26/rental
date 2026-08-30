@@ -104,42 +104,55 @@ exports.handler = async () => {
         if (!cycle) continue;                             // not this rule's day
         if (rule.lastSentPeriod === cycle.period) continue; // already sent this cycle
 
-        // Find active tenants for this property.
-        let tenantsSnap;
-        try {
-          tenantsSnap = await db.collection('tenants')
-            .where('propertyId', '==', propDoc.id)
-            .where('status', '==', 'active')
-            .get();
-        } catch (err) {
-          console.error(`send-property-reminders: could not query tenants for property ${propDoc.id}:`, err.message);
-          errors++;
-          continue;
+        const notifyTenants = rule.notifyTenants !== false; // default true, preserving existing behavior
+        const notifyEmail = (rule.notifyEmail || '').trim();
+
+        // Tenant notification and the admin/payables notification are
+        // independent — a Firestore hiccup on the tenant lookup shouldn't
+        // block the admin's own copy, and an admin-only reminder (tenants
+        // turned off) shouldn't need any active tenants to exist at all.
+        let recipients = [];
+        if (notifyTenants) {
+          try {
+            const tenantsSnap = await db.collection('tenants')
+              .where('propertyId', '==', propDoc.id)
+              .where('status', '==', 'active')
+              .get();
+            tenantsSnap.docs.forEach(tDoc => {
+              const tenant = tDoc.data();
+              if (tenant.email) recipients.push({ email: tenant.email, name: tenant.firstName || 'there', isAdminCopy: false });
+            });
+          } catch (err) {
+            console.error(`send-property-reminders: could not query tenants for property ${propDoc.id}:`, err.message);
+            errors++;
+          }
         }
-        if (tenantsSnap.empty) { updatedRules[i].lastSentPeriod = cycle.period; rulesChanged = true; continue; }
+        if (notifyEmail) {
+          recipients.push({ email: notifyEmail, name: 'there', isAdminCopy: true });
+        }
+
+        if (!recipients.length) { updatedRules[i].lastSentPeriod = cycle.period; rulesChanged = true; continue; }
 
         const dueDateLabel = new Date(cycle.dueMs).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
         const label = rule.label || 'Bill';
         const customMessage = (rule.message || '').trim();
 
-        for (const tDoc of tenantsSnap.docs) {
-          const tenant = tDoc.data();
-          if (!tenant.email) continue;
+        for (const recipient of recipients) {
           try {
             await transporter.sendMail({
               from: process.env.SMTP_FROM || process.env.SMTP_USER,
-              to: tenant.email,
+              to: recipient.email,
               subject: `Reminder: ${label} due ${dueDateLabel}`,
               html: `
-                <p>Hi ${tenant.firstName || 'there'},</p>
-                <p>This is a reminder that your <strong>${label}</strong> for ${property.name || 'your property'} is due on <strong>${dueDateLabel}</strong>.</p>
+                <p>Hi ${recipient.name},</p>
+                <p>This is a reminder that ${recipient.isAdminCopy ? 'the' : 'your'} <strong>${label}</strong> for ${property.name || 'your property'} is due on <strong>${dueDateLabel}</strong>.</p>
                 ${customMessage ? `<p>${customMessage}</p>` : ''}
                 <p style="color:#6B7280;font-size:12px;">This is an automated reminder, not an invoice — check with your property manager if you have questions about how to pay.</p>
               `,
             });
             tenantsNotified++;
           } catch (err) {
-            console.error(`send-property-reminders: failed to email tenant ${tDoc.id} for property ${propDoc.id}:`, err.message);
+            console.error(`send-property-reminders: failed to email ${recipient.email} for property ${propDoc.id}:`, err.message);
             errors++;
           }
         }
