@@ -203,9 +203,21 @@ exports.handler = async (event) => {
     // ── TEST EMAIL — tests a specific saved provider (or the active one if
     //    no id given) without requiring it to be active first ─────────────
     if (action === 'test_email') {
-      const { id } = body;
+      const { id, host, user, pass, port, fromAddress } = body;
       let cfg = null;
-      if (id) {
+      if (host && user) {
+        // Test whatever's currently typed in the form, even if unsaved yet.
+        // A blank password here means "use the saved one" only if editing
+        // an existing entry (id present) — for a brand-new, never-saved
+        // entry there's nothing to fall back to, so pass is required.
+        let effectivePass = pass;
+        if (!effectivePass && id) {
+          const existing = await coll.doc(id).get();
+          effectivePass = existing.exists ? existing.data().pass : null;
+        }
+        if (!effectivePass) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a password/API key to test with.' }) };
+        cfg = { host, user, pass: effectivePass, port, fromAddress };
+      } else if (id) {
         const snap = await coll.doc(id).get();
         if (!snap.exists || snap.data().type !== 'email') return { statusCode: 404, body: JSON.stringify({ error: 'Email provider not found.' }) };
         cfg = snap.data();
@@ -228,6 +240,15 @@ exports.handler = async (event) => {
         return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available to test (neither a saved provider nor an environment default).' }) };
       }
 
+      // verify() checks the connection/auth without sending anything —
+      // fails fast with a clear reason if the credentials are wrong,
+      // rather than only finding out via a bounced/failed send.
+      try {
+        await nodemailer.createTransport(transportOpts).verify();
+      } catch (err) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Could not connect/authenticate: ' + err.message }) };
+      }
+
       const transporter = nodemailer.createTransport(transportOpts);
       await transporter.sendMail({
         from: (cfg && cfg.fromAddress) || process.env.SMTP_FROM || transportOpts.auth.user,
@@ -236,6 +257,46 @@ exports.handler = async (event) => {
         html: `<p>This confirms ${cfg ? `the "${cfg.label || 'saved'}" provider` : 'your environment default configuration'} is working. Sent to ${caller.email} at ${new Date().toISOString()}.</p>`,
       });
       return { statusCode: 200, body: JSON.stringify({ success: true, sentTo: caller.email }) };
+    }
+
+    // ── TEST STORAGE — validates Cloudinary credentials with a read-only
+    //    call (account usage stats), no file is uploaded or stored ────────
+    if (action === 'test_storage') {
+      const { id, cloudName, apiKey, apiSecret } = body;
+      let creds = null;
+      if (cloudName && apiKey) {
+        let effectiveSecret = apiSecret;
+        if (!effectiveSecret && id) {
+          const existing = await coll.doc(id).get();
+          effectiveSecret = existing.exists ? existing.data().apiSecret : null;
+        }
+        if (!effectiveSecret) return { statusCode: 400, body: JSON.stringify({ error: 'Enter an API secret to test with.' }) };
+        creds = { cloudName, apiKey, apiSecret: effectiveSecret };
+      } else if (id) {
+        const snap = await coll.doc(id).get();
+        if (!snap.exists || snap.data().type !== 'storage') return { statusCode: 404, body: JSON.stringify({ error: 'Storage provider not found.' }) };
+        creds = snap.data();
+      } else {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No storage configuration given to test.' }) };
+      }
+
+      const basicAuth = Buffer.from(`${creds.apiKey}:${creds.apiSecret}`).toString('base64');
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${creds.cloudName}/usage`, {
+        headers: { Authorization: `Basic ${basicAuth}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { statusCode: 400, body: JSON.stringify({ error: data.error?.message || `Cloudinary rejected these credentials (HTTP ${res.status}).` }) };
+      }
+      const plan = data.plan || 'unknown';
+      const usedCredits = typeof data.credits?.usage === 'number' ? data.credits.usage.toFixed(2) : null;
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          message: `Connected successfully. Plan: ${plan}${usedCredits ? `, ${usedCredits} credits used this cycle` : ''}.`,
+        }),
+      };
     }
 
     return { statusCode: 400, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
