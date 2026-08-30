@@ -826,11 +826,50 @@
             <button onclick="openStorageProviderModal()" class="btn btn-outline btn-sm">+ Add Storage Provider</button>
           </div>
           <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">Cloudinary is currently the only supported backend for photo uploads (property photos, logos, maintenance photos). Adding one here lets you point uploads at a specific Cloudinary account — useful if you're managing this for multiple landlords who each want their own.</p>
-          <div style="overflow-x:auto;">
+          <div style="overflow-x:auto;margin-bottom:20px;">
             <table class="data-table">
               <thead><tr><th>Label</th><th>Cloud Name</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody id="storage-providers-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">Loading...</td></tr></tbody>
             </table>
+          </div>
+
+          <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 16px;">
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h4 style="font-size:1rem;font-weight:500;margin:0;">✍️ Envelope / E-Signature Providers</h4>
+            <button onclick="openEnvelopeProviderModal()" class="btn btn-outline btn-sm">+ Add Envelope Provider</button>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">Documenso is currently the only supported e-signature backend (used for lease agreements). The template ID set here is the default for any property that doesn't have its own <code>documensoTemplateId</code> override.</p>
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead><tr><th>Label</th><th>Template ID</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="envelope-providers-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">Loading...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ENVELOPE PROVIDER MODAL -->
+      <div id="envelope-provider-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop absolute inset-0" onclick="closeModal('envelope-provider-modal')"></div>
+        <div style="background:#fff;width:100%;max-width:480px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+          <button onclick="closeModal('envelope-provider-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+          <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" id="envelope-provider-modal-title">Add Envelope Provider</h3>
+          <input type="hidden" id="int-envelope-id">
+          <div id="envelope-provider-modal-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div><label class="label">Label</label><input type="text" id="int-envelope-label" class="form-input" placeholder="My Documenso Account"></div>
+            <div><label class="label">API Key</label><input type="text" id="int-envelope-apikey" class="form-input" placeholder="Documenso → Settings → API Tokens"></div>
+            <div><label class="label">Default Template ID <span style="font-size:10px;font-weight:400;color:var(--slate);">(numeric, not the "envelope_..." string)</span></label><input type="text" id="int-envelope-templateid" class="form-input" placeholder="123"></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="label">API URL</label><input type="text" id="int-envelope-apiurl" class="form-input" placeholder="https://app.documenso.com/api/v2"></div>
+              <div><label class="label">App URL</label><input type="text" id="int-envelope-appurl" class="form-input" placeholder="https://app.documenso.com"></div>
+            </div>
+            <div><label class="label">Webhook Secret <span id="envelope-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-envelope-secret" class="form-input" placeholder="Optional — matches the secret set in Documenso's webhook config"></div>
+          </div>
+          <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;">
+            <button onclick="saveEnvelopeProvider()" class="btn btn-primary" style="flex:1;" id="envelope-int-save-btn">Save</button>
+            <button onclick="testEnvelopeIntegration()" class="btn btn-outline" id="envelope-int-test-btn">Test Connection</button>
           </div>
         </div>
       </div>
@@ -838,6 +877,7 @@
       <!-- EMAIL PROVIDER MODAL -->
       <div id="email-provider-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="modal-backdrop absolute inset-0" onclick="closeModal('email-provider-modal')"></div>
+
         <div style="background:#fff;width:100%;max-width:480px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
           <button onclick="closeModal('email-provider-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
           <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" id="email-provider-modal-title">Add Email Provider</h3>
@@ -1620,6 +1660,8 @@
       'properties.dueToday':'Due today', 'properties.dueTomorrow':'Due tomorrow', 'properties.dueInDays':'Due in {days} days',
       'properties.reminderAheadNote':'{days} day(s) ahead', 'properties.reminderSameDayNote':'Same day as due date',
       'properties.remindersCount':'🔔 {count} reminder(s)', 'properties.remindersNone':'No reminders set',
+      'properties.notifyEmailPlaceholder':'Also notify this email (e.g. accounts payable, yourself)',
+      'properties.notifyTenantsToo':'Also notify tenants',
       'properties.name':'Property Name *', 'properties.countryHint':'Determines which visitors (US or Colombia) see this listing on the public site.',
       'properties.availableHint':'Show this property on the tenant listings page when available.',
       'properties.type':'Type', 'properties.city':'City', 'properties.zip':'ZIP',
@@ -1697,6 +1739,8 @@
       'properties.dueToday':'Vence hoy', 'properties.dueTomorrow':'Vence mañana', 'properties.dueInDays':'Vence en {days} días',
       'properties.reminderAheadNote':'{days} día(s) antes', 'properties.reminderSameDayNote':'El mismo día del vencimiento',
       'properties.remindersCount':'🔔 {count} recordatorio(s)', 'properties.remindersNone':'Sin recordatorios',
+      'properties.notifyEmailPlaceholder':'También notificar a este correo (ej. cuentas por pagar, tú mismo)',
+      'properties.notifyTenantsToo':'También notificar a inquilinos',
       'properties.name':'Nombre de la Propiedad *', 'properties.countryHint':'Determina qué visitantes (EE.UU. o Colombia) ven este listado en el sitio público.',
       'properties.availableHint':'Mostrar esta propiedad en la página de listados cuando esté disponible.',
       'properties.type':'Tipo', 'properties.city':'Ciudad', 'properties.zip':'Código Postal',
@@ -4544,6 +4588,7 @@
       allIntegrationProviders = result.providers;
       renderProvidersTable('email', 'email-providers-tbody');
       renderProvidersTable('storage', 'storage-providers-tbody');
+      renderProvidersTable('envelope', 'envelope-providers-tbody');
     } catch (e) {
       console.error('loadIntegrationsStatus:', e);
     }
@@ -4556,10 +4601,13 @@
       tbody.innerHTML = `<tr><td colspan="${type === 'email' ? 5 : 4}" style="text-align:center;color:var(--slate);padding:16px;">No ${type} providers saved yet — using the environment default.</td></tr>`;
       return;
     }
+    const openFns = { email: 'openEmailProviderModal', storage: 'openStorageProviderModal', envelope: 'openEnvelopeProviderModal' };
     tbody.innerHTML = rows.map(p => {
       const statusBadge = p.isActive ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-pending">Inactive</span>';
-      const openFn = type === 'email' ? 'openEmailProviderModal' : 'openStorageProviderModal';
-      const middleCell = type === 'email' ? `<td style="font-size:12px;">${p.host || '—'}</td>` : `<td style="font-size:12px;">${p.cloudName || '—'}</td>`;
+      const openFn = openFns[type];
+      const middleCell = type === 'email' ? `<td style="font-size:12px;">${p.host || '—'}</td>`
+        : type === 'storage' ? `<td style="font-size:12px;">${p.cloudName || '—'}</td>`
+        : `<td style="font-size:12px;">${p.templateId || '—'}</td>`;
       return `<tr>
         <td><strong>${p.label}</strong></td>
         ${type === 'email' ? `<td style="font-size:12px;">${p.provider}</td>` : ''}
@@ -4584,7 +4632,8 @@
     const original = btnEl.textContent; btnEl.textContent = 'Testing...';
     resultEl.textContent = '';
     try {
-      const result = await callManageIntegrations(type === 'email' ? 'test_email' : 'test_storage', { id });
+      const action = { email: 'test_email', storage: 'test_storage', envelope: 'test_envelope' }[type];
+      const result = await callManageIntegrations(action, { id });
       resultEl.style.color = '#16A34A';
       resultEl.textContent = '✓ ' + (result.message || `Test email sent to ${result.sentTo}.`);
     } catch (e) {
@@ -4712,6 +4761,56 @@
     } catch (e) { showAlert('storage-provider-modal-alert', 'Test failed: ' + e.message); }
     btn.disabled = false; btn.textContent = 'Test Connection';
   };
+
+  // ── Envelope / e-signature provider modal (Documenso) ──────────────────
+  window.openEnvelopeProviderModal = (id) => {
+    const p = id ? allIntegrationProviders.find(x => x.id === id) : null;
+    document.getElementById('int-envelope-id').value = id || '';
+    document.getElementById('int-envelope-label').value = p?.label || '';
+    document.getElementById('int-envelope-apikey').value = '';
+    document.getElementById('int-envelope-templateid').value = p?.templateId || '';
+    document.getElementById('int-envelope-apiurl').value = p?.apiUrl || 'https://app.documenso.com/api/v2';
+    document.getElementById('int-envelope-appurl').value = p?.appUrl || 'https://app.documenso.com';
+    document.getElementById('int-envelope-secret').value = '';
+    document.getElementById('envelope-secret-hint').textContent = p ? `(leave blank to keep current: ${p.webhookSecretMasked || '••••'})` : 'Optional — matches the secret set in Documenso\'s webhook config';
+    document.getElementById('envelope-provider-modal-title').textContent = p ? 'Edit Envelope Provider' : 'Add Envelope Provider';
+    document.getElementById('envelope-provider-modal-alert').classList.add('hidden');
+    openModal('envelope-provider-modal');
+  };
+  window.saveEnvelopeProvider = async () => {
+    const id = document.getElementById('int-envelope-id').value;
+    const btn = document.getElementById('envelope-int-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    const payload = {
+      label: document.getElementById('int-envelope-label').value.trim(),
+      apiKey: document.getElementById('int-envelope-apikey').value.trim(), // blank on edit = keep existing
+      templateId: document.getElementById('int-envelope-templateid').value.trim(),
+      apiUrl: document.getElementById('int-envelope-apiurl').value.trim(),
+      appUrl: document.getElementById('int-envelope-appurl').value.trim(),
+      webhookSecret: document.getElementById('int-envelope-secret').value, // blank on edit = keep existing
+    };
+    try {
+      if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('envelope_provider_updated', 'settings', id, payload.label); }
+      else { await callManageIntegrations('add_provider', { type: 'envelope', ...payload }); logAdminAction('envelope_provider_added', 'settings', null, payload.label); }
+      closeModal('envelope-provider-modal');
+      await loadIntegrationsStatus();
+    } catch (e) { showAlert('envelope-provider-modal-alert', e.message); }
+    btn.disabled = false; btn.textContent = 'Save';
+  };
+  window.testEnvelopeIntegration = async () => {
+    const id = document.getElementById('int-envelope-id').value;
+    const btn = document.getElementById('envelope-int-test-btn'); btn.disabled = true; btn.textContent = 'Testing...';
+    try {
+      const result = await callManageIntegrations('test_envelope', {
+        id: id || undefined,
+        apiKey: document.getElementById('int-envelope-apikey').value.trim(),
+        templateId: document.getElementById('int-envelope-templateid').value.trim(),
+        apiUrl: document.getElementById('int-envelope-apiurl').value.trim(),
+      });
+      showAlert('envelope-provider-modal-alert', '✓ ' + result.message, 'success');
+    } catch (e) { showAlert('envelope-provider-modal-alert', 'Test failed: ' + e.message); }
+    btn.disabled = false; btn.textContent = 'Test Connection';
+  };
+
   // ===== PAGE BUILDER (Super Admin only — landing page layout) =====
   let currentLayout = []; // in-memory working copy; only written to Firestore on Save
   let sortableInstance = null;
@@ -5228,17 +5327,25 @@
       return;
     }
     list.innerHTML = currentReminders.map((r, idx) => `
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px;background:#FDFBF8;border-radius:3px;">
-        <input type="text" value="${(r.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Electric Bill" class="form-input" style="flex:2;min-width:120px;" oninput="updateReminderField(${idx},'label',this.value)">
-        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderDueDay')}</span>
-        <input type="number" value="${r.dayOfMonth||1}" min="1" max="28" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'dayOfMonth',Math.min(Math.max(parseInt(this.value)||1,1),28))">
-        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderRemind')}</span>
-        <input type="number" value="${r.leadDays!==undefined?r.leadDays:3}" min="0" max="27" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'leadDays',Math.min(Math.max(parseInt(this.value)||0,0),27))">
-        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderDaysBefore')}</span>
-        <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;">
-          <input type="checkbox" ${r.enabled!==false?'checked':''} onchange="updateReminderField(${idx},'enabled',this.checked)"> ${t('properties.reminderOn')}
-        </label>
-        <button type="button" onclick="removeReminderRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
+      <div style="display:flex;flex-direction:column;gap:6px;padding:8px;background:#FDFBF8;border-radius:3px;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input type="text" value="${(r.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Electric Bill" class="form-input" style="flex:2;min-width:120px;" oninput="updateReminderField(${idx},'label',this.value)">
+          <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderDueDay')}</span>
+          <input type="number" value="${r.dayOfMonth||1}" min="1" max="28" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'dayOfMonth',Math.min(Math.max(parseInt(this.value)||1,1),28))">
+          <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderRemind')}</span>
+          <input type="number" value="${r.leadDays!==undefined?r.leadDays:3}" min="0" max="27" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'leadDays',Math.min(Math.max(parseInt(this.value)||0,0),27))">
+          <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderDaysBefore')}</span>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;">
+            <input type="checkbox" ${r.enabled!==false?'checked':''} onchange="updateReminderField(${idx},'enabled',this.checked)"> ${t('properties.reminderOn')}
+          </label>
+          <button type="button" onclick="removeReminderRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding-left:2px;">
+          <input type="email" value="${(r.notifyEmail||'').replace(/"/g,'&quot;')}" placeholder="${t('properties.notifyEmailPlaceholder')}" class="form-input" style="flex:1;min-width:220px;font-size:12px;" oninput="updateReminderField(${idx},'notifyEmail',this.value)">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;color:var(--slate);">
+            <input type="checkbox" ${r.notifyTenants!==false?'checked':''} onchange="updateReminderField(${idx},'notifyTenants',this.checked)"> ${t('properties.notifyTenantsToo')}
+          </label>
+        </div>
       </div>
     `).join('');
   }
