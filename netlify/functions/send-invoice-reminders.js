@@ -77,6 +77,7 @@ function buildEmail({ siteName, tenantName, invoiceNumber, total, dueMs, daysBef
 }
 
 exports.handler = async () => {
+  await require('./_lib/apply-email-config')(); // load any custom email provider override before this function's existing nodemailer code runs
   if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.SMTP_HOST) {
     console.warn('send-invoice-reminders: missing FIREBASE_SERVICE_ACCOUNT or SMTP_HOST — skipping.');
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
