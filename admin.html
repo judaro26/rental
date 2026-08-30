@@ -1176,6 +1176,15 @@
       <p style="font-size:11px;color:var(--slate);margin-top:10px;">Get these from your own Bold merchant account (<a href="https://developers.bold.co/pagos-en-linea/llaves-de-integracion" target="_blank" rel="noopener" style="color:var(--amber);">developers.bold.co</a>). Payments settle directly to your Bold account, not through this platform.</p>
     </div>
 
+    <div id="prop-reminders-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">🔔 Bill &amp; Utility Reminders</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">Emails active tenants ahead of any recurring bill you name — rent, electric, water, internet, whatever this property needs. Uses whichever email provider is currently active in Settings → Integrations.</p>
+      <div id="prop-reminders-alert" class="hidden alert" style="margin-bottom:10px;"></div>
+      <div id="prop-reminders-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+      <button type="button" onclick="addReminderRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Reminder</button>
+      <button type="button" onclick="savePropertyReminders()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-reminders-save-btn">Save Reminders</button>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:20px;">
       <button onclick="saveProperty()" class="btn btn-primary" style="flex:1;" id="prop-save-btn">Save Property</button>
       <button onclick="closeModal('property-modal')" class="btn btn-outline">Cancel</button>
@@ -1793,6 +1802,7 @@
     applyCountryLockToModal();
     renderImageRows([]);
     document.getElementById('prop-bold-section').classList.add('hidden'); // needs a saved property first
+    document.getElementById('prop-reminders-section').classList.add('hidden');
     openModal('property-modal');
   };
   window.editProperty = id => {
@@ -1815,6 +1825,8 @@
     renderImageRows(imgs);
     document.getElementById('prop-bold-section').classList.remove('hidden');
     loadPropertyBoldStatus(id);
+    document.getElementById('prop-reminders-section').classList.remove('hidden');
+    renderReminderRows(p.reminders || []);
     openModal('property-modal');
   };
   window.saveProperty = async () => {
@@ -4801,6 +4813,61 @@
   // through our own functions, so there's no size limit to worry about).
   // Reuses the exact same /api/sign-cloudinary-upload contract as the
   // tenant portal's maintenance-photo upload — one upload mechanism, not two.
+  // ===== BILL & UTILITY REMINDERS (self-serve, per-property) =====
+  let currentReminders = []; // in-memory working copy, saved explicitly via the Save button
+
+  function renderReminderRows(reminders) {
+    currentReminders = (reminders || []).map(r => ({ ...r }));
+    const list = document.getElementById('prop-reminders-list');
+    if (!currentReminders.length) {
+      list.innerHTML = '<p style="font-size:12px;color:var(--slate);">No reminders configured yet.</p>';
+      return;
+    }
+    list.innerHTML = currentReminders.map((r, idx) => `
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px;background:#FDFBF8;border-radius:3px;">
+        <input type="text" value="${(r.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Electric Bill" class="form-input" style="flex:2;min-width:120px;" oninput="updateReminderField(${idx},'label',this.value)">
+        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">Due day</span>
+        <input type="number" value="${r.dayOfMonth||1}" min="1" max="28" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'dayOfMonth',Math.min(Math.max(parseInt(this.value)||1,1),28))">
+        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">Remind</span>
+        <input type="number" value="${r.leadDays!==undefined?r.leadDays:3}" min="0" max="27" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'leadDays',Math.min(Math.max(parseInt(this.value)||0,0),27))">
+        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">day(s) before</span>
+        <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;">
+          <input type="checkbox" ${r.enabled!==false?'checked':''} onchange="updateReminderField(${idx},'enabled',this.checked)"> On
+        </label>
+        <button type="button" onclick="removeReminderRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
+      </div>
+    `).join('');
+  }
+
+  window.updateReminderField = (idx, field, value) => { if (currentReminders[idx]) currentReminders[idx][field] = value; };
+
+  window.addReminderRow = () => {
+    currentReminders.push({ id: 'rem_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), label: '', dayOfMonth: 1, leadDays: 3, enabled: true });
+    renderReminderRows(currentReminders);
+  };
+
+  window.removeReminderRow = (idx) => {
+    currentReminders.splice(idx, 1);
+    renderReminderRows(currentReminders);
+  };
+
+  window.savePropertyReminders = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    for (const r of currentReminders) {
+      if (!r.label || !r.label.trim()) { showAlert('prop-reminders-alert', 'Every reminder needs a label (e.g. "Electric Bill").'); return; }
+    }
+    const btn = document.getElementById('prop-reminders-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      await updateDoc(doc(db,'properties',propertyId), { reminders: currentReminders, updatedAt: serverTimestamp() });
+      logAdminAction('property_reminders_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, `${currentReminders.length} reminder(s)`);
+      showAlert('prop-reminders-alert', 'Reminders saved.', 'success');
+      const idx = allProperties.findIndex(p => p.id === propertyId);
+      if (idx !== -1) allProperties[idx].reminders = currentReminders; // keep local cache in sync without a full reload
+    } catch (e) { showAlert('prop-reminders-alert', e.message); }
+    btn.disabled = false; btn.textContent = 'Save Reminders';
+  };
+
   // ===== BOLD PAYMENT SETTINGS (self-serve, per-property) =====
   async function callManagePropertyPayments(action, payload) {
     const idToken = await auth.currentUser.getIdToken();
