@@ -223,6 +223,12 @@
 
     <!-- PROPERTIES -->
     <section id="section-properties" class="section">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header">
+          <h3 style="font-size:1.2rem;font-weight:500;" data-i18n="properties.upcomingBillsTitle">🔔 Upcoming Bills &amp; Utilities</h3>
+        </div>
+        <div id="upcoming-bills-body" class="card-body"></div>
+      </div>
       <div class="card">
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;" data-i18n="properties.title">Manage Properties</h3>
@@ -1607,6 +1613,13 @@
       'properties.loadingStatus':'Loading status...', 'properties.leaveBlankKeepCurrent':'(leave blank to keep current: {val})',
       'properties.remindersSaved':'Reminders saved.', 'common.saving':'Saving...', 'common.testing':'Testing...',
       'properties.boldSaved':'Bold settings saved.',
+      'properties.upcomingBillsTitle':'🔔 Upcoming Bills &amp; Utilities',
+      'properties.upcomingBillsEmpty':'No utility reminders configured yet. Add one from any property\'s edit screen.',
+      'properties.upcomingBillsDisabledNote':'+ {count} disabled reminder(s) not shown here.',
+      'properties.colBill':'Bill', 'properties.colDueDate':'Due Date', 'properties.colCountdown':'Status', 'properties.colReminderTiming':'Reminder Sent',
+      'properties.dueToday':'Due today', 'properties.dueTomorrow':'Due tomorrow', 'properties.dueInDays':'Due in {days} days',
+      'properties.reminderAheadNote':'{days} day(s) ahead', 'properties.reminderSameDayNote':'Same day as due date',
+      'properties.remindersCount':'🔔 {count} reminder(s)', 'properties.remindersNone':'No reminders set',
       'properties.name':'Property Name *', 'properties.countryHint':'Determines which visitors (US or Colombia) see this listing on the public site.',
       'properties.availableHint':'Show this property on the tenant listings page when available.',
       'properties.type':'Type', 'properties.city':'City', 'properties.zip':'ZIP',
@@ -1677,6 +1690,13 @@
       'properties.loadingStatus':'Cargando estado...', 'properties.leaveBlankKeepCurrent':'(deja en blanco para mantener el actual: {val})',
       'properties.remindersSaved':'Recordatorios guardados.', 'common.saving':'Guardando...', 'common.testing':'Probando...',
       'properties.boldSaved':'Configuración Bold guardada.',
+      'properties.upcomingBillsTitle':'🔔 Próximas Facturas y Servicios',
+      'properties.upcomingBillsEmpty':'Aún no hay recordatorios de servicios configurados. Agrega uno desde la pantalla de edición de cualquier propiedad.',
+      'properties.upcomingBillsDisabledNote':'+ {count} recordatorio(s) desactivado(s) no mostrados aquí.',
+      'properties.colBill':'Factura', 'properties.colDueDate':'Fecha de Vencimiento', 'properties.colCountdown':'Estado', 'properties.colReminderTiming':'Recordatorio Enviado',
+      'properties.dueToday':'Vence hoy', 'properties.dueTomorrow':'Vence mañana', 'properties.dueInDays':'Vence en {days} días',
+      'properties.reminderAheadNote':'{days} día(s) antes', 'properties.reminderSameDayNote':'El mismo día del vencimiento',
+      'properties.remindersCount':'🔔 {count} recordatorio(s)', 'properties.remindersNone':'Sin recordatorios',
       'properties.name':'Nombre de la Propiedad *', 'properties.countryHint':'Determina qué visitantes (EE.UU. o Colombia) ven este listado en el sitio público.',
       'properties.availableHint':'Mostrar esta propiedad en la página de listados cuando esté disponible.',
       'properties.type':'Tipo', 'properties.city':'Ciudad', 'properties.zip':'Código Postal',
@@ -1707,7 +1727,7 @@
     });
     // A few dynamically-generated strings aren't static DOM, so re-render them.
     if (typeof allProperties !== 'undefined' && document.getElementById('properties-tbody')) {
-      renderPropertiesTable(); renderCountryCoverageBanner();
+      renderPropertiesTable(); renderCountryCoverageBanner(); renderUpcomingBills();
     }
     if (typeof currentDashboardLayout !== 'undefined' && document.getElementById('dashboard-widgets-container')) {
       renderDashboard();
@@ -1797,6 +1817,7 @@
     renderPropertiesTable();
     populatePropertySelects();
     renderCountryCoverageBanner();
+    renderUpcomingBills();
   }
   function countryFlag(c) { return c === 'CO' ? '🇨🇴' : c === 'US' ? '🇺🇸' : ''; }
   function countryCell(p) {
@@ -1838,7 +1859,7 @@
         </div>`;
       return `<tr>
       <td>${thumb}</td>
-      <td><strong>${p.name}</strong></td>
+      <td><strong>${p.name}</strong><div style="font-size:10px;color:var(--slate);margin-top:2px;">${(p.reminders||[]).filter(r=>r.enabled!==false).length ? t('properties.remindersCount').replace('{count}', (p.reminders||[]).filter(r=>r.enabled!==false).length) : ''}</div></td>
       <td>${countryCell(p)}</td>
       <td style="font-size:12px;">${p.address||'—'}</td>
       <td>${p.units||'—'}</td>
@@ -1857,6 +1878,72 @@
       `${p.name||''} ${p.address||''} ${p.city||''} ${p.state||''} ${p.zip||''}`.toLowerCase().includes(q)
     ));
   };
+
+  // Finds the next occurrence (today or later) of a reminder rule's due day —
+  // checks this month first, falls through to next month if this month's
+  // has already passed. Mirrors the logic in send-property-reminders.js,
+  // but answers "when's the next one" for display, rather than "does today
+  // match" for triggering a send.
+  function getNextReminderOccurrence(rule) {
+    const now = new Date();
+    const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const y = now.getUTCFullYear(), m = now.getUTCMonth();
+    for (const candidateMonth of [m, m + 1]) {
+      const due = new Date(Date.UTC(y, candidateMonth, Math.min(Math.max(rule.dayOfMonth || 1, 1), 28)));
+      if (due.getTime() >= todayMs) {
+        const daysUntil = Math.round((due.getTime() - todayMs) / 86400000);
+        return { dueDate: due, daysUntil };
+      }
+    }
+  }
+
+  function renderUpcomingBills() {
+    const container = document.getElementById('upcoming-bills-body');
+    if (!container) return;
+    const rows = [];
+    let disabledCount = 0;
+    allProperties.forEach(p => {
+      (p.reminders || []).forEach(r => {
+        if (r.enabled === false) { disabledCount++; return; }
+        const occurrence = getNextReminderOccurrence(r);
+        if (!occurrence) return;
+        rows.push({ propertyName: p.name, propertyId: p.id, label: r.label, leadDays: r.leadDays || 0, ...occurrence });
+      });
+    });
+    rows.sort((a, b) => a.daysUntil - b.daysUntil);
+
+    if (!rows.length) {
+      container.innerHTML = `<p style="font-size:13px;color:var(--slate);text-align:center;padding:16px;">${t('properties.upcomingBillsEmpty')}</p>`;
+      return;
+    }
+
+    const countdownText = d => d === 0 ? t('properties.dueToday') : d === 1 ? t('properties.dueTomorrow') : t('properties.dueInDays').replace('{days}', d);
+    const reminderTimingText = ld => ld === 0 ? t('properties.reminderSameDayNote') : t('properties.reminderAheadNote').replace('{days}', ld);
+    const dateLocale = CURRENT_LANG === 'es' ? 'es-ES' : 'en-US';
+
+    container.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table class="data-table">
+          <thead><tr><th>${t('common.property')}</th><th>${t('properties.colBill')}</th><th>${t('properties.colDueDate')}</th><th>${t('properties.colCountdown')}</th><th>${t('properties.colReminderTiming')}</th><th>${t('common.actions')}</th></tr></thead>
+          <tbody>
+            ${rows.map(r => {
+              const urgent = r.daysUntil <= 3;
+              return `<tr>
+                <td><strong>${r.propertyName}</strong></td>
+                <td>${r.label}</td>
+                <td style="font-size:12px;">${r.dueDate.toLocaleDateString(dateLocale, {month:'short', day:'numeric', timeZone:'UTC'})}</td>
+                <td><span style="font-size:11px;padding:2px 8px;border-radius:10px;background:${urgent?'#FEF2F2':'#F0FDF4'};color:${urgent?'#DC2626':'#16A34A'};font-weight:500;">${countdownText(r.daysUntil)}</span></td>
+                <td style="font-size:12px;color:var(--slate);">${reminderTimingText(r.leadDays)}</td>
+                <td><button onclick="editProperty('${r.propertyId}')" class="btn btn-sm btn-outline">${t('common.edit')}</button></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${disabledCount > 0 ? `<p style="font-size:11px;color:var(--slate);margin-top:10px;">${t('properties.upcomingBillsDisabledNote').replace('{count}', disabledCount)}</p>` : ''}
+    `;
+  }
+
   function populatePropertySelects() {
     const opts = allProperties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     ['edit-property','ann-property'].forEach(id => {
@@ -5181,6 +5268,7 @@
       showAlert('prop-reminders-alert', t('properties.remindersSaved'), 'success');
       const idx = allProperties.findIndex(p => p.id === propertyId);
       if (idx !== -1) allProperties[idx].reminders = currentReminders; // keep local cache in sync without a full reload
+      renderUpcomingBills();
     } catch (e) { showAlert('prop-reminders-alert', e.message); }
     btn.disabled = false; btn.textContent = t('properties.saveReminders');
   };
