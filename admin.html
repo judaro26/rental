@@ -200,13 +200,13 @@
     <!-- DASHBOARD -->
     <section id="section-dashboard" class="section active">
       <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-        <button onclick="toggleDashboardEditMode()" id="dashboard-edit-toggle-btn" class="btn btn-outline btn-sm">🧩 Customize Dashboard</button>
+        <button onclick="toggleDashboardEditMode()" id="dashboard-edit-toggle-btn" class="btn btn-outline btn-sm" data-i18n="dashboard.customize">🧩 Customize Dashboard</button>
       </div>
       <div id="dashboard-edit-bar" class="hidden" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:4px;">
-        <span style="font-size:12px;color:#92400E;flex:1;min-width:200px;">Drag widgets by their handle to reorder. This is personal to your own login — other admins see their own arrangement.</span>
-        <button onclick="openAddWidgetModal()" class="btn btn-primary btn-sm">+ Add Widget</button>
-        <button onclick="saveDashboardLayout()" class="btn btn-primary btn-sm" id="dashboard-save-btn">Save Layout</button>
-        <button onclick="resetDashboardLayout()" class="btn btn-sm" style="background:none;color:#92400E;">Reset to Default</button>
+        <span style="font-size:12px;color:#92400E;flex:1;min-width:200px;" data-i18n="dashboard.editHint">Drag widgets by their handle to reorder. This is personal to your own login — other admins see their own arrangement.</span>
+        <button onclick="openAddWidgetModal()" class="btn btn-primary btn-sm" data-i18n="dashboard.addWidget">+ Add Widget</button>
+        <button onclick="saveDashboardLayout()" class="btn btn-primary btn-sm" id="dashboard-save-btn" data-i18n="dashboard.saveLayout">Save Layout</button>
+        <button onclick="resetDashboardLayout()" class="btn btn-sm" style="background:none;color:#92400E;" data-i18n="dashboard.resetLayout">Reset to Default</button>
       </div>
       <div id="dashboard-widgets-container" class="grid grid-cols-1 md:grid-cols-4 gap-5"></div>
     </section>
@@ -216,7 +216,7 @@
       <div class="modal-backdrop absolute inset-0" onclick="closeModal('add-widget-modal')"></div>
       <div style="background:#fff;width:100%;max-width:520px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:85vh;overflow-y:auto;">
         <button onclick="closeModal('add-widget-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-        <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;">Add a Widget</h3>
+        <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" data-i18n="dashboard.addWidgetTitle">Add a Widget</h3>
         <div id="widget-picker-list" style="display:flex;flex-direction:column;gap:18px;"></div>
       </div>
     </div>
@@ -1164,32 +1164,32 @@
     </div>
 
     <div id="prop-bold-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
-      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">💳 Bold Payment Settings</h4>
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;" data-i18n="properties.boldTitle">💳 Bold Payment Settings</h4>
       <p id="prop-bold-status" style="font-size:12px;color:var(--slate);margin-bottom:12px;">Loading status...</p>
       <div id="prop-bold-alert" class="hidden alert" style="margin-bottom:12px;"></div>
       <div style="display:flex;flex-direction:column;gap:12px;">
-        <div><label class="label">API Key</label><input type="text" id="prop-bold-apikey" class="form-input" placeholder="Your Bold integration key"></div>
-        <div><label class="label">Secret Key <span id="prop-bold-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="prop-bold-secret" class="form-input" placeholder="Your Bold webhook signing key"></div>
+        <div><label class="label" data-i18n="properties.boldApiKey">API Key</label><input type="text" id="prop-bold-apikey" class="form-input" placeholder="Your Bold integration key" data-i18n-placeholder="properties.boldApiKeyPlaceholder"></div>
+        <div><label class="label" data-i18n="properties.boldSecretKey">Secret Key</label> <span id="prop-bold-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span><input type="password" id="prop-bold-secret" class="form-input" placeholder="Your Bold webhook signing key" data-i18n-placeholder="properties.boldSecretPlaceholder"></div>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-          <input type="checkbox" id="prop-bold-enabled" style="width:16px;height:16px;"> Accept Bold payments for this property
+          <input type="checkbox" id="prop-bold-enabled" style="width:16px;height:16px;"> <span data-i18n="properties.boldAccept">Accept Bold payments for this property</span>
         </label>
       </div>
       <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
-        <button type="button" onclick="savePropertyBold()" class="btn btn-primary btn-sm" id="prop-bold-save-btn">Save Bold Settings</button>
-        <button type="button" onclick="testPropertyBold()" class="btn btn-outline btn-sm" id="prop-bold-test-btn">Test Connection</button>
-        <button type="button" onclick="clearPropertyBold()" class="btn btn-sm" style="background:none;color:var(--slate);">Remove</button>
+        <button type="button" onclick="savePropertyBold()" class="btn btn-primary btn-sm" id="prop-bold-save-btn" data-i18n="properties.boldSave">Save Bold Settings</button>
+        <button type="button" onclick="testPropertyBold()" class="btn btn-outline btn-sm" id="prop-bold-test-btn" data-i18n="properties.boldTest">Test Connection</button>
+        <button type="button" onclick="clearPropertyBold()" class="btn btn-sm" style="background:none;color:var(--slate);" data-i18n="properties.boldRemove">Remove</button>
       </div>
       <div id="prop-bold-test-result" style="font-size:12px;margin-top:8px;"></div>
-      <p style="font-size:11px;color:var(--slate);margin-top:10px;">Get these from your own Bold merchant account (<a href="https://developers.bold.co/pagos-en-linea/llaves-de-integracion" target="_blank" rel="noopener" style="color:var(--amber);">developers.bold.co</a>). Payments settle directly to your Bold account, not through this platform.</p>
+      <p style="font-size:11px;color:var(--slate);margin-top:10px;" data-i18n="properties.boldHelp">Get these from your own Bold merchant account (<a href="https://developers.bold.co/pagos-en-linea/llaves-de-integracion" target="_blank" rel="noopener" style="color:var(--amber);">developers.bold.co</a>). Payments settle directly to your Bold account, not through this platform.</p>
     </div>
 
     <div id="prop-reminders-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
-      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">🔔 Bill &amp; Utility Reminders</h4>
-      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">Emails active tenants ahead of any recurring bill you name — rent, electric, water, internet, whatever this property needs. Uses whichever email provider is currently active in Settings → Integrations.</p>
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;" data-i18n="properties.remindersTitle">🔔 Bill &amp; Utility Reminders</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="properties.remindersHelp">Emails active tenants ahead of any recurring bill you name — rent, electric, water, internet, whatever this property needs. Uses whichever email provider is currently active in Settings → Integrations.</p>
       <div id="prop-reminders-alert" class="hidden alert" style="margin-bottom:10px;"></div>
       <div id="prop-reminders-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
-      <button type="button" onclick="addReminderRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Reminder</button>
-      <button type="button" onclick="savePropertyReminders()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-reminders-save-btn">Save Reminders</button>
+      <button type="button" onclick="addReminderRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;" data-i18n="properties.addReminder">+ Add Reminder</button>
+      <button type="button" onclick="savePropertyReminders()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-reminders-save-btn" data-i18n="properties.saveReminders">Save Reminders</button>
     </div>
     </div>
 
@@ -1561,6 +1561,29 @@
       'dashboard.properties':'Properties', 'dashboard.activeTenants':'Active Tenants',
       'dashboard.pendingApprovals':'Pending Approvals', 'dashboard.openRequests':'Open Requests',
       'dashboard.pendingTenantApprovals':'Pending Tenant Approvals', 'dashboard.openMaintenance':'Open Maintenance',
+      'dashboard.occupancyRate':'Occupancy Rate', 'dashboard.occupancyUnits':'of {total} units',
+      'dashboard.collectionRate':'Collection Rate', 'dashboard.collectionOf':'of {expected} expected',
+      'dashboard.outstandingBalance':'Outstanding Balance', 'dashboard.outstandingNote':'Across sent &amp; overdue invoices',
+      'dashboard.noPendingApprovals':'No pending approvals.', 'dashboard.noOpenRequests':'No open requests.',
+      'dashboard.leasesExpiring':'Leases Expiring Soon', 'dashboard.noLeasesExpiring':'No leases expiring in the next 60 days.',
+      'dashboard.needsSetup':'Properties Needing Setup', 'dashboard.needsSetupIssue':'⚠️ Needs a country assigned',
+      'dashboard.needsSetupOk':'✓ All properties are fully set up.', 'dashboard.fixNow':'Fix Now',
+      'dashboard.revenueTrend':'Monthly Revenue Trend',
+      'dashboard.colName':'Name', 'dashboard.colEmail':'Email', 'dashboard.colProperty':'Property', 'dashboard.colAction':'Action',
+      'dashboard.colTenant':'Tenant', 'dashboard.colCategory':'Category', 'dashboard.colPriority':'Priority',
+      'dashboard.colLeaseEnd':'Lease End', 'dashboard.colIssue':'Issue',
+      'dashboard.approve':'Approve', 'dashboard.setup':'Setup', 'dashboard.update':'Update',
+      'dashboard.customize':'🧩 Customize Dashboard', 'dashboard.doneCustomizing':'✓ Done Customizing',
+      'dashboard.editHint':'Drag widgets by their handle to reorder. This is personal to your own login — other admins see their own arrangement.',
+      'dashboard.addWidget':'+ Add Widget', 'dashboard.saveLayout':'Save Layout', 'dashboard.resetLayout':'Reset to Default',
+      'dashboard.addWidgetTitle':'Add a Widget', 'dashboard.allWidgetsAdded':'Every available widget is already on your dashboard.',
+      'dashboard.categoryStats':'Stats', 'dashboard.categoryTables':'Tables & Lists', 'dashboard.categoryCharts':'Charts',
+      'dashboard.descOccupancy':'% of units currently occupied by an active tenant.',
+      'dashboard.descCollectionRate':'% of expected rent actually collected so far this month.',
+      'dashboard.descOutstanding':'Total across sent/overdue invoices, not yet paid.',
+      'dashboard.descLeasesExpiring':'Active tenants whose lease ends in the next 60 days.',
+      'dashboard.descNeedsSetup':'Properties missing a country assignment.',
+      'dashboard.descRevenueTrend':'Collected payments over the last 6 months.',
       'common.name':'Name', 'common.email':'Email', 'common.property':'Property', 'common.action':'Action',
       'common.actions':'Actions', 'common.tenant':'Tenant', 'common.category':'Category', 'common.priority':'Priority',
       'common.save':'Save', 'common.cancel':'Cancel', 'common.edit':'Edit', 'common.delete':'Delete', 'common.close':'Close',
@@ -1568,6 +1591,22 @@
       'properties.title':'Manage Properties', 'properties.add':'+ Add Property', 'properties.country':'Country *',
       'properties.address':'Address *', 'properties.units':'Units', 'properties.available':'Available',
       'properties.imageUrl':'Image URL', 'properties.modalAddTitle':'Add Property', 'properties.modalEditTitle':'Edit Property',
+      'properties.boldTitle':'💳 Bold Payment Settings', 'properties.boldApiKey':'API Key', 'properties.boldApiKeyPlaceholder':'Your Bold integration key',
+      'properties.boldSecretKey':'Secret Key', 'properties.boldSecretPlaceholder':'Your Bold webhook signing key',
+      'properties.boldAccept':'Accept Bold payments for this property', 'properties.boldSave':'Save Bold Settings',
+      'properties.boldTest':'Test Connection', 'properties.boldRemove':'Remove',
+      'properties.boldHelp':'Get these from your own Bold merchant account (<a href="https://developers.bold.co/pagos-en-linea/llaves-de-integracion" target="_blank" rel="noopener" style="color:var(--amber);">developers.bold.co</a>). Payments settle directly to your Bold account, not through this platform.',
+      'properties.boldNotConfigured':'Not configured yet — this property will not show a Bold payment option to tenants.',
+      'properties.boldConfigured':'Configured (API key {key}). {status} Last updated {date} by {by}.',
+      'properties.boldActive':'Currently accepting Bold payments.', 'properties.boldInactive':'Currently disabled.',
+      'properties.remindersTitle':'🔔 Bill &amp; Utility Reminders',
+      'properties.remindersHelp':'Emails active tenants ahead of any recurring bill you name — rent, electric, water, internet, whatever this property needs. Uses whichever email provider is currently active in Settings → Integrations.',
+      'properties.addReminder':'+ Add Reminder', 'properties.saveReminders':'Save Reminders',
+      'properties.reminderDueDay':'Due day', 'properties.reminderRemind':'Remind', 'properties.reminderDaysBefore':'day(s) before', 'properties.reminderOn':'On',
+      'properties.noRemindersYet':'No reminders configured yet.', 'properties.reminderLabelRequired':'Every reminder needs a label (e.g. "Electric Bill").',
+      'properties.loadingStatus':'Loading status...', 'properties.leaveBlankKeepCurrent':'(leave blank to keep current: {val})',
+      'properties.remindersSaved':'Reminders saved.', 'common.saving':'Saving...', 'common.testing':'Testing...',
+      'properties.boldSaved':'Bold settings saved.',
       'properties.name':'Property Name *', 'properties.countryHint':'Determines which visitors (US or Colombia) see this listing on the public site.',
       'properties.availableHint':'Show this property on the tenant listings page when available.',
       'properties.type':'Type', 'properties.city':'City', 'properties.zip':'ZIP',
@@ -1592,6 +1631,29 @@
       'dashboard.properties':'Propiedades', 'dashboard.activeTenants':'Inquilinos Activos',
       'dashboard.pendingApprovals':'Aprobaciones Pendientes', 'dashboard.openRequests':'Solicitudes Abiertas',
       'dashboard.pendingTenantApprovals':'Aprobaciones de Inquilinos Pendientes', 'dashboard.openMaintenance':'Mantenimiento Abierto',
+      'dashboard.occupancyRate':'Tasa de Ocupación', 'dashboard.occupancyUnits':'de {total} unidades',
+      'dashboard.collectionRate':'Tasa de Cobro', 'dashboard.collectionOf':'de {expected} esperado',
+      'dashboard.outstandingBalance':'Saldo Pendiente', 'dashboard.outstandingNote':'En facturas enviadas y vencidas',
+      'dashboard.noPendingApprovals':'No hay aprobaciones pendientes.', 'dashboard.noOpenRequests':'No hay solicitudes abiertas.',
+      'dashboard.leasesExpiring':'Contratos por Vencer', 'dashboard.noLeasesExpiring':'No hay contratos que venzan en los próximos 60 días.',
+      'dashboard.needsSetup':'Propiedades que Necesitan Configuración', 'dashboard.needsSetupIssue':'⚠️ Necesita un país asignado',
+      'dashboard.needsSetupOk':'✓ Todas las propiedades están completamente configuradas.', 'dashboard.fixNow':'Arreglar Ahora',
+      'dashboard.revenueTrend':'Tendencia de Ingresos Mensuales',
+      'dashboard.colName':'Nombre', 'dashboard.colEmail':'Correo', 'dashboard.colProperty':'Propiedad', 'dashboard.colAction':'Acción',
+      'dashboard.colTenant':'Inquilino', 'dashboard.colCategory':'Categoría', 'dashboard.colPriority':'Prioridad',
+      'dashboard.colLeaseEnd':'Fin del Contrato', 'dashboard.colIssue':'Problema',
+      'dashboard.approve':'Aprobar', 'dashboard.setup':'Configurar', 'dashboard.update':'Actualizar',
+      'dashboard.customize':'🧩 Personalizar Panel', 'dashboard.doneCustomizing':'✓ Listo',
+      'dashboard.editHint':'Arrastra los widgets por su manija para reordenarlos. Esto es personal de tu propia cuenta — otros administradores ven su propio arreglo.',
+      'dashboard.addWidget':'+ Agregar Widget', 'dashboard.saveLayout':'Guardar Diseño', 'dashboard.resetLayout':'Restablecer Predeterminado',
+      'dashboard.addWidgetTitle':'Agregar un Widget', 'dashboard.allWidgetsAdded':'Todos los widgets disponibles ya están en tu panel.',
+      'dashboard.categoryStats':'Estadísticas', 'dashboard.categoryTables':'Tablas y Listas', 'dashboard.categoryCharts':'Gráficos',
+      'dashboard.descOccupancy':'% de unidades actualmente ocupadas por un inquilino activo.',
+      'dashboard.descCollectionRate':'% de la renta esperada realmente cobrada hasta ahora este mes.',
+      'dashboard.descOutstanding':'Total de facturas enviadas/vencidas, aún no pagadas.',
+      'dashboard.descLeasesExpiring':'Inquilinos activos cuyo contrato termina en los próximos 60 días.',
+      'dashboard.descNeedsSetup':'Propiedades sin un país asignado.',
+      'dashboard.descRevenueTrend':'Pagos cobrados durante los últimos 6 meses.',
       'common.name':'Nombre', 'common.email':'Correo', 'common.property':'Propiedad', 'common.action':'Acción',
       'common.actions':'Acciones', 'common.tenant':'Inquilino', 'common.category':'Categoría', 'common.priority':'Prioridad',
       'common.save':'Guardar', 'common.cancel':'Cancelar', 'common.edit':'Editar', 'common.delete':'Eliminar', 'common.close':'Cerrar',
@@ -1599,6 +1661,22 @@
       'properties.title':'Administrar Propiedades', 'properties.add':'+ Agregar Propiedad', 'properties.country':'País *',
       'properties.address':'Dirección *', 'properties.units':'Unidades', 'properties.available':'Disponible',
       'properties.imageUrl':'URL de Imagen', 'properties.modalAddTitle':'Agregar Propiedad', 'properties.modalEditTitle':'Editar Propiedad',
+      'properties.boldTitle':'💳 Configuración de Pagos Bold', 'properties.boldApiKey':'Clave API', 'properties.boldApiKeyPlaceholder':'Tu clave de integración de Bold',
+      'properties.boldSecretKey':'Clave Secreta', 'properties.boldSecretPlaceholder':'Tu clave secreta de webhook de Bold',
+      'properties.boldAccept':'Aceptar pagos Bold para esta propiedad', 'properties.boldSave':'Guardar Configuración Bold',
+      'properties.boldTest':'Probar Conexión', 'properties.boldRemove':'Eliminar',
+      'properties.boldHelp':'Obtén esto desde tu propia cuenta de comercio Bold (<a href="https://developers.bold.co/pagos-en-linea/llaves-de-integracion" target="_blank" rel="noopener" style="color:var(--amber);">developers.bold.co</a>). Los pagos se depositan directamente en tu cuenta Bold, no a través de esta plataforma.',
+      'properties.boldNotConfigured':'Aún no configurado — esta propiedad no mostrará una opción de pago Bold a los inquilinos.',
+      'properties.boldConfigured':'Configurado (clave API {key}). {status} Última actualización {date} por {by}.',
+      'properties.boldActive':'Actualmente aceptando pagos Bold.', 'properties.boldInactive':'Actualmente desactivado.',
+      'properties.remindersTitle':'🔔 Recordatorios de Facturas y Servicios',
+      'properties.remindersHelp':'Envía correos a inquilinos activos antes de cualquier factura recurrente que nombres — renta, electricidad, agua, internet, lo que esta propiedad necesite. Usa el proveedor de correo actualmente activo en Configuración → Integraciones.',
+      'properties.addReminder':'+ Agregar Recordatorio', 'properties.saveReminders':'Guardar Recordatorios',
+      'properties.reminderDueDay':'Día de vencimiento', 'properties.reminderRemind':'Recordar', 'properties.reminderDaysBefore':'día(s) antes', 'properties.reminderOn':'Activo',
+      'properties.noRemindersYet':'Aún no hay recordatorios configurados.', 'properties.reminderLabelRequired':'Cada recordatorio necesita una etiqueta (ej. "Factura de Electricidad").',
+      'properties.loadingStatus':'Cargando estado...', 'properties.leaveBlankKeepCurrent':'(deja en blanco para mantener el actual: {val})',
+      'properties.remindersSaved':'Recordatorios guardados.', 'common.saving':'Guardando...', 'common.testing':'Probando...',
+      'properties.boldSaved':'Configuración Bold guardada.',
       'properties.name':'Nombre de la Propiedad *', 'properties.countryHint':'Determina qué visitantes (EE.UU. o Colombia) ven este listado en el sitio público.',
       'properties.availableHint':'Mostrar esta propiedad en la página de listados cuando esté disponible.',
       'properties.type':'Tipo', 'properties.city':'Ciudad', 'properties.zip':'Código Postal',
@@ -1618,6 +1696,7 @@
   function t(key) { return (I18N[CURRENT_LANG] && I18N[CURRENT_LANG][key]) || I18N.en[key] || key; }
   function applyTranslations() {
     document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = t(el.getAttribute('data-i18n')); });
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.getAttribute('data-i18n-placeholder')); });
     document.getElementById('lang-btn-en')?.classList.toggle('active-lang', CURRENT_LANG === 'en');
     document.getElementById('lang-btn-es')?.classList.toggle('active-lang', CURRENT_LANG === 'es');
     ['lang-btn-en','lang-btn-es'].forEach(id => {
@@ -1629,6 +1708,9 @@
     // A few dynamically-generated strings aren't static DOM, so re-render them.
     if (typeof allProperties !== 'undefined' && document.getElementById('properties-tbody')) {
       renderPropertiesTable(); renderCountryCoverageBanner();
+    }
+    if (typeof currentDashboardLayout !== 'undefined' && document.getElementById('dashboard-widgets-container')) {
+      renderDashboard();
     }
   }
   async function initLanguage() {
@@ -3187,18 +3269,18 @@
   let dashboardSortable = null;
 
   const DASHBOARD_WIDGETS = {
-    stat_properties:          { label: 'Total Properties', category: 'Stats', size: 'small' },
-    stat_active_tenants:      { label: 'Active Tenants', category: 'Stats', size: 'small' },
-    stat_pending_approvals:   { label: 'Pending Approvals', category: 'Stats', size: 'small' },
-    stat_open_maintenance:    { label: 'Open Maintenance', category: 'Stats', size: 'small' },
-    stat_occupancy:           { label: 'Occupancy Rate', category: 'Stats', size: 'small', desc: '% of units currently occupied by an active tenant.' },
-    stat_collection_rate:     { label: 'Collection Rate (This Month)', category: 'Stats', size: 'small', desc: '% of expected rent actually collected so far this month.' },
-    stat_outstanding:         { label: 'Outstanding Balance', category: 'Stats', size: 'small', desc: 'Total across sent/overdue invoices, not yet paid.' },
-    table_pending_approvals:  { label: 'Pending Tenant Approvals', category: 'Tables & Lists', size: 'large' },
-    table_open_maintenance:   { label: 'Open Maintenance Requests', category: 'Tables & Lists', size: 'large' },
-    table_leases_expiring:    { label: 'Leases Expiring Soon', category: 'Tables & Lists', size: 'large', desc: 'Active tenants whose lease ends in the next 60 days.' },
-    table_needs_setup:        { label: 'Properties Needing Setup', category: 'Tables & Lists', size: 'large', desc: 'Properties missing a country assignment.' },
-    chart_revenue_trend:      { label: 'Monthly Revenue Trend', category: 'Charts', size: 'large', desc: 'Collected payments over the last 6 months.' },
+    stat_properties:          { labelKey: 'dashboard.properties', categoryKey: 'dashboard.categoryStats', size: 'small' },
+    stat_active_tenants:      { labelKey: 'dashboard.activeTenants', categoryKey: 'dashboard.categoryStats', size: 'small' },
+    stat_pending_approvals:   { labelKey: 'dashboard.pendingApprovals', categoryKey: 'dashboard.categoryStats', size: 'small' },
+    stat_open_maintenance:    { labelKey: 'dashboard.openRequests', categoryKey: 'dashboard.categoryStats', size: 'small' },
+    stat_occupancy:           { labelKey: 'dashboard.occupancyRate', categoryKey: 'dashboard.categoryStats', size: 'small', descKey: 'dashboard.descOccupancy' },
+    stat_collection_rate:     { labelKey: 'dashboard.collectionRate', categoryKey: 'dashboard.categoryStats', size: 'small', descKey: 'dashboard.descCollectionRate' },
+    stat_outstanding:         { labelKey: 'dashboard.outstandingBalance', categoryKey: 'dashboard.categoryStats', size: 'small', descKey: 'dashboard.descOutstanding' },
+    table_pending_approvals:  { labelKey: 'dashboard.pendingTenantApprovals', categoryKey: 'dashboard.categoryTables', size: 'large' },
+    table_open_maintenance:   { labelKey: 'dashboard.openMaintenance', categoryKey: 'dashboard.categoryTables', size: 'large' },
+    table_leases_expiring:    { labelKey: 'dashboard.leasesExpiring', categoryKey: 'dashboard.categoryTables', size: 'large', descKey: 'dashboard.descLeasesExpiring' },
+    table_needs_setup:        { labelKey: 'dashboard.needsSetup', categoryKey: 'dashboard.categoryTables', size: 'large', descKey: 'dashboard.descNeedsSetup' },
+    chart_revenue_trend:      { labelKey: 'dashboard.revenueTrend', categoryKey: 'dashboard.categoryCharts', size: 'large', descKey: 'dashboard.descRevenueTrend' },
   };
 
   // Pre-computes shared values so widgets that need the same underlying
@@ -3234,37 +3316,37 @@
     const m = computeDashboardMetrics();
     switch (key) {
       case 'stat_properties':
-        return widgetCard('Total Properties', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allProperties.length}</div>`, 'small');
+        return widgetCard(t('dashboard.properties'), `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allProperties.length}</div>`, 'small');
       case 'stat_active_tenants':
-        return widgetCard('Active Tenants', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${m.activeTenants.length}</div>`, 'small');
+        return widgetCard(t('dashboard.activeTenants'), `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${m.activeTenants.length}</div>`, 'small');
       case 'stat_pending_approvals':
-        return widgetCard('Pending Approvals', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allTenants.filter(t=>t.status==='pending').length}</div>`, 'small');
+        return widgetCard(t('dashboard.pendingApprovals'), `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allTenants.filter(t=>t.status==='pending').length}</div>`, 'small');
       case 'stat_open_maintenance':
-        return widgetCard('Open Maintenance', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allMaintenance.filter(r=>r.status==='open').length}</div>`, 'small');
+        return widgetCard(t('dashboard.openRequests'), `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allMaintenance.filter(r=>r.status==='open').length}</div>`, 'small');
       case 'stat_occupancy': {
         const pct = m.totalUnits > 0 ? Math.round((m.activeTenants.length / m.totalUnits) * 100) : 0;
-        return widgetCard('Occupancy Rate', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${pct}%</div><div style="font-size:11px;color:var(--slate);">${m.activeTenants.length} of ${m.totalUnits} units</div>`, 'small');
+        return widgetCard(t('dashboard.occupancyRate'), `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${pct}%</div><div style="font-size:11px;color:var(--slate);">${m.activeTenants.length} ${t('dashboard.occupancyUnits').replace('{total}', m.totalUnits)}</div>`, 'small');
       }
       case 'stat_collection_rate': {
         const pct = m.expectedThisMonth > 0 ? Math.round((m.collectedThisMonth / m.expectedThisMonth) * 100) : 0;
-        return widgetCard('Collection Rate', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${pct}%</div><div style="font-size:11px;color:var(--slate);">$${m.collectedThisMonth.toLocaleString(undefined,{maximumFractionDigits:0})} of $${m.expectedThisMonth.toLocaleString(undefined,{maximumFractionDigits:0})} expected</div>`, 'small');
+        return widgetCard(t('dashboard.collectionRate'), `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${pct}%</div><div style="font-size:11px;color:var(--slate);">$${m.collectedThisMonth.toLocaleString(undefined,{maximumFractionDigits:0})} ${t('dashboard.collectionOf').replace('{expected}', '$'+m.expectedThisMonth.toLocaleString(undefined,{maximumFractionDigits:0}))}</div>`, 'small');
       }
       case 'stat_outstanding':
-        return widgetCard('Outstanding Balance', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">$${m.outstanding.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div style="font-size:11px;color:var(--slate);">Across sent &amp; overdue invoices</div>`, 'small');
+        return widgetCard(t('dashboard.outstandingBalance'), `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">$${m.outstanding.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div style="font-size:11px;color:var(--slate);">${t('dashboard.outstandingNote')}</div>`, 'small');
 
       case 'table_pending_approvals': {
         const rows = allTenants.filter(t => t.status === 'pending');
         const body = rows.length
-          ? rows.map(t => `<tr><td>${t.firstName||''} ${t.lastName||''}</td><td style="font-size:12px;">${t.email||''}</td><td style="font-size:12px;">${t.propertyName||allProperties.find(p=>p.id===t.propertyId)?.name||'—'} / ${t.unit||'—'}</td><td><button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success" style="margin-right:4px;">Approve</button><button onclick="openEditTenant('${t.id}')" class="btn btn-sm btn-outline">Setup</button></td></tr>`).join('')
-          : '<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">No pending approvals.</td></tr>';
-        return widgetCard('Pending Tenant Approvals', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Property</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+          ? rows.map(tn => `<tr><td>${tn.firstName||''} ${tn.lastName||''}</td><td style="font-size:12px;">${tn.email||''}</td><td style="font-size:12px;">${tn.propertyName||allProperties.find(p=>p.id===tn.propertyId)?.name||'—'} / ${tn.unit||'—'}</td><td><button onclick="approveTenant('${tn.id}')" class="btn btn-sm btn-success" style="margin-right:4px;">${t('dashboard.approve')}</button><button onclick="openEditTenant('${tn.id}')" class="btn btn-sm btn-outline">${t('dashboard.setup')}</button></td></tr>`).join('')
+          : `<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">${t('dashboard.noPendingApprovals')}</td></tr>`;
+        return widgetCard(t('dashboard.pendingTenantApprovals'), `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>${t('dashboard.colName')}</th><th>${t('dashboard.colEmail')}</th><th>${t('dashboard.colProperty')}</th><th>${t('dashboard.colAction')}</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
       }
       case 'table_open_maintenance': {
         const rows = allMaintenance.filter(r => r.status === 'open').slice(0, 8);
         const body = rows.length
-          ? rows.map(r => `<tr><td>${r.tenantName||'—'}</td><td>${r.category||''}</td><td><span class="${r.priority==='high'?'priority-high':r.priority==='medium'?'priority-medium':'priority-low'}">${r.priority||''}</span></td><td><button onclick="openMaintModal('${r.id}')" class="btn btn-sm btn-amber">Update</button></td></tr>`).join('')
-          : '<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">No open requests.</td></tr>';
-        return widgetCard('Open Maintenance Requests', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Tenant</th><th>Category</th><th>Priority</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+          ? rows.map(r => `<tr><td>${r.tenantName||'—'}</td><td>${r.category||''}</td><td><span class="${r.priority==='high'?'priority-high':r.priority==='medium'?'priority-medium':'priority-low'}">${r.priority||''}</span></td><td><button onclick="openMaintModal('${r.id}')" class="btn btn-sm btn-amber">${t('dashboard.update')}</button></td></tr>`).join('')
+          : `<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">${t('dashboard.noOpenRequests')}</td></tr>`;
+        return widgetCard(t('dashboard.openMaintenance'), `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>${t('dashboard.colTenant')}</th><th>${t('dashboard.colCategory')}</th><th>${t('dashboard.colPriority')}</th><th>${t('dashboard.colAction')}</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
       }
       case 'table_leases_expiring': {
         const cutoff = Date.now() + 60 * 24 * 60 * 60 * 1000;
@@ -3274,22 +3356,22 @@
           .filter(t => !isNaN(t._leaseEndMs) && t._leaseEndMs <= cutoff)
           .sort((a,b) => a._leaseEndMs - b._leaseEndMs);
         const body = rows.length
-          ? rows.map(t => `<tr><td>${t.firstName||''} ${t.lastName||''}</td><td>${allProperties.find(p=>p.id===t.propertyId)?.name||'—'}</td><td>${new Date(t.leaseEnd+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td></tr>`).join('')
-          : '<tr><td colspan="3" style="text-align:center;color:var(--slate);padding:16px;">No leases expiring in the next 60 days.</td></tr>';
-        return widgetCard('Leases Expiring Soon', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Tenant</th><th>Property</th><th>Lease End</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+          ? rows.map(tn => `<tr><td>${tn.firstName||''} ${tn.lastName||''}</td><td>${allProperties.find(p=>p.id===tn.propertyId)?.name||'—'}</td><td>${new Date(tn.leaseEnd+'T00:00:00').toLocaleDateString(CURRENT_LANG==='es'?'es-ES':'en-US',{month:'short',day:'numeric',year:'numeric'})}</td></tr>`).join('')
+          : `<tr><td colspan="3" style="text-align:center;color:var(--slate);padding:16px;">${t('dashboard.noLeasesExpiring')}</td></tr>`;
+        return widgetCard(t('dashboard.leasesExpiring'), `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>${t('dashboard.colTenant')}</th><th>${t('dashboard.colProperty')}</th><th>${t('dashboard.colLeaseEnd')}</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
       }
       case 'table_needs_setup': {
         const rows = allProperties.filter(p => !p.country);
         const body = rows.length
-          ? rows.map(p => `<tr><td>${p.name}</td><td>⚠️ Needs a country assigned</td><td><button onclick="switchSection('properties',document.getElementById('nav-dashboard'));editProperty('${p.id}')" class="btn btn-sm btn-outline">Fix Now</button></td></tr>`).join('')
-          : '<tr><td colspan="3" style="text-align:center;color:var(--slate);padding:16px;">✓ All properties are fully set up.</td></tr>';
-        return widgetCard('Properties Needing Setup', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Property</th><th>Issue</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+          ? rows.map(p => `<tr><td>${p.name}</td><td>${t('dashboard.needsSetupIssue')}</td><td><button onclick="switchSection('properties',document.getElementById('nav-dashboard'));editProperty('${p.id}')" class="btn btn-sm btn-outline">${t('dashboard.fixNow')}</button></td></tr>`).join('')
+          : `<tr><td colspan="3" style="text-align:center;color:var(--slate);padding:16px;">${t('dashboard.needsSetupOk')}</td></tr>`;
+        return widgetCard(t('dashboard.needsSetup'), `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>${t('dashboard.colProperty')}</th><th>${t('dashboard.colIssue')}</th><th>${t('dashboard.colAction')}</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
       }
       case 'chart_revenue_trend': {
         const months = [];
         for (let i = 5; i >= 0; i--) {
           const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - i, 1));
-          months.push({ year: d.getUTCFullYear(), month: d.getUTCMonth(), label: d.toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}), total: 0 });
+          months.push({ year: d.getUTCFullYear(), month: d.getUTCMonth(), label: d.toLocaleDateString(CURRENT_LANG==='es'?'es-ES':'en-US',{month:'short',timeZone:'UTC'}), total: 0 });
         }
         allPayments.forEach(p => {
           if (p.status !== 'paid' || !p.paidAt?.toDate) return;
@@ -3307,7 +3389,7 @@
             <text x="${x + barW/2}" y="${chartH + 16}" text-anchor="middle" font-size="11" fill="#6B7280">${mo.label}</text>
             <text x="${x + barW/2}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#374151">$${mo.total >= 1000 ? Math.round(mo.total/1000)+'k' : mo.total.toFixed(0)}</text>`;
         }).join('');
-        return widgetCard('Monthly Revenue Trend', `<svg viewBox="0 0 ${svgW} ${chartH + 30}" style="width:100%;max-width:${svgW}px;height:auto;">${bars}</svg>`, 'large');
+        return widgetCard(t('dashboard.revenueTrend'), `<svg viewBox="0 0 ${svgW} ${chartH + 30}" style="width:100%;max-width:${svgW}px;height:auto;">${bars}</svg>`, 'large');
       }
       default:
         return '';
@@ -3343,17 +3425,17 @@
   window.toggleDashboardEditMode = () => {
     dashboardEditMode = !dashboardEditMode;
     document.getElementById('dashboard-edit-bar').classList.toggle('hidden', !dashboardEditMode);
-    document.getElementById('dashboard-edit-toggle-btn').textContent = dashboardEditMode ? '✓ Done Customizing' : '🧩 Customize Dashboard';
+    document.getElementById('dashboard-edit-toggle-btn').textContent = dashboardEditMode ? t('dashboard.doneCustomizing') : t('dashboard.customize');
     renderDashboard();
   };
 
   window.openAddWidgetModal = () => {
     const available = Object.entries(DASHBOARD_WIDGETS).filter(([key]) => !currentDashboardLayout.includes(key));
     const byCategory = {};
-    available.forEach(([key, def]) => { (byCategory[def.category] = byCategory[def.category] || []).push([key, def]); });
+    available.forEach(([key, def]) => { const cat = t(def.categoryKey); (byCategory[cat] = byCategory[cat] || []).push([key, def]); });
     const list = document.getElementById('widget-picker-list');
     if (!available.length) {
-      list.innerHTML = '<p style="font-size:13px;color:var(--slate);text-align:center;">Every available widget is already on your dashboard.</p>';
+      list.innerHTML = `<p style="font-size:13px;color:var(--slate);text-align:center;">${t('dashboard.allWidgetsAdded')}</p>`;
     } else {
       list.innerHTML = Object.entries(byCategory).map(([cat, widgets]) => `
         <div>
@@ -3361,8 +3443,8 @@
           <div style="display:flex;flex-direction:column;gap:6px;">
             ${widgets.map(([key, def]) => `
               <button onclick="addDashboardWidget('${key}')" style="text-align:left;padding:10px 12px;border:1px solid var(--border);border-radius:3px;background:#fff;cursor:pointer;">
-                <strong style="font-size:13px;">${def.label}</strong>
-                ${def.desc ? `<div style="font-size:11px;color:var(--slate);margin-top:2px;">${def.desc}</div>` : ''}
+                <strong style="font-size:13px;">${t(def.labelKey)}</strong>
+                ${def.descKey ? `<div style="font-size:11px;color:var(--slate);margin-top:2px;">${t(def.descKey)}</div>` : ''}
               </button>
             `).join('')}
           </div>
@@ -5055,19 +5137,19 @@
     currentReminders = (reminders || []).map(r => ({ ...r }));
     const list = document.getElementById('prop-reminders-list');
     if (!currentReminders.length) {
-      list.innerHTML = '<p style="font-size:12px;color:var(--slate);">No reminders configured yet.</p>';
+      list.innerHTML = `<p style="font-size:12px;color:var(--slate);">${t('properties.noRemindersYet')}</p>`;
       return;
     }
     list.innerHTML = currentReminders.map((r, idx) => `
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px;background:#FDFBF8;border-radius:3px;">
         <input type="text" value="${(r.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Electric Bill" class="form-input" style="flex:2;min-width:120px;" oninput="updateReminderField(${idx},'label',this.value)">
-        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">Due day</span>
+        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderDueDay')}</span>
         <input type="number" value="${r.dayOfMonth||1}" min="1" max="28" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'dayOfMonth',Math.min(Math.max(parseInt(this.value)||1,1),28))">
-        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">Remind</span>
+        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderRemind')}</span>
         <input type="number" value="${r.leadDays!==undefined?r.leadDays:3}" min="0" max="27" class="form-input" style="width:58px;" oninput="updateReminderField(${idx},'leadDays',Math.min(Math.max(parseInt(this.value)||0,0),27))">
-        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">day(s) before</span>
+        <span style="font-size:11px;color:var(--slate);white-space:nowrap;">${t('properties.reminderDaysBefore')}</span>
         <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;">
-          <input type="checkbox" ${r.enabled!==false?'checked':''} onchange="updateReminderField(${idx},'enabled',this.checked)"> On
+          <input type="checkbox" ${r.enabled!==false?'checked':''} onchange="updateReminderField(${idx},'enabled',this.checked)"> ${t('properties.reminderOn')}
         </label>
         <button type="button" onclick="removeReminderRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
       </div>
@@ -5090,17 +5172,17 @@
     const propertyId = document.getElementById('prop-id').value;
     if (!propertyId) return;
     for (const r of currentReminders) {
-      if (!r.label || !r.label.trim()) { showAlert('prop-reminders-alert', 'Every reminder needs a label (e.g. "Electric Bill").'); return; }
+      if (!r.label || !r.label.trim()) { showAlert('prop-reminders-alert', t('properties.reminderLabelRequired')); return; }
     }
-    const btn = document.getElementById('prop-reminders-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    const btn = document.getElementById('prop-reminders-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
     try {
       await updateDoc(doc(db,'properties',propertyId), { reminders: currentReminders, updatedAt: serverTimestamp() });
       logAdminAction('property_reminders_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, `${currentReminders.length} reminder(s)`);
-      showAlert('prop-reminders-alert', 'Reminders saved.', 'success');
+      showAlert('prop-reminders-alert', t('properties.remindersSaved'), 'success');
       const idx = allProperties.findIndex(p => p.id === propertyId);
       if (idx !== -1) allProperties[idx].reminders = currentReminders; // keep local cache in sync without a full reload
     } catch (e) { showAlert('prop-reminders-alert', e.message); }
-    btn.disabled = false; btn.textContent = 'Save Reminders';
+    btn.disabled = false; btn.textContent = t('properties.saveReminders');
   };
 
   // ===== BOLD PAYMENT SETTINGS (self-serve, per-property) =====
@@ -5118,7 +5200,7 @@
 
   async function loadPropertyBoldStatus(propertyId) {
     const statusEl = document.getElementById('prop-bold-status');
-    statusEl.textContent = 'Loading status...';
+    statusEl.textContent = t('properties.loadingStatus');
     document.getElementById('prop-bold-test-result').textContent = '';
     try {
       const result = await callManagePropertyPayments('get_status', { propertyId });
@@ -5127,11 +5209,15 @@
       document.getElementById('prop-bold-apikey').value = ''; // write-only, never pre-filled
       document.getElementById('prop-bold-secret').value = '';
       if (bold.configured) {
-        document.getElementById('prop-bold-secret-hint').textContent = `(leave blank to keep current: ${bold.secretKeyMasked || '••••'})`;
-        statusEl.textContent = `Configured (API key ${bold.apiKeyMasked || '••••'}). ${bold.enabled ? 'Currently accepting Bold payments.' : 'Currently disabled.'} Last updated ${bold.updatedAt ? new Date(bold.updatedAt).toLocaleString() : '—'} by ${bold.updatedBy || 'unknown'}.`;
+        document.getElementById('prop-bold-secret-hint').textContent = t('properties.leaveBlankKeepCurrent').replace('{val}', bold.secretKeyMasked || '••••');
+        statusEl.textContent = t('properties.boldConfigured')
+          .replace('{key}', bold.apiKeyMasked || '••••')
+          .replace('{status}', bold.enabled ? t('properties.boldActive') : t('properties.boldInactive'))
+          .replace('{date}', bold.updatedAt ? new Date(bold.updatedAt).toLocaleString() : '—')
+          .replace('{by}', bold.updatedBy || 'unknown');
       } else {
         document.getElementById('prop-bold-secret-hint').textContent = '';
-        statusEl.textContent = 'Not configured yet — this property will not show a Bold payment option to tenants.';
+        statusEl.textContent = t('properties.boldNotConfigured');
       }
     } catch (e) {
       statusEl.textContent = '';
@@ -5142,7 +5228,7 @@
   window.savePropertyBold = async () => {
     const propertyId = document.getElementById('prop-id').value;
     if (!propertyId) return;
-    const btn = document.getElementById('prop-bold-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    const btn = document.getElementById('prop-bold-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
     try {
       await callManagePropertyPayments('set_bold', {
         propertyId,
@@ -5151,10 +5237,10 @@
         enabled: document.getElementById('prop-bold-enabled').checked,
       });
       logAdminAction('bold_payments_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name);
-      showAlert('prop-bold-alert', 'Bold settings saved.', 'success');
+      showAlert('prop-bold-alert', t('properties.boldSaved'), 'success');
       await loadPropertyBoldStatus(propertyId);
     } catch (e) { showAlert('prop-bold-alert', e.message); }
-    btn.disabled = false; btn.textContent = 'Save Bold Settings';
+    btn.disabled = false; btn.textContent = t('properties.boldSave');
   };
 
   window.testPropertyBold = async () => {
@@ -5162,7 +5248,7 @@
     if (!propertyId) return;
     const btn = document.getElementById('prop-bold-test-btn');
     const resultEl = document.getElementById('prop-bold-test-result');
-    btn.disabled = true; btn.textContent = 'Testing...';
+    btn.disabled = true; btn.textContent = t('common.testing');
     resultEl.textContent = '';
     try {
       const result = await callManagePropertyPayments('test_bold', {
@@ -5175,7 +5261,7 @@
       resultEl.style.color = '#DC2626';
       resultEl.textContent = '✗ ' + e.message;
     }
-    btn.disabled = false; btn.textContent = 'Test Connection';
+    btn.disabled = false; btn.textContent = t('properties.boldTest');
   };
 
   window.clearPropertyBold = async () => {
