@@ -145,6 +145,37 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ success: true }) };
     }
 
+    // ── TEST BOLD — validates the API key with a read-only call (the
+    //    merchant's enabled payment methods), no payment link is created.
+    //    Note: this can only confirm the API key, not the webhook secret —
+    //    there's no Bold endpoint to check a signing key without an actual
+    //    webhook event, so that only gets confirmed by a real payment. ────
+    if (action === 'test_bold') {
+      const { apiKey } = body;
+      let effectiveApiKey = apiKey;
+      if (!effectiveApiKey) {
+        const snap = await secretRef.get();
+        effectiveApiKey = snap.exists ? snap.data().bold?.apiKey : null;
+      }
+      if (!effectiveApiKey) return { statusCode: 400, body: JSON.stringify({ error: 'Enter an API key to test with.' }) };
+
+      const res = await fetch('https://integrations.api.bold.co/online/link/v1/payment_methods', {
+        headers: { Authorization: `x-api-key ${effectiveApiKey}` },
+      });
+      const data = await res.json();
+      if (!res.ok || data.errors?.length) {
+        return { statusCode: 400, body: JSON.stringify({ error: data.errors?.[0]?.message || `Bold rejected this API key (HTTP ${res.status}).` }) };
+      }
+      const methods = Object.keys(data.payload?.payment_methods || {});
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          message: `API key validated. Enabled payment methods: ${methods.join(', ') || 'none found'}. Note: this doesn't confirm your webhook secret key — that's only verified by an actual payment.`,
+        }),
+      };
+    }
+
     return { statusCode: 400, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
 
   } catch (err) {
