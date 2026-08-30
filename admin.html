@@ -240,7 +240,7 @@
         <div id="country-coverage-banner" class="hidden" style="margin:0 20px 16px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:12px 16px;font-size:12px;color:#92400E;"></div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th></th><th data-i18n="common.name">Name</th><th data-i18n="properties.country">Country</th><th data-i18n="properties.address">Address</th><th data-i18n="properties.units">Units</th><th data-i18n="properties.available">Available</th><th data-i18n="common.actions">Actions</th></tr></thead>
+            <thead><tr><th></th><th data-sort-section="properties" data-sort-col="name" onclick="handleSort('properties','name')" style="cursor:pointer;user-select:none;"><span data-i18n="common.name">Name</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="country" onclick="handleSort('properties','country')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.country">Country</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="address" onclick="handleSort('properties','address')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.address">Address</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="units" onclick="handleSort('properties','units')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.units">Units</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="available" onclick="handleSort('properties','available')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.available">Available</span><span class="sort-arrow"></span></th><th data-i18n="common.actions">Actions</th></tr></thead>
             <tbody id="properties-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
@@ -259,7 +259,7 @@
         </div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Property / Unit</th><th>Rent</th><th>Lease End</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th data-sort-section="tenants" data-sort-col="name" onclick="handleSort('tenants','name')" style="cursor:pointer;user-select:none;">Name<span class="sort-arrow"></span></th><th data-sort-section="tenants" data-sort-col="email" onclick="handleSort('tenants','email')" style="cursor:pointer;user-select:none;">Email<span class="sort-arrow"></span></th><th data-sort-section="tenants" data-sort-col="property" onclick="handleSort('tenants','property')" style="cursor:pointer;user-select:none;">Property / Unit<span class="sort-arrow"></span></th><th data-sort-section="tenants" data-sort-col="rent" onclick="handleSort('tenants','rent')" style="cursor:pointer;user-select:none;">Rent<span class="sort-arrow"></span></th><th data-sort-section="tenants" data-sort-col="leaseEnd" onclick="handleSort('tenants','leaseEnd')" style="cursor:pointer;user-select:none;">Lease End<span class="sort-arrow"></span></th><th data-sort-section="tenants" data-sort-col="status" onclick="handleSort('tenants','status')" style="cursor:pointer;user-select:none;">Status<span class="sort-arrow"></span></th><th>Actions</th></tr></thead>
             <tbody id="tenants-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
@@ -299,6 +299,7 @@
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;">All Payments</h3>
           <div style="display:flex;gap:8px;">
+            <input type="text" id="payment-search" class="form-input" style="width:180px;" placeholder="Search tenant or description..." oninput="filterPayments()">
             <select id="payment-filter" class="form-input" style="width:150px;" onchange="filterPayments()">
               <option value="">All statuses</option>
               <option value="paid">Paid</option>
@@ -310,7 +311,7 @@
         </div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Tenant</th><th>Description</th><th>Amount</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th data-sort-section="payments" data-sort-col="date" onclick="handleSort('payments','date')" style="cursor:pointer;user-select:none;">Date<span class="sort-arrow"></span></th><th data-sort-section="payments" data-sort-col="tenant" onclick="handleSort('payments','tenant')" style="cursor:pointer;user-select:none;">Tenant<span class="sort-arrow"></span></th><th data-sort-section="payments" data-sort-col="description" onclick="handleSort('payments','description')" style="cursor:pointer;user-select:none;">Description<span class="sort-arrow"></span></th><th data-sort-section="payments" data-sort-col="amount" onclick="handleSort('payments','amount')" style="cursor:pointer;user-select:none;">Amount<span class="sort-arrow"></span></th><th data-sort-section="payments" data-sort-col="status" onclick="handleSort('payments','status')" style="cursor:pointer;user-select:none;">Status<span class="sort-arrow"></span></th><th>Actions</th></tr></thead>
             <tbody id="payments-tbody"><tr><td colspan="6" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
@@ -381,11 +382,14 @@
       <div class="card">
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;">Maintenance Requests</h3>
-          <select id="maint-filter" class="form-input" style="width:170px;" onchange="filterMaintenance()"><option value="">All statuses</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="maint-search" class="form-input" style="width:180px;" placeholder="Search tenant, category..." oninput="filterMaintenance()">
+            <select id="maint-filter" class="form-input" style="width:170px;" onchange="filterMaintenance()"><option value="">All statuses</option><option value="open">Open</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select>
+          </div>
         </div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Tenant</th><th>Unit</th><th>Category</th><th>Description</th><th>Priority</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th data-sort-section="maintenance" data-sort-col="date" onclick="handleSort('maintenance','date')" style="cursor:pointer;user-select:none;">Date<span class="sort-arrow"></span></th><th data-sort-section="maintenance" data-sort-col="tenant" onclick="handleSort('maintenance','tenant')" style="cursor:pointer;user-select:none;">Tenant<span class="sort-arrow"></span></th><th data-sort-section="maintenance" data-sort-col="unit" onclick="handleSort('maintenance','unit')" style="cursor:pointer;user-select:none;">Unit<span class="sort-arrow"></span></th><th data-sort-section="maintenance" data-sort-col="category" onclick="handleSort('maintenance','category')" style="cursor:pointer;user-select:none;">Category<span class="sort-arrow"></span></th><th>Description</th><th data-sort-section="maintenance" data-sort-col="priority" onclick="handleSort('maintenance','priority')" style="cursor:pointer;user-select:none;">Priority<span class="sort-arrow"></span></th><th data-sort-section="maintenance" data-sort-col="status" onclick="handleSort('maintenance','status')" style="cursor:pointer;user-select:none;">Status<span class="sort-arrow"></span></th><th>Actions</th></tr></thead>
             <tbody id="maintenance-tbody"><tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
@@ -439,6 +443,7 @@
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;">Invoices &amp; Receipts</h3>
           <div style="display:flex;gap:8px;">
+            <input type="text" id="invoice-search" class="form-input" style="width:160px;font-size:12px;" placeholder="Search tenant, #..." oninput="filterInvoices()">
             <select id="inv-filter" class="form-input" style="width:160px;font-size:12px;" onchange="filterInvoices()">
               <option value="">All</option><option value="invoice">Invoices</option><option value="receipt">Receipts</option>
               <option value="draft">Drafts</option><option value="sent">Pending</option><option value="paid">Paid</option><option value="overdue">Overdue</option>
@@ -448,7 +453,7 @@
         </div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>#</th><th>Tenant</th><th>Amount</th><th>Type</th><th>Status</th><th>Due / Paid</th><th>Actions</th></tr></thead>
+            <thead><tr><th data-sort-section="invoices" data-sort-col="number" onclick="handleSort('invoices','number')" style="cursor:pointer;user-select:none;">#<span class="sort-arrow"></span></th><th data-sort-section="invoices" data-sort-col="tenant" onclick="handleSort('invoices','tenant')" style="cursor:pointer;user-select:none;">Tenant<span class="sort-arrow"></span></th><th data-sort-section="invoices" data-sort-col="amount" onclick="handleSort('invoices','amount')" style="cursor:pointer;user-select:none;">Amount<span class="sort-arrow"></span></th><th data-sort-section="invoices" data-sort-col="type" onclick="handleSort('invoices','type')" style="cursor:pointer;user-select:none;">Type<span class="sort-arrow"></span></th><th data-sort-section="invoices" data-sort-col="status" onclick="handleSort('invoices','status')" style="cursor:pointer;user-select:none;">Status<span class="sort-arrow"></span></th><th data-sort-section="invoices" data-sort-col="due" onclick="handleSort('invoices','due')" style="cursor:pointer;user-select:none;">Due / Paid<span class="sort-arrow"></span></th><th>Actions</th></tr></thead>
             <tbody id="invoices-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
@@ -1915,12 +1920,84 @@
     </tr>`;
     }).join('');
   }
+  // ===== GENERIC SORT (Properties, Tenants, Payments, Maintenance, Invoices) =====
+  // One reusable click-to-sort system rather than five bespoke ones: each
+  // section keeps its own {column, direction} state, clicking a header
+  // toggles ascending/descending (or switches column, resetting to
+  // ascending), and each section's own filter function re-applies both its
+  // search/dropdown filter AND the current sort before rendering.
+  const sortState = {};
+  const SECTION_REFRESH = {
+    properties: () => filterProperties(),
+    tenants: () => filterTenants(),
+    payments: () => filterPayments(),
+    maintenance: () => filterMaintenance(),
+    invoices: () => filterInvoices(),
+  };
+  window.handleSort = (section, column) => {
+    const state = sortState[section] || { column: null, direction: 'asc' };
+    state.direction = (state.column === column && state.direction === 'asc') ? 'desc' : 'asc';
+    state.column = column;
+    sortState[section] = state;
+    updateSortArrows(section);
+    SECTION_REFRESH[section]();
+  };
+  function updateSortArrows(section) {
+    document.querySelectorAll(`th[data-sort-section="${section}"]`).forEach(th => {
+      const arrow = th.querySelector('.sort-arrow');
+      if (!arrow) return;
+      const state = sortState[section];
+      arrow.textContent = (state && state.column === th.dataset.sortCol) ? (state.direction === 'asc' ? ' ▲' : ' ▼') : '';
+    });
+  }
+  function applySort(list, section, accessors) {
+    const state = sortState[section];
+    if (!state || !state.column || !accessors[state.column]) return list;
+    const accessor = accessors[state.column];
+    const dir = state.direction === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      let av = accessor(a), bv = accessor(b);
+      if (av == null) av = '';
+      if (bv == null) bv = '';
+      if (typeof av === 'string') av = av.toLowerCase();
+      if (typeof bv === 'string') bv = bv.toLowerCase();
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }
+  const PROPERTY_SORT_ACCESSORS = {
+    name: p => p.name || '', country: p => p.country || '', address: p => p.address || '',
+    units: p => Number(p.units) || 0, available: p => p.available ? 1 : 0,
+  };
+  const TENANT_SORT_ACCESSORS = {
+    name: t => `${t.firstName||''} ${t.lastName||''}`, email: t => t.email || '',
+    property: t => t.propertyName || '', rent: t => Number(t.monthlyRent) || 0,
+    leaseEnd: t => t.leaseEnd || '', status: t => t.status || '',
+  };
+  const PAYMENT_SORT_ACCESSORS = {
+    date: p => p.createdAt?.toDate ? p.createdAt.toDate().getTime() : (p.manualDate ? new Date(p.manualDate).getTime() : 0),
+    tenant: p => { const t = allTenants.find(x=>x.id===p.tenantId); return t ? `${t.firstName||''} ${t.lastName||''}` : (p.tenantId||''); },
+    description: p => p.description || '', amount: p => Number(p.amount) || 0, status: p => p.status || '',
+  };
+  const MAINTENANCE_SORT_ACCESSORS = {
+    date: r => r.createdAt?.toDate ? r.createdAt.toDate().getTime() : 0, tenant: r => r.tenantName || '',
+    unit: r => r.unit || '', category: r => r.category || '',
+    priority: r => ({high:3,medium:2,low:1})[r.priority] || 0, status: r => r.status || '',
+  };
+  const INVOICE_SORT_ACCESSORS = {
+    number: i => i.invoiceNumber || '', tenant: i => i.tenantName || '', amount: i => Number(i.total) || 0,
+    type: i => i.type || '', status: i => i.status || '',
+    due: i => i.dueDate ? new Date(i.dueDate).getTime() : (i.paidDate ? new Date(i.paidDate).getTime() : 0),
+  };
+
   window.filterProperties = () => {
     const q = document.getElementById('property-search').value.toLowerCase().trim();
-    if (!q) { renderPropertiesTable(); return; }
-    renderPropertiesTable(allProperties.filter(p =>
+    let list = q ? allProperties.filter(p =>
       `${p.name||''} ${p.address||''} ${p.city||''} ${p.state||''} ${p.zip||''}`.toLowerCase().includes(q)
-    ));
+    ) : allProperties;
+    list = applySort(list, 'properties', PROPERTY_SORT_ACCESSORS);
+    renderPropertiesTable(list);
   };
 
   // Finds the next occurrence (today or later) of a reminder rule's due day —
@@ -2859,7 +2936,9 @@
 
   window.filterTenants = () => {
     const q = document.getElementById('tenant-search').value.toLowerCase();
-    renderTenantsTable(allTenants.filter(t => `${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(q)));
+    let list = allTenants.filter(t => `${t.firstName} ${t.lastName} ${t.email}`.toLowerCase().includes(q));
+    list = applySort(list, 'tenants', TENANT_SORT_ACCESSORS);
+    renderTenantsTable(list);
   };
   window.approveTenant = async id => {
     const t = allTenants.find(x => x.id === id);
@@ -2952,7 +3031,15 @@
   }
   window.filterPayments = () => {
     const filter = document.getElementById('payment-filter').value;
-    renderPaymentsTable(filter ? allPayments.filter(p=>p.status===filter) : allPayments);
+    const q = document.getElementById('payment-search').value.toLowerCase().trim();
+    let list = filter ? allPayments.filter(p=>p.status===filter) : allPayments;
+    if (q) list = list.filter(p => {
+      const t = allTenants.find(x=>x.id===p.tenantId);
+      const tName = t ? `${t.firstName||''} ${t.lastName||''}` : '';
+      return `${tName} ${p.description||''}`.toLowerCase().includes(q);
+    });
+    list = applySort(list, 'payments', PAYMENT_SORT_ACCESSORS);
+    renderPaymentsTable(list);
   };
   async function autoRecordFinancial({ propertyId, propertyName, amount, description, category, type, date }) {
     try {
@@ -3317,7 +3404,11 @@
   };
   window.filterMaintenance = () => {
     const filter = document.getElementById('maint-filter').value;
-    renderMaintenanceTable(filter ? allMaintenance.filter(r=>r.status===filter) : allMaintenance);
+    const q = document.getElementById('maint-search').value.toLowerCase().trim();
+    let list = filter ? allMaintenance.filter(r=>r.status===filter) : allMaintenance;
+    if (q) list = list.filter(r => `${r.tenantName||''} ${r.category||''} ${r.description||''}`.toLowerCase().includes(q));
+    list = applySort(list, 'maintenance', MAINTENANCE_SORT_ACCESSORS);
+    renderMaintenanceTable(list);
   };
   window.openMaintModal = id => {
     const r = allMaintenance.find(x=>x.id===id); if (!r) return;
@@ -3743,6 +3834,7 @@
   }
   window.filterInvoices = () => {
     const f = document.getElementById('inv-filter').value;
+    const q = document.getElementById('invoice-search').value.toLowerCase().trim();
     let filtered = allInvoices;
     if (f==='invoice') filtered=filtered.filter(i=>i.type==='invoice');
     if (f==='receipt') filtered=filtered.filter(i=>i.type==='receipt');
@@ -3750,6 +3842,8 @@
     if (f==='draft') filtered=filtered.filter(i=>i.status==='draft');
     if (f==='paid') filtered=filtered.filter(i=>i.status==='paid');
     if (f==='overdue') filtered=filtered.filter(i=>i.status==='overdue');
+    if (q) filtered = filtered.filter(i => `${i.tenantName||''} ${i.invoiceNumber||''}`.toLowerCase().includes(q));
+    filtered = applySort(filtered, 'invoices', INVOICE_SORT_ACCESSORS);
     renderInvoicesTable(filtered);
   };
   function renderInvoicesTable(items) {
