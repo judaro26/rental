@@ -666,6 +666,16 @@
       // Log login event
       logAction('login', `Signed in via browser`);
 
+      // Check Bold payment availability for this tenant's property — a
+      // plain, public boolean field (not the actual credentials, which
+      // stay in the fully locked propertyPaymentSecrets collection).
+      if (tenantData.propertyId) {
+        try {
+          const propSnap = await getDoc(doc(db,'properties',tenantData.propertyId));
+          window._boldPaymentsEnabled = propSnap.exists() && propSnap.data().boldPaymentsEnabled === true;
+        } catch { window._boldPaymentsEnabled = false; }
+      }
+
       // Load all data sections
       await Promise.all([
         loadPayments(),
@@ -677,6 +687,20 @@
         loadInvoicesTenant(),
         loadAnnouncements()
       ]);
+
+      // Returning from Bold's hosted checkout — the actual "paid" status
+      // comes from the webhook asynchronously, so this is a "we're
+      // confirming it" message, not a guarantee it's already reflected.
+      if (new URLSearchParams(window.location.search).get('paid') === 'bold') {
+        const toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:24px;right:24px;z-index:9999;background:#1A1A2E;color:#fff;padding:14px 20px;border-radius:4px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,0.2);max-width:320px;';
+        toast.textContent = '✓ Thanks! We\'re confirming your payment with Bold — this usually takes a few minutes. Your invoice will update automatically once confirmed.';
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 8000);
+        history.replaceState({}, '', window.location.pathname);
+        // One extra refresh a few seconds later, in case the webhook lands quickly.
+        setTimeout(() => loadInvoicesTenant(), 5000);
+      }
 
     } catch (err) {
       console.error('Error loading tenant data:', err);
@@ -1483,6 +1507,7 @@
         const isPaid = inv.status === 'paid';
         const statusColor = isPaid ? '#16A34A' : inv.status === 'overdue' ? '#DC2626' : '#D97706';
         const statusBg    = isPaid ? '#F0FDF4'  : inv.status === 'overdue' ? '#FEF2F2'  : '#FFFBEB';
+        const canPayWithBold = !isRec && !isPaid && window._boldPaymentsEnabled;
         return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #F9FAFB;flex-wrap:wrap;gap:8px;">
           <div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -1493,6 +1518,7 @@
           </div>
           <div style="display:flex;align-items:center;gap:12px;">
             <span style="font-size:16px;font-weight:700;color:var(--amber);">$${parseFloat(inv.total||0).toFixed(2)}</span>
+            ${canPayWithBold ? `<button onclick="payInvoiceWithBold('${inv.id}',this)" style="font-size:12px;padding:5px 12px;background:#0047FF;color:#fff;border:none;border-radius:2px;cursor:pointer;">💳 Pay with Bold</button>` : ''}
             <a href="${inv.invoiceUrl||'#'}" target="_blank" rel="noopener"
               style="font-size:12px;padding:5px 12px;background:#1A1A2E;color:#fff;text-decoration:none;border-radius:2px;">View</a>
           </div>
@@ -1500,6 +1526,28 @@
       }).join('');
     } catch(e) { console.warn('loadInvoicesTenant:', e); }
   }
+
+  window.payInvoiceWithBold = async (invoiceId, btnEl) => {
+    btnEl.disabled = true;
+    const originalText = btnEl.textContent;
+    btnEl.textContent = 'Preparing...';
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch('/api/create-bold-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ invoiceId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not start payment.');
+      logAction('bold_payment_started', `Invoice ${invoiceId}`);
+      window.location.href = data.url; // redirect to Bold's hosted checkout; Bold redirects back afterward
+    } catch (e) {
+      alert('Could not start Bold payment: ' + e.message);
+      btnEl.disabled = false;
+      btnEl.textContent = originalText;
+    }
+  };
 
   window._expandQr = (src) => {
     const overlay = document.createElement('div');
