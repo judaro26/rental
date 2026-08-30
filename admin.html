@@ -199,33 +199,27 @@
 
     <!-- DASHBOARD -->
     <section id="section-dashboard" class="section active">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
-        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;" data-i18n="dashboard.properties">Properties</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-props">—</div></div>
-        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;" data-i18n="dashboard.activeTenants">Active Tenants</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-tenants">—</div></div>
-        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;" data-i18n="dashboard.pendingApprovals">Pending Approvals</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-pending">—</div></div>
-        <div class="stat-card"><div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;" data-i18n="dashboard.openRequests">Open Requests</div><div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;" id="stat-requests">—</div></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
+        <button onclick="toggleDashboardEditMode()" id="dashboard-edit-toggle-btn" class="btn btn-outline btn-sm">🧩 Customize Dashboard</button>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="card">
-          <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="dashboard.pendingTenantApprovals">Pending Tenant Approvals</h3></div>
-          <div style="overflow-x:auto;">
-            <table class="data-table">
-              <thead><tr><th data-i18n="common.name">Name</th><th data-i18n="common.email">Email</th><th data-i18n="common.property">Property</th><th data-i18n="common.action">Action</th></tr></thead>
-              <tbody id="pending-tenants-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">Loading...</td></tr></tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="dashboard.openMaintenance">Open Maintenance</h3></div>
-          <div style="overflow-x:auto;">
-            <table class="data-table">
-              <thead><tr><th data-i18n="common.tenant">Tenant</th><th data-i18n="common.category">Category</th><th data-i18n="common.priority">Priority</th><th data-i18n="common.action">Action</th></tr></thead>
-              <tbody id="open-maint-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">Loading...</td></tr></tbody>
-            </table>
-          </div>
-        </div>
+      <div id="dashboard-edit-bar" class="hidden" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:12px 16px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:4px;">
+        <span style="font-size:12px;color:#92400E;flex:1;min-width:200px;">Drag widgets by their handle to reorder. This is personal to your own login — other admins see their own arrangement.</span>
+        <button onclick="openAddWidgetModal()" class="btn btn-primary btn-sm">+ Add Widget</button>
+        <button onclick="saveDashboardLayout()" class="btn btn-primary btn-sm" id="dashboard-save-btn">Save Layout</button>
+        <button onclick="resetDashboardLayout()" class="btn btn-sm" style="background:none;color:#92400E;">Reset to Default</button>
       </div>
+      <div id="dashboard-widgets-container" class="grid grid-cols-1 md:grid-cols-4 gap-5"></div>
     </section>
+
+    <!-- ADD DASHBOARD WIDGET MODAL -->
+    <div id="add-widget-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div class="modal-backdrop absolute inset-0" onclick="closeModal('add-widget-modal')"></div>
+      <div style="background:#fff;width:100%;max-width:520px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:85vh;overflow-y:auto;">
+        <button onclick="closeModal('add-widget-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+        <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;">Add a Widget</h3>
+        <div id="widget-picker-list" style="display:flex;flex-direction:column;gap:18px;"></div>
+      </div>
+    </div>
 
     <!-- PROPERTIES -->
     <section id="section-properties" class="section">
@@ -1672,6 +1666,7 @@
       uid: user.uid, email: user.email,
       role: adminData.role, allowedCountry: adminData.allowedCountry || null,
       language: adminData.language || null,
+      dashboardLayoutRaw: Array.isArray(adminData.dashboardLayout) ? adminData.dashboardLayout : null,
     };
 
     document.getElementById('admin-email-label').textContent = user.email;
@@ -1679,6 +1674,7 @@
     await initLanguage();
     resetInactivityTimer();
     await loadAll();
+    await loadDashboardLayout();
   });
 
   async function loadAll() {
@@ -3166,12 +3162,229 @@
   };
 
   // ===== DASHBOARD STATS =====
-  function updateDashboardStats() {
-    document.getElementById('stat-props').textContent = allProperties.length;
-    document.getElementById('stat-tenants').textContent = allTenants.filter(t=>t.status==='active').length;
-    document.getElementById('stat-pending').textContent = allTenants.filter(t=>t.status==='pending').length;
-    document.getElementById('stat-requests').textContent = allMaintenance.filter(r=>r.status==='open').length;
+  // updateDashboardStats() is called from several places whenever data that
+  // could affect dashboard widgets changes (tenant approved, maintenance
+  // updated, etc.) — keeping the name and redirecting it here means none of
+  // those call sites needed to change.
+  function updateDashboardStats() { renderDashboard(); }
+
+  // ===== DASHBOARD BUILDER (personal per-admin layout) =====
+  const DEFAULT_DASHBOARD_LAYOUT = ['stat_properties', 'stat_active_tenants', 'stat_pending_approvals', 'stat_open_maintenance', 'table_pending_approvals', 'table_open_maintenance'];
+  let currentDashboardLayout = [...DEFAULT_DASHBOARD_LAYOUT];
+  let dashboardEditMode = false;
+  let dashboardSortable = null;
+
+  const DASHBOARD_WIDGETS = {
+    stat_properties:          { label: 'Total Properties', category: 'Stats', size: 'small' },
+    stat_active_tenants:      { label: 'Active Tenants', category: 'Stats', size: 'small' },
+    stat_pending_approvals:   { label: 'Pending Approvals', category: 'Stats', size: 'small' },
+    stat_open_maintenance:    { label: 'Open Maintenance', category: 'Stats', size: 'small' },
+    stat_occupancy:           { label: 'Occupancy Rate', category: 'Stats', size: 'small', desc: '% of units currently occupied by an active tenant.' },
+    stat_collection_rate:     { label: 'Collection Rate (This Month)', category: 'Stats', size: 'small', desc: '% of expected rent actually collected so far this month.' },
+    stat_outstanding:         { label: 'Outstanding Balance', category: 'Stats', size: 'small', desc: 'Total across sent/overdue invoices, not yet paid.' },
+    table_pending_approvals:  { label: 'Pending Tenant Approvals', category: 'Tables & Lists', size: 'large' },
+    table_open_maintenance:   { label: 'Open Maintenance Requests', category: 'Tables & Lists', size: 'large' },
+    table_leases_expiring:    { label: 'Leases Expiring Soon', category: 'Tables & Lists', size: 'large', desc: 'Active tenants whose lease ends in the next 60 days.' },
+    table_needs_setup:        { label: 'Properties Needing Setup', category: 'Tables & Lists', size: 'large', desc: 'Properties missing a country assignment.' },
+    chart_revenue_trend:      { label: 'Monthly Revenue Trend', category: 'Charts', size: 'large', desc: 'Collected payments over the last 6 months.' },
+  };
+
+  // Pre-computes shared values so widgets that need the same underlying
+  // numbers (e.g. total units, this month's boundaries) don't each redo it.
+  function computeDashboardMetrics() {
+    const totalUnits = allProperties.reduce((sum, p) => sum + (Number(p.units) || 0), 0);
+    const activeTenants = allTenants.filter(t => t.status === 'active');
+    const now = new Date();
+    const monthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+    const expectedThisMonth = activeTenants.reduce((sum, t) => sum + (Number(t.monthlyRent) || 0), 0);
+    const collectedThisMonth = allPayments
+      .filter(p => p.status === 'paid' && p.paidAt?.toDate && p.paidAt.toDate().getTime() >= monthStart)
+      .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const outstanding = allInvoices
+      .filter(i => i.status === 'sent' || i.status === 'overdue')
+      .reduce((sum, i) => sum + (Number(i.total) || 0), 0);
+    return { totalUnits, activeTenants, expectedThisMonth, collectedThisMonth, outstanding };
   }
+
+  function widgetCard(title, innerHtml, size) {
+    return `<div class="dashboard-widget" data-widget-key="__KEY__" style="grid-column: span ${size === 'small' ? 1 : 4};">
+      <div class="card" style="height:100%;">
+        <div class="card-header">
+          <h3 style="font-size:${size === 'small' ? '11px' : '1.2rem'};${size === 'small' ? 'letter-spacing:0.1em;text-transform:uppercase;color:var(--slate);font-weight:500;' : 'font-weight:500;'}">${title}</h3>
+          <span class="dashboard-widget-remove hidden" onclick="removeDashboardWidget('__KEY__')" style="cursor:pointer;color:#DC2626;font-size:16px;" title="Remove">×</span>
+        </div>
+        <div class="card-body" style="${size === 'small' ? 'padding-top:0;' : ''}">${innerHtml}</div>
+      </div>
+    </div>`;
+  }
+
+  function renderWidgetHtml(key) {
+    const m = computeDashboardMetrics();
+    switch (key) {
+      case 'stat_properties':
+        return widgetCard('Total Properties', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allProperties.length}</div>`, 'small');
+      case 'stat_active_tenants':
+        return widgetCard('Active Tenants', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${m.activeTenants.length}</div>`, 'small');
+      case 'stat_pending_approvals':
+        return widgetCard('Pending Approvals', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allTenants.filter(t=>t.status==='pending').length}</div>`, 'small');
+      case 'stat_open_maintenance':
+        return widgetCard('Open Maintenance', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${allMaintenance.filter(r=>r.status==='open').length}</div>`, 'small');
+      case 'stat_occupancy': {
+        const pct = m.totalUnits > 0 ? Math.round((m.activeTenants.length / m.totalUnits) * 100) : 0;
+        return widgetCard('Occupancy Rate', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${pct}%</div><div style="font-size:11px;color:var(--slate);">${m.activeTenants.length} of ${m.totalUnits} units</div>`, 'small');
+      }
+      case 'stat_collection_rate': {
+        const pct = m.expectedThisMonth > 0 ? Math.round((m.collectedThisMonth / m.expectedThisMonth) * 100) : 0;
+        return widgetCard('Collection Rate', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">${pct}%</div><div style="font-size:11px;color:var(--slate);">$${m.collectedThisMonth.toLocaleString(undefined,{maximumFractionDigits:0})} of $${m.expectedThisMonth.toLocaleString(undefined,{maximumFractionDigits:0})} expected</div>`, 'small');
+      }
+      case 'stat_outstanding':
+        return widgetCard('Outstanding Balance', `<div style="font-size:2.2rem;font-family:'Cormorant Garamond',serif;">$${m.outstanding.toLocaleString(undefined,{maximumFractionDigits:0})}</div><div style="font-size:11px;color:var(--slate);">Across sent &amp; overdue invoices</div>`, 'small');
+
+      case 'table_pending_approvals': {
+        const rows = allTenants.filter(t => t.status === 'pending');
+        const body = rows.length
+          ? rows.map(t => `<tr><td>${t.firstName||''} ${t.lastName||''}</td><td>${t.email||''}</td><td>${allProperties.find(p=>p.id===t.propertyId)?.name||'—'}</td><td><button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success">Approve</button></td></tr>`).join('')
+          : '<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">No pending approvals.</td></tr>';
+        return widgetCard('Pending Tenant Approvals', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Property</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+      }
+      case 'table_open_maintenance': {
+        const rows = allMaintenance.filter(r => r.status === 'open').slice(0, 8);
+        const body = rows.length
+          ? rows.map(r => `<tr><td>${r.tenantName||'—'}</td><td>${r.category||''}</td><td><span class="${r.priority==='high'?'priority-high':r.priority==='medium'?'priority-medium':'priority-low'}">${r.priority||''}</span></td><td><button onclick="openMaintModal('${r.id}')" class="btn btn-sm btn-amber">Update</button></td></tr>`).join('')
+          : '<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">No open requests.</td></tr>';
+        return widgetCard('Open Maintenance Requests', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Tenant</th><th>Category</th><th>Priority</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+      }
+      case 'table_leases_expiring': {
+        const cutoff = Date.now() + 60 * 24 * 60 * 60 * 1000;
+        const rows = allTenants
+          .filter(t => t.status === 'active' && t.leaseEnd)
+          .map(t => ({ ...t, _leaseEndMs: new Date(t.leaseEnd + 'T00:00:00').getTime() }))
+          .filter(t => !isNaN(t._leaseEndMs) && t._leaseEndMs <= cutoff)
+          .sort((a,b) => a._leaseEndMs - b._leaseEndMs);
+        const body = rows.length
+          ? rows.map(t => `<tr><td>${t.firstName||''} ${t.lastName||''}</td><td>${allProperties.find(p=>p.id===t.propertyId)?.name||'—'}</td><td>${new Date(t.leaseEnd+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</td></tr>`).join('')
+          : '<tr><td colspan="3" style="text-align:center;color:var(--slate);padding:16px;">No leases expiring in the next 60 days.</td></tr>';
+        return widgetCard('Leases Expiring Soon', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Tenant</th><th>Property</th><th>Lease End</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+      }
+      case 'table_needs_setup': {
+        const rows = allProperties.filter(p => !p.country);
+        const body = rows.length
+          ? rows.map(p => `<tr><td>${p.name}</td><td>⚠️ Needs a country assigned</td><td><button onclick="switchSection('properties',document.getElementById('nav-dashboard'));editProperty('${p.id}')" class="btn btn-sm btn-outline">Fix Now</button></td></tr>`).join('')
+          : '<tr><td colspan="3" style="text-align:center;color:var(--slate);padding:16px;">✓ All properties are fully set up.</td></tr>';
+        return widgetCard('Properties Needing Setup', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Property</th><th>Issue</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
+      }
+      case 'chart_revenue_trend': {
+        const months = [];
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - i, 1));
+          months.push({ year: d.getUTCFullYear(), month: d.getUTCMonth(), label: d.toLocaleDateString('en-US',{month:'short',timeZone:'UTC'}), total: 0 });
+        }
+        allPayments.forEach(p => {
+          if (p.status !== 'paid' || !p.paidAt?.toDate) return;
+          const d = p.paidAt.toDate();
+          const bucket = months.find(mo => mo.year === d.getUTCFullYear() && mo.month === d.getUTCMonth());
+          if (bucket) bucket.total += Number(p.amount) || 0;
+        });
+        const max = Math.max(...months.map(mo => mo.total), 1);
+        const barW = 60, gap = 24, chartH = 140, svgW = months.length * (barW + gap);
+        const bars = months.map((mo, idx) => {
+          const h = Math.round((mo.total / max) * (chartH - 24));
+          const x = idx * (barW + gap) + gap / 2;
+          const y = chartH - h;
+          return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="var(--amber)" rx="2"></rect>
+            <text x="${x + barW/2}" y="${chartH + 16}" text-anchor="middle" font-size="11" fill="#6B7280">${mo.label}</text>
+            <text x="${x + barW/2}" y="${y - 6}" text-anchor="middle" font-size="10" fill="#374151">$${mo.total >= 1000 ? Math.round(mo.total/1000)+'k' : mo.total.toFixed(0)}</text>`;
+        }).join('');
+        return widgetCard('Monthly Revenue Trend', `<svg viewBox="0 0 ${svgW} ${chartH + 30}" style="width:100%;max-width:${svgW}px;height:auto;">${bars}</svg>`, 'large');
+      }
+      default:
+        return '';
+    }
+  }
+
+  function renderDashboard() {
+    const container = document.getElementById('dashboard-widgets-container');
+    if (!container) return; // dashboard tab not in DOM yet on first paint tick
+    container.innerHTML = currentDashboardLayout.map(key => renderWidgetHtml(key).replaceAll('__KEY__', key)).join('');
+    if (dashboardEditMode) {
+      container.querySelectorAll('.dashboard-widget-remove').forEach(el => el.classList.remove('hidden'));
+      if (dashboardSortable) dashboardSortable.destroy();
+      dashboardSortable = Sortable.create(container, {
+        animation: 150,
+        onEnd: () => {
+          currentDashboardLayout = Array.from(container.querySelectorAll('.dashboard-widget')).map(el => el.dataset.widgetKey);
+        },
+      });
+    } else if (dashboardSortable) {
+      dashboardSortable.destroy();
+      dashboardSortable = null;
+    }
+  }
+
+  async function loadDashboardLayout() {
+    currentDashboardLayout = (CURRENT_ADMIN?.dashboardLayoutRaw && CURRENT_ADMIN.dashboardLayoutRaw.length)
+      ? CURRENT_ADMIN.dashboardLayoutRaw.filter(key => DASHBOARD_WIDGETS[key]) // drop any keys from a future/unknown widget type
+      : [...DEFAULT_DASHBOARD_LAYOUT];
+    renderDashboard();
+  }
+
+  window.toggleDashboardEditMode = () => {
+    dashboardEditMode = !dashboardEditMode;
+    document.getElementById('dashboard-edit-bar').classList.toggle('hidden', !dashboardEditMode);
+    document.getElementById('dashboard-edit-toggle-btn').textContent = dashboardEditMode ? '✓ Done Customizing' : '🧩 Customize Dashboard';
+    renderDashboard();
+  };
+
+  window.openAddWidgetModal = () => {
+    const available = Object.entries(DASHBOARD_WIDGETS).filter(([key]) => !currentDashboardLayout.includes(key));
+    const byCategory = {};
+    available.forEach(([key, def]) => { (byCategory[def.category] = byCategory[def.category] || []).push([key, def]); });
+    const list = document.getElementById('widget-picker-list');
+    if (!available.length) {
+      list.innerHTML = '<p style="font-size:13px;color:var(--slate);text-align:center;">Every available widget is already on your dashboard.</p>';
+    } else {
+      list.innerHTML = Object.entries(byCategory).map(([cat, widgets]) => `
+        <div>
+          <p style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">${cat}</p>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${widgets.map(([key, def]) => `
+              <button onclick="addDashboardWidget('${key}')" style="text-align:left;padding:10px 12px;border:1px solid var(--border);border-radius:3px;background:#fff;cursor:pointer;">
+                <strong style="font-size:13px;">${def.label}</strong>
+                ${def.desc ? `<div style="font-size:11px;color:var(--slate);margin-top:2px;">${def.desc}</div>` : ''}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+    openModal('add-widget-modal');
+  };
+
+  window.addDashboardWidget = (key) => {
+    currentDashboardLayout.push(key);
+    closeModal('add-widget-modal');
+    renderDashboard();
+  };
+
+  window.removeDashboardWidget = (key) => {
+    currentDashboardLayout = currentDashboardLayout.filter(k => k !== key);
+    renderDashboard();
+  };
+
+  window.saveDashboardLayout = async () => {
+    const btn = document.getElementById('dashboard-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      await updateDoc(doc(db,'admins',CURRENT_ADMIN.uid), { dashboardLayout: currentDashboardLayout, updatedAt: serverTimestamp() });
+      if (CURRENT_ADMIN) CURRENT_ADMIN.dashboardLayoutRaw = currentDashboardLayout;
+    } catch (e) { alert('Could not save dashboard layout: ' + e.message); }
+    btn.disabled = false; btn.textContent = 'Save Layout';
+  };
+
+  window.resetDashboardLayout = () => {
+    if (!confirm('Reset your dashboard to the default widgets?')) return;
+    currentDashboardLayout = [...DEFAULT_DASHBOARD_LAYOUT];
+    renderDashboard();
+  };
 
   // ===== HELPERS =====
   window.openModal  = id => document.getElementById(id).classList.remove('hidden');
