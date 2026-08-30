@@ -152,6 +152,7 @@ function buildAdminEmail({ firstName, lastName, email, phone, propertyName, unit
 
 // ── Handler ──────────────────────────────────────────────────────────────────
 exports.handler = async (event) => {
+  await require('./_lib/apply-email-config')(); // load any custom email provider override before this function's existing nodemailer code runs
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' }, body: '' };
   }
