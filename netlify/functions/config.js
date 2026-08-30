@@ -9,6 +9,34 @@
  *   ALLOWED_ORIGIN  (e.g. https://your-site.netlify.app)
  */
 
+let admin;
+function getAdmin() {
+  if (!admin) {
+    admin = require('firebase-admin');
+    if (!admin.apps.length && process.env.FIREBASE_SERVICE_ACCOUNT) {
+      admin.initializeApp({
+        credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+      });
+    }
+  }
+  return admin;
+}
+
+// If a Super Admin has configured a custom Cloudinary account via
+// manage-integrations.js, prefer it over the environment variable default.
+// Fails silently to the env var on any error — a lookup hiccup here should
+// never break the whole config endpoint.
+async function getCloudinaryCloudName() {
+  try {
+    const a = getAdmin();
+    if (!a.apps.length) return process.env.CLOUDINARY_CLOUD_NAME || null;
+    const snap = await a.firestore().collection('integrationSecrets').doc('storage').get();
+    if (snap.exists && snap.data().cloudName) return snap.data().cloudName;
+  } catch (err) {
+    console.warn('config.js: could not check storage override, using env var:', err.message);
+  }
+  return process.env.CLOUDINARY_CLOUD_NAME || null;
+}
 
 exports.handler = async (event) => {
   // ── Origin check ────────────────────────────────────────────────────────────
@@ -43,6 +71,7 @@ exports.handler = async (event) => {
   }
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
+  const cloudinaryCloud = await getCloudinaryCloudName();
 
   return {
     statusCode: 200,
@@ -61,7 +90,7 @@ exports.handler = async (event) => {
         appId:             process.env.FIREBASE_APP_ID,
       },
       stripePk:         process.env.STRIPE_PUBLISHABLE_KEY,
-      cloudinaryCloud:  process.env.CLOUDINARY_CLOUD_NAME    || null,
+      cloudinaryCloud,
       cloudinaryPreset: process.env.CLOUDINARY_UPLOAD_PRESET || null,
     }),
   };
