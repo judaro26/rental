@@ -1109,9 +1109,19 @@
 <!-- PROPERTY MODAL -->
 <div id="property-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('property-modal')"></div>
-  <div style="background:#fff;width:100%;max-width:480px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
-    <button onclick="closeModal('property-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:24px;" id="prop-modal-title" data-i18n="properties.modalAddTitle">Add Property</h3>
+  <div style="background:#fff;width:100%;max-width:960px;max-height:92vh;border-radius:4px;box-shadow:0 24px 64px rgba(26,26,46,0.25);position:relative;z-index:1;display:flex;flex-direction:column;overflow:hidden;">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 28px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <h3 style="font-size:1.6rem;font-weight:400;margin:0;" id="prop-modal-title" data-i18n="properties.modalAddTitle">Add Property</h3>
+      <button onclick="closeModal('property-modal')" style="display:flex;align-items:center;gap:6px;background:#F3F4F6;border:none;padding:9px 18px;border-radius:4px;cursor:pointer;font-size:13px;color:#374151;font-weight:500;flex-shrink:0;">
+        ✕ <span data-i18n="common.close">Close</span>
+      </button>
+    </div>
+    <p style="font-size:12px;color:var(--slate);padding:10px 28px 0;margin:0;flex-shrink:0;" data-i18n="properties.closeHint">
+      You can close this anytime — click "Close" above, click outside this box, or press the Escape key. Nothing is saved until you click "Save Property" below.
+    </p>
+
+    <div style="padding:20px 28px;overflow-y:auto;flex:1;">
     <input type="hidden" id="prop-id">
     <div id="prop-alert" class="hidden alert"></div>
     <div class="grid grid-cols-2 gap-4">
@@ -1181,10 +1191,11 @@
       <button type="button" onclick="addReminderRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Reminder</button>
       <button type="button" onclick="savePropertyReminders()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-reminders-save-btn">Save Reminders</button>
     </div>
+    </div>
 
-    <div style="display:flex;gap:10px;margin-top:20px;">
+    <div style="display:flex;gap:10px;padding:16px 28px;border-top:1px solid var(--border);flex-shrink:0;">
       <button onclick="saveProperty()" class="btn btn-primary" style="flex:1;" id="prop-save-btn">Save Property</button>
-      <button onclick="closeModal('property-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="closeModal('property-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1552,7 +1563,8 @@
       'dashboard.pendingTenantApprovals':'Pending Tenant Approvals', 'dashboard.openMaintenance':'Open Maintenance',
       'common.name':'Name', 'common.email':'Email', 'common.property':'Property', 'common.action':'Action',
       'common.actions':'Actions', 'common.tenant':'Tenant', 'common.category':'Category', 'common.priority':'Priority',
-      'common.save':'Save', 'common.cancel':'Cancel', 'common.edit':'Edit', 'common.delete':'Delete',
+      'common.save':'Save', 'common.cancel':'Cancel', 'common.edit':'Edit', 'common.delete':'Delete', 'common.close':'Close',
+      'properties.closeHint':'You can close this anytime — click "Close" above, click outside this box, or press the Escape key. Nothing is saved until you click "Save Property" below.',
       'properties.title':'Manage Properties', 'properties.add':'+ Add Property', 'properties.country':'Country *',
       'properties.address':'Address *', 'properties.units':'Units', 'properties.available':'Available',
       'properties.imageUrl':'Image URL', 'properties.modalAddTitle':'Add Property', 'properties.modalEditTitle':'Edit Property',
@@ -1582,7 +1594,8 @@
       'dashboard.pendingTenantApprovals':'Aprobaciones de Inquilinos Pendientes', 'dashboard.openMaintenance':'Mantenimiento Abierto',
       'common.name':'Nombre', 'common.email':'Correo', 'common.property':'Propiedad', 'common.action':'Acción',
       'common.actions':'Acciones', 'common.tenant':'Inquilino', 'common.category':'Categoría', 'common.priority':'Prioridad',
-      'common.save':'Guardar', 'common.cancel':'Cancelar', 'common.edit':'Editar', 'common.delete':'Eliminar',
+      'common.save':'Guardar', 'common.cancel':'Cancelar', 'common.edit':'Editar', 'common.delete':'Eliminar', 'common.close':'Cerrar',
+      'properties.closeHint':'Puedes cerrar esto en cualquier momento — haz clic en "Cerrar" arriba, haz clic fuera de este cuadro, o presiona la tecla Escape. Nada se guarda hasta que hagas clic en "Guardar Propiedad" abajo.',
       'properties.title':'Administrar Propiedades', 'properties.add':'+ Agregar Propiedad', 'properties.country':'País *',
       'properties.address':'Dirección *', 'properties.units':'Unidades', 'properties.available':'Disponible',
       'properties.imageUrl':'URL de Imagen', 'properties.modalAddTitle':'Agregar Propiedad', 'properties.modalEditTitle':'Editar Propiedad',
@@ -3388,6 +3401,16 @@
   // ===== HELPERS =====
   window.openModal  = id => document.getElementById(id).classList.remove('hidden');
   window.closeModal = id => document.getElementById(id).classList.add('hidden');
+
+  // Escape closes whichever modal is currently open. Every modal in this
+  // file consistently ends its id in "-modal", so this works for all of
+  // them without needing a per-modal listener.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('[id$="-modal"]').forEach(el => {
+      if (!el.classList.contains('hidden')) el.classList.add('hidden');
+    });
+  });
   function showAlert(elId, msg, type='error') {
     const el = document.getElementById(elId); if (!el) return;
     el.className=`alert alert-${type}`; el.textContent=msg; el.classList.remove('hidden');
