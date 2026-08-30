@@ -226,12 +226,15 @@
       <div class="card">
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;" data-i18n="properties.title">Manage Properties</h3>
-          <button onclick="openPropertyModal()" class="btn btn-primary btn-sm" data-i18n="properties.add">+ Add Property</button>
+          <div style="display:flex;gap:10px;align-items:center;">
+            <input type="text" id="property-search" class="form-input" style="width:220px;" placeholder="Search by name, address, city..." oninput="filterProperties()">
+            <button onclick="openPropertyModal()" class="btn btn-primary btn-sm" data-i18n="properties.add">+ Add Property</button>
+          </div>
         </div>
         <div id="country-coverage-banner" class="hidden" style="margin:0 20px 16px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:12px 16px;font-size:12px;color:#92400E;"></div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th data-i18n="common.name">Name</th><th data-i18n="properties.country">Country</th><th data-i18n="properties.address">Address</th><th data-i18n="properties.units">Units</th><th data-i18n="properties.available">Available</th><th data-i18n="properties.imageUrl">Image URL</th><th data-i18n="common.actions">Actions</th></tr></thead>
+            <thead><tr><th></th><th data-i18n="common.name">Name</th><th data-i18n="properties.country">Country</th><th data-i18n="properties.address">Address</th><th data-i18n="properties.units">Units</th><th data-i18n="properties.available">Available</th><th data-i18n="common.actions">Actions</th></tr></thead>
             <tbody id="properties-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
@@ -1727,22 +1730,38 @@
     el.classList.remove('hidden');
     el.innerHTML = `⚠️ <strong>${missing} propert${missing===1?'y needs':'ies need'} a country assigned</strong> — until set, ${missing===1?'it is':'they are'} shown to visitors from both the US and Colombia on the public site. Use the dropdown in the table below to fix ${missing===1?'it':'them'} quickly.`;
   }
-  function renderPropertiesTable() {
+  function renderPropertiesTable(list) {
+    const properties = list || allProperties;
     const tbody = document.getElementById('properties-tbody');
     if (!allProperties.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No properties yet.</td></tr>'; return; }
-    tbody.innerHTML = allProperties.map(p => `<tr>
+    if (!properties.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No properties match your search.</td></tr>'; return; }
+    tbody.innerHTML = properties.map(p => {
+      const thumbUrl = (p.imageUrls && p.imageUrls[0]) || p.imageUrl || '';
+      const thumb = `<div style="width:52px;height:52px;position:relative;">
+          <img src="${thumbUrl}" alt="${p.name}" style="width:52px;height:52px;object-fit:cover;border-radius:3px;border:1px solid var(--border);display:${thumbUrl ? 'block' : 'none'};" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+          <div style="display:${thumbUrl ? 'none' : 'flex'};width:52px;height:52px;border-radius:3px;background:#F3F4F6;align-items:center;justify-content:center;font-size:18px;position:absolute;top:0;left:0;">🏠</div>
+        </div>`;
+      return `<tr>
+      <td>${thumb}</td>
       <td><strong>${p.name}</strong></td>
       <td>${countryCell(p)}</td>
       <td style="font-size:12px;">${p.address||'—'}</td>
       <td>${p.units||'—'}</td>
       <td><span class="badge ${p.available ? 'badge-active' : 'badge-pending'}">${p.available ? 'Available' : 'Hidden'}</span></td>
-      <td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--slate);">${(p.imageUrls||[]).join(', ')||p.imageUrl||'—'}</td>
       <td>
         <button onclick="editProperty('${p.id}')" class="btn btn-sm btn-outline" style="margin-right:6px;">Edit</button>
         <button onclick="deleteProperty('${p.id}')" class="btn btn-sm btn-danger">Delete</button>
       </td>
-    </tr>`).join('');
+    </tr>`;
+    }).join('');
   }
+  window.filterProperties = () => {
+    const q = document.getElementById('property-search').value.toLowerCase().trim();
+    if (!q) { renderPropertiesTable(); return; }
+    renderPropertiesTable(allProperties.filter(p =>
+      `${p.name||''} ${p.address||''} ${p.city||''} ${p.state||''} ${p.zip||''}`.toLowerCase().includes(q)
+    ));
+  };
   function populatePropertySelects() {
     const opts = allProperties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     ['edit-property','ann-property'].forEach(id => {
@@ -2669,18 +2688,6 @@
       const el = document.getElementById(id); if (!el) return;
       el.innerHTML = '<option value="">Select tenant...</option>' + opts;
     });
-    const pending = allTenants.filter(t=>t.status==='pending');
-    const tbody = document.getElementById('pending-tenants-tbody');
-    if (!pending.length) { tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">No pending approvals</td></tr>'; return; }
-    tbody.innerHTML = pending.map(t=>`<tr>
-      <td>${t.firstName||''} ${t.lastName||''}</td>
-      <td style="font-size:12px;">${t.email||''}</td>
-      <td style="font-size:12px;">${t.propertyName||'—'} / ${t.unit||'—'}</td>
-      <td>
-        <button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success" style="margin-right:4px;">Approve</button>
-        <button onclick="openEditTenant('${t.id}')" class="btn btn-sm btn-outline">Setup</button>
-      </td>
-    </tr>`).join('');
   }
 
   // ===== PAYMENTS =====
@@ -3057,14 +3064,6 @@
     const snap = await getDocs(query(collection(db,'maintenanceRequests'), orderBy('createdAt','desc')));
     allMaintenance = scopeByCountry(snap.docs.map(d=>({ id:d.id, ...d.data() })));
     renderMaintenanceTable(allMaintenance);
-    const openMaint = allMaintenance.filter(r=>r.status==='open');
-    const tbody = document.getElementById('open-maint-tbody');
-    if (!openMaint.length) { tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:20px;">No open requests</td></tr>'; return; }
-    tbody.innerHTML = openMaint.slice(0,5).map(r=>`<tr>
-      <td>${r.tenantName||'—'}</td><td>${r.category}</td>
-      <td><span class="${r.priority==='high'?'priority-high':r.priority==='medium'?'priority-medium':'priority-low'}">${r.priority}</span></td>
-      <td><button onclick="openMaintModal('${r.id}')" class="btn btn-sm btn-amber">Update</button></td>
-    </tr>`).join('');
   }
   function renderMaintenanceTable(items) {
     const tbody = document.getElementById('maintenance-tbody');
@@ -3243,7 +3242,7 @@
       case 'table_pending_approvals': {
         const rows = allTenants.filter(t => t.status === 'pending');
         const body = rows.length
-          ? rows.map(t => `<tr><td>${t.firstName||''} ${t.lastName||''}</td><td>${t.email||''}</td><td>${allProperties.find(p=>p.id===t.propertyId)?.name||'—'}</td><td><button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success">Approve</button></td></tr>`).join('')
+          ? rows.map(t => `<tr><td>${t.firstName||''} ${t.lastName||''}</td><td style="font-size:12px;">${t.email||''}</td><td style="font-size:12px;">${t.propertyName||allProperties.find(p=>p.id===t.propertyId)?.name||'—'} / ${t.unit||'—'}</td><td><button onclick="approveTenant('${t.id}')" class="btn btn-sm btn-success" style="margin-right:4px;">Approve</button><button onclick="openEditTenant('${t.id}')" class="btn btn-sm btn-outline">Setup</button></td></tr>`).join('')
           : '<tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">No pending approvals.</td></tr>';
         return widgetCard('Pending Tenant Approvals', `<div style="overflow-x:auto;"><table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Property</th><th>Action</th></tr></thead><tbody>${body}</tbody></table></div>`, 'large');
       }
