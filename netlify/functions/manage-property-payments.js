@@ -115,22 +115,33 @@ exports.handler = async (event) => {
 
       const existing = await secretRef.get();
       const existingSecretKey = existing.exists ? existing.data().bold?.secretKey : null;
+      const isEnabled = enabled !== undefined ? !!enabled : true;
 
       await secretRef.set({
         bold: {
           apiKey,
           secretKey: secretKey ? secretKey : existingSecretKey, // blank on update = keep existing
-          enabled: enabled !== undefined ? !!enabled : true,
+          enabled: isEnabled,
           updatedAt: a.firestore.FieldValue.serverTimestamp(),
           updatedBy: caller.email,
         },
       }, { merge: true });
+
+      // Public, non-secret mirror on the property itself — properties are
+      // publicly readable by design, so only a plain availability boolean
+      // goes here, never the credentials. Lets tenant-portal.html check
+      // "can I pay this property via Bold" without any access to the
+      // locked propertyPaymentSecrets collection.
+      await db.collection('properties').doc(propertyId).update({
+        boldPaymentsEnabled: isEnabled,
+      });
 
       return { statusCode: 200, body: JSON.stringify({ success: true }) };
     }
 
     if (action === 'clear_bold') {
       await secretRef.set({ bold: a.firestore.FieldValue.delete() }, { merge: true });
+      await db.collection('properties').doc(propertyId).update({ boldPaymentsEnabled: false });
       return { statusCode: 200, body: JSON.stringify({ success: true }) };
     }
 
