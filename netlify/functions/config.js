@@ -30,8 +30,13 @@ async function getCloudinaryCloudName() {
   try {
     const a = getAdmin();
     if (!a.apps.length) return process.env.CLOUDINARY_CLOUD_NAME || null;
-    const snap = await a.firestore().collection('integrationSecrets').doc('storage').get();
-    if (snap.exists && snap.data().cloudName) return snap.data().cloudName;
+    const db = a.firestore();
+    const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
+    const activeId = activeSnap.exists ? activeSnap.data().storage : null;
+    if (activeId) {
+      const snap = await db.collection('integrationSecrets').doc(activeId).get();
+      if (snap.exists && snap.data().cloudName) return snap.data().cloudName;
+    }
   } catch (err) {
     console.warn('config.js: could not check storage override, using env var:', err.message);
   }
