@@ -7,6 +7,7 @@
 const nodemailer = require('nodemailer');
 
 exports.handler = async (event) => {
+  await require('./_lib/apply-email-config')(); // load any custom email provider override before this function's existing nodemailer code runs
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
