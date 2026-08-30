@@ -1152,6 +1152,25 @@
         </div>
       </div>
     </div>
+
+    <div id="prop-bold-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">💳 Bold Payment Settings</h4>
+      <p id="prop-bold-status" style="font-size:12px;color:var(--slate);margin-bottom:12px;">Loading status...</p>
+      <div id="prop-bold-alert" class="hidden alert" style="margin-bottom:12px;"></div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div><label class="label">API Key</label><input type="text" id="prop-bold-apikey" class="form-input" placeholder="Your Bold integration key"></div>
+        <div><label class="label">Secret Key <span id="prop-bold-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="prop-bold-secret" class="form-input" placeholder="Your Bold webhook signing key"></div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" id="prop-bold-enabled" style="width:16px;height:16px;"> Accept Bold payments for this property
+        </label>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
+        <button type="button" onclick="savePropertyBold()" class="btn btn-primary btn-sm" id="prop-bold-save-btn">Save Bold Settings</button>
+        <button type="button" onclick="clearPropertyBold()" class="btn btn-sm" style="background:none;color:var(--slate);">Remove</button>
+      </div>
+      <p style="font-size:11px;color:var(--slate);margin-top:10px;">Get these from your own Bold merchant account (<a href="https://developers.bold.co/pagos-en-linea/llaves-de-integracion" target="_blank" rel="noopener" style="color:var(--amber);">developers.bold.co</a>). Payments settle directly to your Bold account, not through this platform.</p>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:20px;">
       <button onclick="saveProperty()" class="btn btn-primary" style="flex:1;" id="prop-save-btn">Save Property</button>
       <button onclick="closeModal('property-modal')" class="btn btn-outline">Cancel</button>
@@ -1768,6 +1787,7 @@
     document.getElementById('prop-alert').classList.add('hidden');
     applyCountryLockToModal();
     renderImageRows([]);
+    document.getElementById('prop-bold-section').classList.add('hidden'); // needs a saved property first
     openModal('property-modal');
   };
   window.editProperty = id => {
@@ -1788,6 +1808,8 @@
     applyCountryLockToModal();
     const imgs = p.imageUrls || (p.imageUrl ? [p.imageUrl] : []);
     renderImageRows(imgs);
+    document.getElementById('prop-bold-section').classList.remove('hidden');
+    loadPropertyBoldStatus(id);
     openModal('property-modal');
   };
   window.saveProperty = async () => {
@@ -4733,6 +4755,71 @@
   // through our own functions, so there's no size limit to worry about).
   // Reuses the exact same /api/sign-cloudinary-upload contract as the
   // tenant portal's maintenance-photo upload — one upload mechanism, not two.
+  // ===== BOLD PAYMENT SETTINGS (self-serve, per-property) =====
+  async function callManagePropertyPayments(action, payload) {
+    const idToken = await auth.currentUser.getIdToken();
+    const res = await fetch('/api/manage-property-payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify({ action, ...payload }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  async function loadPropertyBoldStatus(propertyId) {
+    const statusEl = document.getElementById('prop-bold-status');
+    statusEl.textContent = 'Loading status...';
+    try {
+      const result = await callManagePropertyPayments('get_status', { propertyId });
+      const bold = result.bold;
+      document.getElementById('prop-bold-enabled').checked = !!bold.enabled;
+      document.getElementById('prop-bold-apikey').value = ''; // write-only, never pre-filled
+      document.getElementById('prop-bold-secret').value = '';
+      if (bold.configured) {
+        document.getElementById('prop-bold-secret-hint').textContent = `(leave blank to keep current: ${bold.secretKeyMasked || '••••'})`;
+        statusEl.textContent = `Configured (API key ${bold.apiKeyMasked || '••••'}). ${bold.enabled ? 'Currently accepting Bold payments.' : 'Currently disabled.'} Last updated ${bold.updatedAt ? new Date(bold.updatedAt).toLocaleString() : '—'} by ${bold.updatedBy || 'unknown'}.`;
+      } else {
+        document.getElementById('prop-bold-secret-hint').textContent = '';
+        statusEl.textContent = 'Not configured yet — this property will not show a Bold payment option to tenants.';
+      }
+    } catch (e) {
+      statusEl.textContent = '';
+      showAlert('prop-bold-alert', 'Could not load status: ' + e.message);
+    }
+  }
+
+  window.savePropertyBold = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    const btn = document.getElementById('prop-bold-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      await callManagePropertyPayments('set_bold', {
+        propertyId,
+        apiKey: document.getElementById('prop-bold-apikey').value.trim(),
+        secretKey: document.getElementById('prop-bold-secret').value, // blank = keep existing
+        enabled: document.getElementById('prop-bold-enabled').checked,
+      });
+      logAdminAction('bold_payments_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name);
+      showAlert('prop-bold-alert', 'Bold settings saved.', 'success');
+      await loadPropertyBoldStatus(propertyId);
+    } catch (e) { showAlert('prop-bold-alert', e.message); }
+    btn.disabled = false; btn.textContent = 'Save Bold Settings';
+  };
+
+  window.clearPropertyBold = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    if (!confirm('Remove Bold payment settings for this property? Tenants will no longer see a Bold payment option.')) return;
+    try {
+      await callManagePropertyPayments('clear_bold', { propertyId });
+      logAdminAction('bold_payments_removed', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name);
+      showAlert('prop-bold-alert', 'Bold settings removed.', 'success');
+      await loadPropertyBoldStatus(propertyId);
+    } catch (e) { showAlert('prop-bold-alert', e.message); }
+  };
+
   window.handlePropertyImageUpload = async (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
