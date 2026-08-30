@@ -38,11 +38,16 @@ function getAdmin() {
 async function getCloudinaryCredentials() {
   try {
     const a = getAdmin();
-    const snap = await a.firestore().collection('integrationSecrets').doc('storage').get();
-    if (snap.exists) {
-      const d = snap.data();
-      if (d.cloudName && d.apiKey && d.apiSecret) {
-        return { cloudName: d.cloudName, apiKey: d.apiKey, apiSecret: d.apiSecret };
+    const db = a.firestore();
+    const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
+    const activeId = activeSnap.exists ? activeSnap.data().storage : null;
+    if (activeId) {
+      const snap = await db.collection('integrationSecrets').doc(activeId).get();
+      if (snap.exists) {
+        const d = snap.data();
+        if (d.cloudName && d.apiKey && d.apiSecret) {
+          return { cloudName: d.cloudName, apiKey: d.apiKey, apiSecret: d.apiSecret };
+        }
       }
     }
   } catch (err) {
@@ -97,4 +102,3 @@ exports.handler = async (event) => {
     body: JSON.stringify({ signature, timestamp, apiKey: creds.apiKey }),
   };
 };
-
