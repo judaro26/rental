@@ -881,7 +881,10 @@
             <div><label class="label">API Key</label><input type="text" id="int-storage-key" class="form-input" placeholder="123456789012345"></div>
             <div><label class="label">API Secret <span id="storage-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-storage-secret" class="form-input" placeholder="••••••••"></div>
           </div>
-          <button onclick="saveStorageProvider()" class="btn btn-primary" style="width:100%;margin-top:22px;" id="storage-int-save-btn">Save</button>
+          <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;">
+            <button onclick="saveStorageProvider()" class="btn btn-primary" style="flex:1;" id="storage-int-save-btn">Save</button>
+            <button onclick="testStorageIntegration()" class="btn btn-outline" id="storage-int-test-btn">Test Connection</button>
+          </div>
         </div>
       </div>
     </section>
@@ -1166,8 +1169,10 @@
       </div>
       <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
         <button type="button" onclick="savePropertyBold()" class="btn btn-primary btn-sm" id="prop-bold-save-btn">Save Bold Settings</button>
+        <button type="button" onclick="testPropertyBold()" class="btn btn-outline btn-sm" id="prop-bold-test-btn">Test Connection</button>
         <button type="button" onclick="clearPropertyBold()" class="btn btn-sm" style="background:none;color:var(--slate);">Remove</button>
       </div>
+      <div id="prop-bold-test-result" style="font-size:12px;margin-top:8px;"></div>
       <p style="font-size:11px;color:var(--slate);margin-top:10px;">Get these from your own Bold merchant account (<a href="https://developers.bold.co/pagos-en-linea/llaves-de-integracion" target="_blank" rel="noopener" style="color:var(--amber);">developers.bold.co</a>). Payments settle directly to your Bold account, not through this platform.</p>
     </div>
 
@@ -4144,14 +4149,34 @@
         ${type === 'email' ? `<td style="font-size:12px;">${p.provider}</td>` : ''}
         ${middleCell}
         <td>${statusBadge}</td>
-        <td><div style="display:flex;gap:6px;flex-wrap:wrap;">
-          ${!p.isActive ? `<button onclick="setActiveProvider('${p.id}','${type}')" class="btn btn-sm btn-outline">Set Active</button>` : ''}
-          <button onclick="${openFn}('${p.id}')" class="btn btn-sm btn-outline">Edit</button>
-          <button onclick="removeProvider('${p.id}','${type}')" class="btn btn-sm btn-danger">Remove</button>
-        </div></td>
+        <td>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${!p.isActive ? `<button onclick="setActiveProvider('${p.id}','${type}')" class="btn btn-sm btn-outline">Set Active</button>` : ''}
+            <button onclick="testSavedProvider('${p.id}','${type}',this)" class="btn btn-sm btn-outline">Test</button>
+            <button onclick="${openFn}('${p.id}')" class="btn btn-sm btn-outline">Edit</button>
+            <button onclick="removeProvider('${p.id}','${type}')" class="btn btn-sm btn-danger">Remove</button>
+          </div>
+          <div class="provider-test-result" style="font-size:11px;margin-top:4px;"></div>
+        </td>
       </tr>`;
     }).join('');
   }
+
+  window.testSavedProvider = async (id, type, btnEl) => {
+    const resultEl = btnEl.closest('td').querySelector('.provider-test-result');
+    btnEl.disabled = true;
+    const original = btnEl.textContent; btnEl.textContent = 'Testing...';
+    resultEl.textContent = '';
+    try {
+      const result = await callManageIntegrations(type === 'email' ? 'test_email' : 'test_storage', { id });
+      resultEl.style.color = '#16A34A';
+      resultEl.textContent = '✓ ' + (result.message || `Test email sent to ${result.sentTo}.`);
+    } catch (e) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = '✗ ' + e.message;
+    }
+    btnEl.disabled = false; btnEl.textContent = original;
+  };
 
   window.setActiveProvider = async (id, type) => {
     try {
@@ -4187,7 +4212,7 @@
     document.getElementById('email-pass-hint').textContent = p ? `(leave blank to keep current: ${p.passMasked || '••••'})` : '';
     document.getElementById('email-provider-modal-title').textContent = p ? 'Edit Email Provider' : 'Add Email Provider';
     document.getElementById('email-provider-modal-alert').classList.add('hidden');
-    document.getElementById('email-int-test-btn').style.display = p ? '' : 'none'; // can't test before it's saved once
+    document.getElementById('email-int-test-btn').style.display = ''; // now works even before the first save
     openModal('email-provider-modal');
   };
   window.saveEmailProvider = async () => {
@@ -4212,10 +4237,17 @@
   };
   window.testEmailIntegration = async () => {
     const id = document.getElementById('int-email-id').value;
-    const btn = document.getElementById('email-int-test-btn'); btn.disabled = true; btn.textContent = 'Sending...';
+    const btn = document.getElementById('email-int-test-btn'); btn.disabled = true; btn.textContent = 'Testing...';
     try {
-      const result = await callManageIntegrations('test_email', id ? { id } : {});
-      showAlert('email-provider-modal-alert', `Test email sent to ${result.sentTo}. Check your inbox.`, 'success');
+      const result = await callManageIntegrations('test_email', {
+        id: id || undefined,
+        host: document.getElementById('int-email-host').value.trim(),
+        user: document.getElementById('int-email-user').value.trim(),
+        pass: document.getElementById('int-email-pass').value,
+        port: document.getElementById('int-email-port').value.trim(),
+        fromAddress: document.getElementById('int-email-from').value.trim(),
+      });
+      showAlert('email-provider-modal-alert', `✓ Test email sent to ${result.sentTo}. Check your inbox.`, 'success');
     } catch (e) { showAlert('email-provider-modal-alert', 'Test failed: ' + e.message); }
     btn.disabled = false; btn.textContent = 'Send Test';
   };
@@ -4249,6 +4281,20 @@
       await loadIntegrationsStatus();
     } catch (e) { showAlert('storage-provider-modal-alert', e.message); }
     btn.disabled = false; btn.textContent = 'Save';
+  };
+  window.testStorageIntegration = async () => {
+    const id = document.getElementById('int-storage-id').value;
+    const btn = document.getElementById('storage-int-test-btn'); btn.disabled = true; btn.textContent = 'Testing...';
+    try {
+      const result = await callManageIntegrations('test_storage', {
+        id: id || undefined,
+        cloudName: document.getElementById('int-storage-cloud').value.trim(),
+        apiKey: document.getElementById('int-storage-key').value.trim(),
+        apiSecret: document.getElementById('int-storage-secret').value,
+      });
+      showAlert('storage-provider-modal-alert', '✓ ' + result.message, 'success');
+    } catch (e) { showAlert('storage-provider-modal-alert', 'Test failed: ' + e.message); }
+    btn.disabled = false; btn.textContent = 'Test Connection';
   };
   // ===== PAGE BUILDER (Super Admin only — landing page layout) =====
   let currentLayout = []; // in-memory working copy; only written to Firestore on Save
@@ -4771,6 +4817,7 @@
   async function loadPropertyBoldStatus(propertyId) {
     const statusEl = document.getElementById('prop-bold-status');
     statusEl.textContent = 'Loading status...';
+    document.getElementById('prop-bold-test-result').textContent = '';
     try {
       const result = await callManagePropertyPayments('get_status', { propertyId });
       const bold = result.bold;
@@ -4806,6 +4853,27 @@
       await loadPropertyBoldStatus(propertyId);
     } catch (e) { showAlert('prop-bold-alert', e.message); }
     btn.disabled = false; btn.textContent = 'Save Bold Settings';
+  };
+
+  window.testPropertyBold = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    const btn = document.getElementById('prop-bold-test-btn');
+    const resultEl = document.getElementById('prop-bold-test-result');
+    btn.disabled = true; btn.textContent = 'Testing...';
+    resultEl.textContent = '';
+    try {
+      const result = await callManagePropertyPayments('test_bold', {
+        propertyId,
+        apiKey: document.getElementById('prop-bold-apikey').value.trim(),
+      });
+      resultEl.style.color = '#16A34A';
+      resultEl.textContent = '✓ ' + result.message;
+    } catch (e) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = '✗ ' + e.message;
+    }
+    btn.disabled = false; btn.textContent = 'Test Connection';
   };
 
   window.clearPropertyBold = async () => {
