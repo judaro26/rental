@@ -62,12 +62,37 @@ exports.handler = async (event) => {
           return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
     }
 
-    const apiKey = process.env.DOCUMENSO_API_KEY;
-    if (!apiKey) {
-          return { statusCode: 400, body: JSON.stringify({ error: 'Documenso is not configured. Set DOCUMENSO_API_KEY in your Netlify environment.' }) };
+    const a = getAdmin();
+    const db = a.firestore();
+
+    // Resolve Documenso credentials: a saved integration (Settings →
+    // Integrations) takes priority over the environment variables, which
+    // remain the fallback if nothing is configured there — same
+    // override-with-fallback pattern as email/storage.
+    let apiKey = process.env.DOCUMENSO_API_KEY;
+    let apiUrl = (process.env.DOCUMENSO_API_URL || 'https://app.documenso.com/api/v2').replace(/\/+$/, '');
+    let appUrl = (process.env.DOCUMENSO_APP_URL || 'https://app.documenso.com').replace(/\/+$/, '');
+    let envDefaultTemplateId = process.env.DOCUMENSO_TEMPLATE_ID;
+    try {
+          const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
+          const activeId = activeSnap.exists ? activeSnap.data().envelope : null;
+          if (activeId) {
+                  const snap = await db.collection('integrationSecrets').doc(activeId).get();
+                  if (snap.exists) {
+                          const d = snap.data();
+                          if (d.apiKey) apiKey = d.apiKey;
+                          if (d.apiUrl) apiUrl = d.apiUrl;
+                          if (d.appUrl) appUrl = d.appUrl;
+                          if (d.templateId) envDefaultTemplateId = d.templateId;
+                  }
+          }
+    } catch (err) {
+          console.warn('generate-lease: could not check envelope override, using env vars:', err.message);
     }
-    const apiUrl = (process.env.DOCUMENSO_API_URL || 'https://app.documenso.com/api/v2').replace(/\/+$/, '');
-    const appUrl = (process.env.DOCUMENSO_APP_URL || 'https://app.documenso.com').replace(/\/+$/, '');
+
+    if (!apiKey) {
+          return { statusCode: 400, body: JSON.stringify({ error: 'Documenso is not configured. Set it up under Settings → Integrations, or set DOCUMENSO_API_KEY in your Netlify environment.' }) };
+    }
 
     let body;
     try { body = JSON.parse(event.body); }
@@ -75,9 +100,6 @@ exports.handler = async (event) => {
 
     const { applicationId, terms = {}, siteName } = body;
     if (!applicationId) return { statusCode: 400, body: JSON.stringify({ error: 'applicationId is required.' }) };
-
-    const a = getAdmin();
-    const db = a.firestore();
 
     try {
           const ref = db.collection('applications').doc(applicationId);
@@ -92,8 +114,8 @@ exports.handler = async (event) => {
                   try { const p = await db.collection('properties').doc(app.propertyId).get(); if (p.exists) prop = p.data(); } catch {}
           }
 
-      const templateId = prop.documensoTemplateId || process.env.DOCUMENSO_TEMPLATE_ID;
-          if (!templateId) return { statusCode: 400, body: JSON.stringify({ error: 'No Documenso template configured. Set DOCUMENSO_TEMPLATE_ID (or a per-property documensoTemplateId).' }) };
+      const templateId = prop.documensoTemplateId || envDefaultTemplateId;
+          if (!templateId) return { statusCode: 400, body: JSON.stringify({ error: 'No Documenso template configured. Set a default under Settings → Integrations (or a per-property documensoTemplateId).' }) };
 
       // Landlord identity: terms → site settings → admin email.
       let siteEmail = '', resolvedSiteName = siteName;
