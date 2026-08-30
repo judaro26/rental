@@ -31,6 +31,7 @@ function esc(s) {
 }
 
 exports.handler = async () => {
+  await require('./_lib/apply-email-config')(); // load any custom email provider override before this function's existing nodemailer code runs
   const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
   if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.SMTP_HOST || !adminEmail) {
     console.warn('purge-summary-report: missing FIREBASE_SERVICE_ACCOUNT / SMTP_HOST / ADMIN_NOTIFY_EMAIL — skipping.');
