@@ -194,7 +194,7 @@
     </div>
     <div style="display:flex;gap:8px;">
       <button onclick="openSitePreview()" style="font-size:12px;color:var(--slate);" class="btn btn-sm btn-outline">👁 Quick Preview</button>
-      <a href="/index.html" target="_blank" rel="noopener" style="font-size:12px;color:var(--slate);text-decoration:none;" class="btn btn-sm btn-outline">↗ View Site</a>
+      <a href="/index.html?preview=1" target="_blank" rel="noopener" style="font-size:12px;color:var(--slate);text-decoration:none;" class="btn btn-sm btn-outline">↗ View Site</a>
     </div>
   </div>
 
@@ -206,7 +206,7 @@
         <h3 style="font-size:1rem;font-weight:500;margin:0;">👁 Site Preview</h3>
         <div style="display:flex;gap:8px;">
           <button onclick="document.getElementById('site-preview-frame').src=document.getElementById('site-preview-frame').src;" class="btn btn-sm btn-outline">↻ Refresh</button>
-          <a href="/index.html" target="_blank" rel="noopener" class="btn btn-sm btn-outline">↗ Open in New Tab</a>
+          <a href="/index.html?preview=1" target="_blank" rel="noopener" class="btn btn-sm btn-outline">↗ Open in New Tab</a>
           <button onclick="closeModal('site-preview-modal')" style="background:#F3F4F6;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;color:#374151;font-weight:500;">✕ Close</button>
         </div>
       </div>
@@ -3741,7 +3741,7 @@
   window.openModal  = id => document.getElementById(id).classList.remove('hidden');
   window.closeModal = id => document.getElementById(id).classList.add('hidden');
   window.openSitePreview = () => {
-    document.getElementById('site-preview-frame').src = '/index.html'; // fresh load each time, not a stale cached one
+    document.getElementById('site-preview-frame').src = '/index.html?preview=1'; // fresh load each time, not a stale cached one; preview=1 stops index.html's own auto-redirect-to-admin logic from firing since we're already an authenticated admin
     openModal('site-preview-modal');
   };
 
