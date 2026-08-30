@@ -73,6 +73,9 @@ function maskProvider(id, d, activeId) {
   if (d.type === 'storage') {
     return { ...base, provider: 'cloudinary', cloudName: d.cloudName, apiKey: d.apiKey, apiSecretMasked: mask(d.apiSecret) };
   }
+  if (d.type === 'envelope') {
+    return { ...base, provider: 'documenso', apiUrl: d.apiUrl, appUrl: d.appUrl, templateId: d.templateId, apiKeyMasked: mask(d.apiKey), webhookSecretMasked: mask(d.webhookSecret) };
+  }
   return base;
 }
 
@@ -109,21 +112,31 @@ exports.handler = async (event) => {
     // ── ADD a new provider ───────────────────────────────────────────────────
     if (action === 'add_provider') {
       const { type, label } = body;
-      if (!['email', 'storage'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email" or "storage".' }) };
+      if (!['email', 'storage', 'envelope'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", or "envelope".' }) };
 
       let fields;
       if (type === 'email') {
         const { provider, host, port, user, pass, fromAddress } = body;
         if (!host || !user || !pass) return { statusCode: 400, body: JSON.stringify({ error: 'host, user, and pass are required for a new email provider.' }) };
         fields = { provider: provider || 'custom', host, port: port ? parseInt(port) : 587, user, pass, fromAddress: fromAddress || user };
-      } else {
+      } else if (type === 'storage') {
         const { cloudName, apiKey, apiSecret } = body;
         if (!cloudName || !apiKey || !apiSecret) return { statusCode: 400, body: JSON.stringify({ error: 'cloudName, apiKey, and apiSecret are required for a new storage provider.' }) };
         fields = { cloudName, apiKey, apiSecret };
+      } else {
+        const { apiKey, templateId, apiUrl, appUrl, webhookSecret } = body;
+        if (!apiKey) return { statusCode: 400, body: JSON.stringify({ error: 'apiKey is required for a new envelope provider.' }) };
+        fields = {
+          apiKey, templateId: templateId || null,
+          apiUrl: (apiUrl || 'https://app.documenso.com/api/v2').replace(/\/+$/, ''),
+          appUrl: (appUrl || 'https://app.documenso.com').replace(/\/+$/, ''),
+          webhookSecret: webhookSecret || null,
+        };
       }
 
+      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider' }[type];
       const ref = await coll.add({
-        type, label: label || (type === 'email' ? 'Email Provider' : 'Storage Provider'),
+        type, label: label || defaultLabel,
         ...fields,
         createdAt: a.firestore.FieldValue.serverTimestamp(),
         updatedAt: a.firestore.FieldValue.serverTimestamp(),
@@ -162,6 +175,12 @@ exports.handler = async (event) => {
         if (body.cloudName !== undefined) update.cloudName = body.cloudName;
         if (body.apiKey !== undefined) update.apiKey = body.apiKey;
         if (body.apiSecret) update.apiSecret = body.apiSecret; // blank = keep existing
+      } else if (d.type === 'envelope') {
+        if (body.templateId !== undefined) update.templateId = body.templateId;
+        if (body.apiUrl !== undefined) update.apiUrl = body.apiUrl.replace(/\/+$/, '');
+        if (body.appUrl !== undefined) update.appUrl = body.appUrl.replace(/\/+$/, '');
+        if (body.apiKey) update.apiKey = body.apiKey; // blank = keep existing
+        if (body.webhookSecret) update.webhookSecret = body.webhookSecret; // blank = keep existing
       }
 
       await ref.update(update);
@@ -295,6 +314,41 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           success: true,
           message: `Connected successfully. Plan: ${plan}${usedCredits ? `, ${usedCredits} credits used this cycle` : ''}.`,
+        }),
+      };
+    }
+
+    // ── TEST ENVELOPE — reuses the exact GET /template/{id} call
+    //    generate-lease.js already makes, so this validates both the API
+    //    key AND the template id together, not just "is the key valid" ──
+    if (action === 'test_envelope') {
+      const { id, apiKey, templateId, apiUrl } = body;
+      let creds = null;
+      if (apiKey && templateId) {
+        creds = { apiKey, templateId, apiUrl: (apiUrl || 'https://app.documenso.com/api/v2').replace(/\/+$/, '') };
+      } else if (id) {
+        const snap = await coll.doc(id).get();
+        if (!snap.exists || snap.data().type !== 'envelope') return { statusCode: 404, body: JSON.stringify({ error: 'Envelope provider not found.' }) };
+        creds = snap.data();
+      } else {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No envelope configuration given to test.' }) };
+      }
+      if (!creds.templateId) return { statusCode: 400, body: JSON.stringify({ error: 'A template ID is required to test — set one from your Documenso template list.' }) };
+
+      const res = await fetch(`${creds.apiUrl}/template/${creds.templateId}`, {
+        headers: { Authorization: creds.apiKey, 'Content-Type': 'application/json' },
+      });
+      let data = null; try { data = await res.json(); } catch {}
+      if (!res.ok) {
+        return { statusCode: 400, body: JSON.stringify({ error: data?.message || `Documenso rejected this (HTTP ${res.status}). Check the API key and template ID.` }) };
+      }
+      const recipientCount = (data.recipients || data.Recipient || []).length;
+      const fieldCount = (data.fields || data.Field || []).length;
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          message: `Connected successfully. Template found with ${recipientCount} recipient(s) and ${fieldCount} field(s).`,
         }),
       };
     }
