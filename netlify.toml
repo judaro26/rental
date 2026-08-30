@@ -10,6 +10,10 @@
 [functions."send-invoice-reminders"]
   schedule = "0 13 * * *"
 
+# ── Scheduled: daily property bill/utility reminder sweep (12:00 UTC) ────────
+[functions."send-property-reminders"]
+  schedule = "0 12 * * *"
+
 # ── Scheduled: daily retention purge of declined/archived application docs ────
 [functions."purge-expired-applications"]
   schedule = "0 3 * * *"
