@@ -192,7 +192,26 @@
       </button>
       <h2 style="font-size:1.5rem;font-weight:400;margin:0;" id="page-title">Dashboard</h2>
     </div>
-    <a href="/index.html" style="font-size:12px;color:var(--slate);text-decoration:none;" class="btn btn-sm btn-outline">← View Site</a>
+    <div style="display:flex;gap:8px;">
+      <button onclick="openSitePreview()" style="font-size:12px;color:var(--slate);" class="btn btn-sm btn-outline">👁 Quick Preview</button>
+      <a href="/index.html" target="_blank" rel="noopener" style="font-size:12px;color:var(--slate);text-decoration:none;" class="btn btn-sm btn-outline">↗ View Site</a>
+    </div>
+  </div>
+
+  <!-- SITE PREVIEW MODAL -->
+  <div id="site-preview-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="modal-backdrop absolute inset-0" onclick="closeModal('site-preview-modal')"></div>
+    <div style="background:#fff;width:100%;max-width:1100px;height:92vh;border-radius:4px;box-shadow:0 24px 64px rgba(26,26,46,0.25);position:relative;z-index:1;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <h3 style="font-size:1rem;font-weight:500;margin:0;">👁 Site Preview</h3>
+        <div style="display:flex;gap:8px;">
+          <button onclick="document.getElementById('site-preview-frame').src=document.getElementById('site-preview-frame').src;" class="btn btn-sm btn-outline">↻ Refresh</button>
+          <a href="/index.html" target="_blank" rel="noopener" class="btn btn-sm btn-outline">↗ Open in New Tab</a>
+          <button onclick="closeModal('site-preview-modal')" style="background:#F3F4F6;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;color:#374151;font-weight:500;">✕ Close</button>
+        </div>
+      </div>
+      <iframe id="site-preview-frame" src="about:blank" style="flex:1;border:none;width:100%;"></iframe>
+    </div>
   </div>
 
   <div class="content">
@@ -3705,6 +3724,10 @@
   // ===== HELPERS =====
   window.openModal  = id => document.getElementById(id).classList.remove('hidden');
   window.closeModal = id => document.getElementById(id).classList.add('hidden');
+  window.openSitePreview = () => {
+    document.getElementById('site-preview-frame').src = '/index.html'; // fresh load each time, not a stale cached one
+    openModal('site-preview-modal');
+  };
 
   // Escape closes whichever modal is currently open. Every modal in this
   // file consistently ends its id in "-modal", so this works for all of
