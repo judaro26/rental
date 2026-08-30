@@ -1233,6 +1233,19 @@
       </div>
     </div>
 
+    <div id="prop-paymentmethods-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">💳 Payment Methods</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">Add manual payment options tenants can use for this property — Venmo, PayPal, bank transfer, whatever applies — and choose which one to feature. Bold, if enabled below, is automatically included as an option here too.</p>
+      <div id="prop-paymentmethods-alert" class="hidden alert" style="margin-bottom:10px;"></div>
+      <div id="prop-paymentmethods-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+      <button type="button" onclick="addPaymentMethodRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Payment Method</button>
+      <div style="margin-top:14px;">
+        <label class="label">Preferred Payment Method <span style="font-size:10px;font-weight:400;color:var(--slate);">(shown first to tenants)</span></label>
+        <select id="prop-preferred-method" class="form-input"></select>
+      </div>
+      <button type="button" onclick="savePropertyPaymentMethods()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-paymentmethods-save-btn">Save Payment Methods</button>
+    </div>
+
     <div id="prop-bold-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
       <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;" data-i18n="properties.boldTitle">💳 Bold Payment Settings</h4>
       <p id="prop-bold-status" style="font-size:12px;color:var(--slate);margin-bottom:12px;">Loading status...</p>
@@ -1241,7 +1254,7 @@
         <div><label class="label" data-i18n="properties.boldApiKey">API Key</label><input type="text" id="prop-bold-apikey" class="form-input" placeholder="Your Bold integration key" data-i18n-placeholder="properties.boldApiKeyPlaceholder"></div>
         <div><label class="label" data-i18n="properties.boldSecretKey">Secret Key</label> <span id="prop-bold-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span><input type="password" id="prop-bold-secret" class="form-input" placeholder="Your Bold webhook signing key" data-i18n-placeholder="properties.boldSecretPlaceholder"></div>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-          <input type="checkbox" id="prop-bold-enabled" style="width:16px;height:16px;"> <span data-i18n="properties.boldAccept">Accept Bold payments for this property</span>
+          <input type="checkbox" id="prop-bold-enabled" style="width:16px;height:16px;" onchange="currentPropertyBoldEnabled=this.checked;rebuildPreferredMethodDropdown(document.getElementById('prop-preferred-method').value);"> <span data-i18n="properties.boldAccept">Accept Bold payments for this property</span>
         </label>
       </div>
       <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;">
@@ -2140,6 +2153,7 @@
     renderImageRows([]);
     document.getElementById('prop-bold-section').classList.add('hidden'); // needs a saved property first
     document.getElementById('prop-reminders-section').classList.add('hidden');
+    document.getElementById('prop-paymentmethods-section').classList.add('hidden');
     openModal('property-modal');
   };
   window.editProperty = id => {
@@ -2164,6 +2178,8 @@
     loadPropertyBoldStatus(id);
     document.getElementById('prop-reminders-section').classList.remove('hidden');
     renderReminderRows(p.reminders || []);
+    document.getElementById('prop-paymentmethods-section').classList.remove('hidden');
+    renderPaymentMethodRows(p.paymentMethods || [], p.preferredPaymentMethod || '', p.boldPaymentsEnabled === true);
     openModal('property-modal');
   };
   window.saveProperty = async () => {
@@ -5433,6 +5449,77 @@
   // through our own functions, so there's no size limit to worry about).
   // Reuses the exact same /api/sign-cloudinary-upload contract as the
   // tenant portal's maintenance-photo upload — one upload mechanism, not two.
+  // ===== PAYMENT METHODS CATALOG (self-serve, per-property) =====
+  let currentPaymentMethods = [];
+  let currentPropertyBoldEnabled = false; // tracked separately so toggling the Bold checkbox live-updates the dropdown below, without needing a save+reopen
+
+  function renderPaymentMethodRows(methods, preferredId, boldEnabled) {
+    currentPaymentMethods = (methods || []).map(m => ({ ...m }));
+    currentPropertyBoldEnabled = boldEnabled;
+    const list = document.getElementById('prop-paymentmethods-list');
+    if (!currentPaymentMethods.length) {
+      list.innerHTML = '<p style="font-size:12px;color:var(--slate);">No manual payment methods added yet.</p>';
+    } else {
+      list.innerHTML = currentPaymentMethods.map((m, idx) => `
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px;background:#FDFBF8;border-radius:3px;">
+          <input type="text" value="${(m.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Venmo" class="form-input" style="flex:1;min-width:100px;" oninput="updatePaymentMethodField(${idx},'label',this.value)">
+          <input type="text" value="${(m.instructions||'').replace(/"/g,'&quot;')}" placeholder="e.g. @my-venmo-handle" class="form-input" style="flex:2;min-width:160px;" oninput="updatePaymentMethodField(${idx},'instructions',this.value)">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;">
+            <input type="checkbox" ${m.enabled!==false?'checked':''} onchange="updatePaymentMethodField(${idx},'enabled',this.checked)"> On
+          </label>
+          <button type="button" onclick="removePaymentMethodRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
+        </div>
+      `).join('');
+    }
+    rebuildPreferredMethodDropdown(preferredId);
+  }
+
+  function rebuildPreferredMethodDropdown(currentPreferred) {
+    const select = document.getElementById('prop-preferred-method');
+    if (!select) return;
+    const options = [{ value: '', label: 'No preference' }];
+    if (currentPropertyBoldEnabled) options.push({ value: 'bold', label: 'Bold' });
+    currentPaymentMethods.forEach(m => { if (m.enabled !== false && m.label) options.push({ value: m.id, label: m.label }); });
+    select.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+    select.value = currentPreferred || '';
+  }
+
+  window.updatePaymentMethodField = (idx, field, value) => {
+    if (!currentPaymentMethods[idx]) return;
+    currentPaymentMethods[idx][field] = value;
+    // Keep the dropdown's option labels in sync live as the admin types,
+    // without disturbing whatever is currently selected.
+    rebuildPreferredMethodDropdown(document.getElementById('prop-preferred-method').value);
+  };
+
+  window.addPaymentMethodRow = () => {
+    currentPaymentMethods.push({ id: 'pm_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), label: '', instructions: '', enabled: true });
+    renderPaymentMethodRows(currentPaymentMethods, document.getElementById('prop-preferred-method').value, currentPropertyBoldEnabled);
+  };
+
+  window.removePaymentMethodRow = (idx) => {
+    currentPaymentMethods.splice(idx, 1);
+    renderPaymentMethodRows(currentPaymentMethods, document.getElementById('prop-preferred-method').value, currentPropertyBoldEnabled);
+  };
+
+  window.savePropertyPaymentMethods = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    for (const m of currentPaymentMethods) {
+      if (!m.label || !m.label.trim()) { showAlert('prop-paymentmethods-alert', 'Every payment method needs a label (e.g. "Venmo").'); return; }
+    }
+    const btn = document.getElementById('prop-paymentmethods-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const preferred = document.getElementById('prop-preferred-method').value;
+      await updateDoc(doc(db,'properties',propertyId), { paymentMethods: currentPaymentMethods, preferredPaymentMethod: preferred, updatedAt: serverTimestamp() });
+      logAdminAction('property_payment_methods_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, `${currentPaymentMethods.length} method(s)`);
+      showAlert('prop-paymentmethods-alert', 'Payment methods saved.', 'success');
+      const idx = allProperties.findIndex(p => p.id === propertyId);
+      if (idx !== -1) { allProperties[idx].paymentMethods = currentPaymentMethods; allProperties[idx].preferredPaymentMethod = preferred; }
+    } catch (e) { showAlert('prop-paymentmethods-alert', e.message); }
+    btn.disabled = false; btn.textContent = 'Save Payment Methods';
+  };
+
   // ===== BILL & UTILITY REMINDERS (self-serve, per-property) =====
   let currentReminders = []; // in-memory working copy, saved explicitly via the Save button
 
