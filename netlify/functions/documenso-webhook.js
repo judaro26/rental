@@ -42,8 +42,23 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
+  const a = getAdmin();
+  const db = a.firestore();
+
   // Optional shared-secret check (Documenso can send a configured secret).
-  const expected = process.env.DOCUMENSO_WEBHOOK_SECRET;
+  // A saved envelope integration's own webhookSecret takes priority over
+  // the env var, same override-with-fallback pattern as everywhere else.
+  let expected = process.env.DOCUMENSO_WEBHOOK_SECRET;
+  try {
+    const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
+    const activeId = activeSnap.exists ? activeSnap.data().envelope : null;
+    if (activeId) {
+      const snap = await db.collection('integrationSecrets').doc(activeId).get();
+      if (snap.exists && snap.data().webhookSecret) expected = snap.data().webhookSecret;
+    }
+  } catch (err) {
+    console.warn('documenso-webhook: could not check envelope override, using env var:', err.message);
+  }
   if (expected) {
     // Netlify normalizes incoming header names to lowercase.
     const got = event.headers['x-documenso-secret'] || event.headers['authorization'];
@@ -68,9 +83,6 @@ exports.handler = async (event) => {
 
   const mapped = mapStatus(evtType, docStatus);
   if (!mapped) return { statusCode: 200, body: JSON.stringify({ ignored: true, reason: 'unmapped event', evtType }) };
-
-  const a  = getAdmin();
-  const db = a.firestore();
 
   try {
     const q = await db.collection('applications')
