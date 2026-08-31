@@ -79,20 +79,37 @@ exports.handler = async (event) => {
     if (!tenant.monthlyRent) return { statusCode: 400, body: JSON.stringify({ error: 'This tenant has no monthly rent amount set.' }) };
     if (!tenant.email) return { statusCode: 400, body: JSON.stringify({ error: 'This tenant has no email address on file.' }) };
 
-    const { findNextDueDate, utcMidnightToday } = require('./_lib/reminder-cycle');
+    const { findNextDueDate, computeCycle, utcMidnightToday } = require('./_lib/reminder-cycle');
     const { createInvoice } = require('./_lib/create-invoice');
+    const { isRentAlreadyCoveredForCycle } = require('./_lib/check-rent-paid');
 
     // If a rent due day is configured, invoice for the next upcoming
     // occurrence of it (so this lines up with what the automatic system
     // would eventually generate). If not configured at all, there's no
     // cycle to target — invoice due immediately, as a one-off.
-    let dueDateLabel, matchedPeriod = null;
+    let dueDateLabel, matchedPeriod = null, upcomingDueMs = null;
     if (tenant.rentDueDay) {
       const next = findNextDueDate(tenant.rentDueDay, utcMidnightToday());
       dueDateLabel = new Date(next.dueMs).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
       matchedPeriod = next.period;
+      upcomingDueMs = next.dueMs;
     } else {
       dueDateLabel = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    // Unlike the fully-automatic sweep, this is a deliberate admin action —
+    // so rather than silently skipping, warn and let the admin explicitly
+    // confirm an override (body.force) if they still want to proceed.
+    if (upcomingDueMs && !body.force) {
+      const upcomingDue = new Date(upcomingDueMs);
+      const prevCycle = computeCycle(tenant.rentDueDay, 0, upcomingDue.getUTCFullYear(), upcomingDue.getUTCMonth() - 1);
+      const rentCovered = await isRentAlreadyCoveredForCycle({
+        db, tenantId, monthlyRent: tenant.monthlyRent,
+        cycleStartMs: prevCycle.dueMs, cycleEndMs: upcomingDueMs,
+      });
+      if (rentCovered) {
+        return { statusCode: 409, body: JSON.stringify({ error: 'ALREADY_PAID', message: 'This tenant appears to have already paid rent for this period. Generate the invoice anyway?' }) };
+      }
     }
 
     let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
