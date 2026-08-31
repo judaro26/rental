@@ -12,6 +12,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, ADMIN_NOTIFY_EMAIL
 
 const nodemailer = require('nodemailer');
+const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
 let admin;
 function getAdmin() {
@@ -133,6 +134,7 @@ exports.handler = async () => {
     return { statusCode: 200, body: JSON.stringify({ success: true, period: periodLabel, purged: purged.length, deleted: deleted.length }) };
   } catch (err) {
     console.error('purge-summary-report error:', err);
+    await notifyAdminOnFailure({ functionName: 'purge-summary-report', fatalError: err.message });
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
