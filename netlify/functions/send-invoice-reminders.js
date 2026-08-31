@@ -13,6 +13,7 @@
 //   SITE_URL (optional — for links)
 
 const nodemailer = require('nodemailer');
+const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
 let admin;
 function getAdmin() {
@@ -76,7 +77,7 @@ function buildEmail({ siteName, tenantName, invoiceNumber, total, dueMs, daysBef
   </div>`;
 }
 
-exports.handler = async () => {
+async function runSendInvoiceReminders() {
   await require('./_lib/apply-email-config')(); // load any custom email provider override before this function's existing nodemailer code runs
   if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.SMTP_HOST) {
     console.warn('send-invoice-reminders: missing FIREBASE_SERVICE_ACCOUNT or SMTP_HOST — skipping.');
@@ -113,6 +114,7 @@ exports.handler = async () => {
 
   const snap = await db.collection('invoices').get();
   let sent = 0, checked = 0, autoSent = 0;
+  const errorMessages = [];
 
   for (const docSnap of snap.docs) {
     const inv = docSnap.data();
@@ -144,7 +146,7 @@ exports.handler = async () => {
         });
         if (r.ok) { autoSent++; console.log(`send-invoice-reminders: auto-sent draft ${inv.invoiceNumber || docSnap.id}`); }
         else { console.error(`send-invoice-reminders: auto-send failed for ${inv.invoiceNumber || docSnap.id}:`, await r.text()); }
-      } catch (err) { console.error(`send-invoice-reminders: auto-send error for ${docSnap.id}:`, err.message); }
+      } catch (err) { console.error(`send-invoice-reminders: auto-send error for ${docSnap.id}:`, err.message); errorMessages.push(`auto-send ${docSnap.id}: ${err.message}`); }
       continue;
     }
 
@@ -202,9 +204,21 @@ exports.handler = async () => {
       sent++;
     } catch (err) {
       console.error(`send-invoice-reminders: failed for invoice ${inv.invoiceNumber || docSnap.id}:`, err.message);
+      errorMessages.push(`invoice ${inv.invoiceNumber || docSnap.id}: ${err.message}`);
     }
   }
 
   console.log(`send-invoice-reminders: checked ${checked} unpaid invoice(s), sent ${sent} reminder(s), auto-sent ${autoSent} draft(s).`);
+  await notifyAdminOnFailure({ functionName: 'send-invoice-reminders', errorCount: errorMessages.length, sampleErrors: errorMessages });
   return { statusCode: 200, body: JSON.stringify({ success: true, checked, sent, autoSent }) };
+}
+
+exports.handler = async () => {
+  try {
+    return await runSendInvoiceReminders();
+  } catch (err) {
+    console.error('send-invoice-reminders error:', err);
+    await notifyAdminOnFailure({ functionName: 'send-invoice-reminders', fatalError: err.message });
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  }
 };
