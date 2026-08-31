@@ -67,6 +67,7 @@ function findMatchingCycle(rule, todayMs) {
 exports.handler = async () => {
   await require('./_lib/apply-email-config')();
   const { renderReminderEmailHtml, renderReminderSubject } = require('./_lib/render-reminder-email');
+  const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
   const a = getAdmin();
   const db = a.firestore();
@@ -95,6 +96,7 @@ exports.handler = async () => {
 
   const todayMs = utcMidnightToday();
   let remindersSent = 0, tenantsNotified = 0, errors = 0;
+  const errorMessages = [];
 
   try {
     const propsSnap = await db.collection('properties').get();
@@ -136,6 +138,7 @@ exports.handler = async () => {
           } catch (err) {
             console.error(`send-property-reminders: could not query tenants for property ${propDoc.id}:`, err.message);
             errors++;
+            errorMessages.push(`tenant query for property ${propDoc.id}: ${err.message}`);
           }
         }
         if (notifyEmail) {
@@ -165,6 +168,7 @@ exports.handler = async () => {
           } catch (err) {
             console.error(`send-property-reminders: failed to email ${recipient.email} for property ${propDoc.id}:`, err.message);
             errors++;
+            errorMessages.push(`${recipient.email} (property ${propDoc.id}): ${err.message}`);
           }
         }
 
@@ -179,10 +183,12 @@ exports.handler = async () => {
     }
 
     console.log(`send-property-reminders: ${remindersSent} reminder(s) triggered, ${tenantsNotified} tenant(s) notified, ${errors} error(s).`);
+    await notifyAdminOnFailure({ functionName: 'send-property-reminders', errorCount: errors, sampleErrors: errorMessages });
     return { statusCode: 200, body: JSON.stringify({ remindersSent, tenantsNotified, errors }) };
 
   } catch (err) {
     console.error('send-property-reminders error:', err);
+    await notifyAdminOnFailure({ functionName: 'send-property-reminders', fatalError: err.message });
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
