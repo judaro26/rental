@@ -218,6 +218,54 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ success: true, sentTo: caller.email }) };
     }
 
+    if (action === 'test_annual_event') {
+      const { label, month, day, lang } = body;
+      if (!label || !label.trim()) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a label to test with.' }) };
+      if (!month || !day) return { statusCode: 400, body: JSON.stringify({ error: 'Set a month and day to test with.' }) };
+
+      await require('./_lib/apply-email-config')();
+      if (!process.env.SMTP_HOST) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
+      }
+      const { renderReminderEmailHtml, renderReminderSubject } = require('./_lib/render-reminder-email');
+      const { generateIcs } = require('./_lib/generate-ics');
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      });
+
+      const effectiveLang = lang === 'es' ? 'es' : 'en';
+      const dateLocale = effectiveLang === 'es' ? 'es-ES' : 'en-US';
+      const now = new Date();
+      let anchorYear = now.getUTCFullYear();
+      if (Date.UTC(anchorYear, month - 1, day) < Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) anchorYear += 1;
+      const dueLabel = new Date(Date.UTC(anchorYear, month - 1, day)).toLocaleDateString(dateLocale, { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
+      let emailTemplate = {};
+      try {
+        const settingsSnap = await db.collection('settings').doc('site').get();
+        if (settingsSnap.exists) emailTemplate = settingsSnap.data().reminderEmailTemplate || {};
+      } catch { /* fall back to default template styling */ }
+
+      const icsContent = generateIcs({ uid: `test-${Date.now()}@rentbay`, label, propertyName: caller.propertyName || '', month, day });
+
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: caller.email,
+        subject: renderReminderSubject({ lang: effectiveLang, label, dueLabel, isTest: true }),
+        html: renderReminderEmailHtml({
+          lang: effectiveLang, recipientName: caller.email.split('@')[0], label,
+          propertyName: caller.propertyName || '', dueLabel, customMessage: '',
+          isAdminCopy: true, isTest: true, template: emailTemplate,
+        }),
+        icalEvent: { filename: 'event.ics', method: 'PUBLISH', content: icsContent },
+      });
+      return { statusCode: 200, body: JSON.stringify({ success: true, sentTo: caller.email }) };
+    }
+
     return { statusCode: 400, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
 
   } catch (err) {
