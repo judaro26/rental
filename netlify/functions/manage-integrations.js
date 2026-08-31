@@ -71,7 +71,10 @@ function maskProvider(id, d, activeId) {
     return { ...base, provider: d.provider || 'custom', host: d.host, port: d.port, user: d.user, fromAddress: d.fromAddress, passMasked: mask(d.pass) };
   }
   if (d.type === 'storage') {
-    return { ...base, provider: 'cloudinary', cloudName: d.cloudName, apiKey: d.apiKey, apiSecretMasked: mask(d.apiSecret) };
+    if (d.backend === 'r2') {
+      return { ...base, backend: 'r2', accountId: d.accountId, accessKeyIdMasked: mask(d.accessKeyId), secretAccessKeyMasked: mask(d.secretAccessKey), bucketName: d.bucketName, publicUrl: d.publicUrl };
+    }
+    return { ...base, backend: 'cloudinary', cloudName: d.cloudName, apiKey: d.apiKey, apiSecretMasked: mask(d.apiSecret) };
   }
   if (d.type === 'envelope') {
     return { ...base, provider: 'documenso', apiUrl: d.apiUrl, appUrl: d.appUrl, templateId: d.templateId, apiKeyMasked: mask(d.apiKey), webhookSecretMasked: mask(d.webhookSecret) };
@@ -123,9 +126,16 @@ exports.handler = async (event) => {
         if (!host || !user || !pass) return { statusCode: 400, body: JSON.stringify({ error: 'host, user, and pass are required for a new email provider.' }) };
         fields = { provider: provider || 'custom', host, port: port ? parseInt(port) : 587, user, pass, fromAddress: fromAddress || user };
       } else if (type === 'storage') {
-        const { cloudName, apiKey, apiSecret } = body;
-        if (!cloudName || !apiKey || !apiSecret) return { statusCode: 400, body: JSON.stringify({ error: 'cloudName, apiKey, and apiSecret are required for a new storage provider.' }) };
-        fields = { cloudName, apiKey, apiSecret };
+        const { backend, cloudName, apiKey, apiSecret, accountId, accessKeyId, secretAccessKey, bucketName, publicUrl } = body;
+        if (backend === 'r2') {
+          if (!accountId || !accessKeyId || !secretAccessKey || !bucketName || !publicUrl) {
+            return { statusCode: 400, body: JSON.stringify({ error: 'accountId, accessKeyId, secretAccessKey, bucketName, and publicUrl are all required for a new R2 storage provider.' }) };
+          }
+          fields = { backend: 'r2', accountId, accessKeyId, secretAccessKey, bucketName, publicUrl: publicUrl.replace(/\/+$/, '') };
+        } else {
+          if (!cloudName || !apiKey || !apiSecret) return { statusCode: 400, body: JSON.stringify({ error: 'cloudName, apiKey, and apiSecret are required for a new Cloudinary storage provider.' }) };
+          fields = { backend: 'cloudinary', cloudName, apiKey, apiSecret };
+        }
       } else if (type === 'envelope') {
         const { apiKey, templateId, apiUrl, appUrl, webhookSecret } = body;
         if (!apiKey) return { statusCode: 400, body: JSON.stringify({ error: 'apiKey is required for a new envelope provider.' }) };
@@ -186,9 +196,17 @@ exports.handler = async (event) => {
         if (body.fromAddress !== undefined) update.fromAddress = body.fromAddress;
         if (body.pass) update.pass = body.pass; // blank = keep existing
       } else if (d.type === 'storage') {
-        if (body.cloudName !== undefined) update.cloudName = body.cloudName;
-        if (body.apiKey !== undefined) update.apiKey = body.apiKey;
-        if (body.apiSecret) update.apiSecret = body.apiSecret; // blank = keep existing
+        if (d.backend === 'r2') {
+          if (body.accountId !== undefined) update.accountId = body.accountId;
+          if (body.bucketName !== undefined) update.bucketName = body.bucketName;
+          if (body.publicUrl !== undefined) update.publicUrl = body.publicUrl.replace(/\/+$/, '');
+          if (body.accessKeyId) update.accessKeyId = body.accessKeyId; // blank = keep existing
+          if (body.secretAccessKey) update.secretAccessKey = body.secretAccessKey; // blank = keep existing
+        } else {
+          if (body.cloudName !== undefined) update.cloudName = body.cloudName;
+          if (body.apiKey !== undefined) update.apiKey = body.apiKey;
+          if (body.apiSecret) update.apiSecret = body.apiSecret; // blank = keep existing
+        }
       } else if (d.type === 'envelope') {
         if (body.templateId !== undefined) update.templateId = body.templateId;
         if (body.apiUrl !== undefined) update.apiUrl = body.apiUrl.replace(/\/+$/, '');
@@ -302,20 +320,62 @@ exports.handler = async (event) => {
     // ── TEST STORAGE — validates Cloudinary credentials with a read-only
     //    call (account usage stats), no file is uploaded or stored ────────
     if (action === 'test_storage') {
-      const { id, cloudName, apiKey, apiSecret } = body;
+      const { id, backend, cloudName, apiKey, apiSecret, accountId, accessKeyId, secretAccessKey, bucketName } = body;
+
+      // Resolve which backend is actually being tested: explicit param
+      // takes priority (used when testing unsaved form values); otherwise
+      // look up the saved document to find out, rather than guessing from
+      // which fields happen to be present in the request.
+      let resolvedBackend = backend;
+      let savedDoc = null;
+      if (!resolvedBackend && id) {
+        const snap = await coll.doc(id).get();
+        if (!snap.exists || snap.data().type !== 'storage') return { statusCode: 404, body: JSON.stringify({ error: 'Storage provider not found.' }) };
+        savedDoc = snap.data();
+        resolvedBackend = savedDoc.backend || 'cloudinary';
+      }
+
+      if (resolvedBackend === 'r2') {
+        let creds = null;
+        if (accountId && accessKeyId && bucketName) {
+          let effectiveSecret = secretAccessKey;
+          if (!effectiveSecret && id) {
+            effectiveSecret = savedDoc ? savedDoc.secretAccessKey : (await coll.doc(id).get()).data()?.secretAccessKey;
+          }
+          if (!effectiveSecret) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a secret access key to test with.' }) };
+          creds = { accountId, accessKeyId, secretAccessKey: effectiveSecret, bucketName };
+        } else if (savedDoc) {
+          creds = savedDoc;
+        } else {
+          return { statusCode: 400, body: JSON.stringify({ error: 'No R2 configuration given to test.' }) };
+        }
+
+        const { S3Client, HeadBucketCommand } = require('@aws-sdk/client-s3');
+        const client = new S3Client({
+          region: 'auto',
+          endpoint: `https://${creds.accountId}.r2.cloudflarestorage.com`,
+          credentials: { accessKeyId: creds.accessKeyId, secretAccessKey: creds.secretAccessKey },
+          forcePathStyle: true,
+        });
+        try {
+          await client.send(new HeadBucketCommand({ Bucket: creds.bucketName }));
+        } catch (err) {
+          return { statusCode: 400, body: JSON.stringify({ error: `R2 rejected these credentials: ${err.message || 'check your Account ID, Access Key, Secret, and bucket name.'}` }) };
+        }
+        return { statusCode: 200, body: JSON.stringify({ success: true, message: `Connected successfully to bucket "${creds.bucketName}".` }) };
+      }
+
+      // Cloudinary path (default)
       let creds = null;
       if (cloudName && apiKey) {
         let effectiveSecret = apiSecret;
         if (!effectiveSecret && id) {
-          const existing = await coll.doc(id).get();
-          effectiveSecret = existing.exists ? existing.data().apiSecret : null;
+          effectiveSecret = savedDoc ? savedDoc.apiSecret : (await coll.doc(id).get()).data()?.apiSecret;
         }
         if (!effectiveSecret) return { statusCode: 400, body: JSON.stringify({ error: 'Enter an API secret to test with.' }) };
         creds = { cloudName, apiKey, apiSecret: effectiveSecret };
-      } else if (id) {
-        const snap = await coll.doc(id).get();
-        if (!snap.exists || snap.data().type !== 'storage') return { statusCode: 404, body: JSON.stringify({ error: 'Storage provider not found.' }) };
-        creds = snap.data();
+      } else if (savedDoc) {
+        creds = savedDoc;
       } else {
         return { statusCode: 400, body: JSON.stringify({ error: 'No storage configuration given to test.' }) };
       }
