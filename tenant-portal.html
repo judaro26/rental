@@ -997,14 +997,23 @@
       const q = query(collection(db,'announcements'), orderBy('createdAt','desc'));
       const snap = await getDocs(q);
       const items = snap.docs.map(d => d.data())
-        .filter(a => !a.propertyId || a.propertyId === tenantData?.propertyId)
+        .filter(a => {
+          // Specific-tenant targeting takes priority when set, matching
+          // the same logic the email-sending backend uses — a tenant not
+          // on the list shouldn't see it in-app either, and one who is
+          // should, regardless of which property they're on.
+          if (Array.isArray(a.tenantIds) && a.tenantIds.length) {
+            return a.tenantIds.includes(currentUser.uid);
+          }
+          return !a.propertyId || a.propertyId === tenantData?.propertyId;
+        })
         .slice(0, 3);
       if (!items.length) return;
       const container = document.getElementById('announcements-section');
       container.style.display = 'block';
       container.innerHTML = items.map(a => `
-        <div class="announcement">
-          <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:var(--amber-light);margin-bottom:4px;">📢 Announcement</div>
+        <div class="announcement" style="${a.urgent ? 'border:2px solid #DC2626;' : ''}">
+          <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:${a.urgent ? '#DC2626' : 'var(--amber-light)'};margin-bottom:4px;font-weight:${a.urgent ? '700' : '400'};">${a.urgent ? '🚨 Urgent Notice' : '📢 Announcement'}</div>
           <div style="font-size:15px;font-weight:500;margin-bottom:4px;">${a.title}</div>
           <div style="font-size:13px;opacity:0.8;">${a.message}</div>
         </div>`).join('');
