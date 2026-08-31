@@ -42,4 +42,24 @@ function findMatchingCycle(rule, todayMs) {
   return null;
 }
 
-module.exports = { utcMidnightToday, computeCycle, findMatchingCycle };
+// Answers a different question than findMatchingCycle: not "should this
+// fire today," but "what's the next upcoming occurrence of this due day,
+// whether or not its lead-time send-date has already passed." Used for
+// ad-hoc, admin-triggered invoice generation — e.g. auto-invoicing was
+// enabled for a tenant after this cycle's normal generate-window already
+// passed, and the admin wants to generate the upcoming one right now
+// rather than wait for next month.
+function findNextDueDate(dayOfMonth, todayMs) {
+  const today = new Date(todayMs);
+  const y = today.getUTCFullYear(), m = today.getUTCMonth();
+  for (const candidateMonth of [m, m + 1]) {
+    const due = new Date(Date.UTC(y, candidateMonth, Math.min(Math.max(dayOfMonth, 1), 28)));
+    if (due.getTime() >= todayMs) {
+      const period = `${due.getUTCFullYear()}-${String(due.getUTCMonth() + 1).padStart(2, '0')}`;
+      return { dueMs: due.getTime(), period };
+    }
+  }
+  return null; // unreachable given dayOfMonth is clamped to 1-28, kept for safety
+}
+
+module.exports = { utcMidnightToday, computeCycle, findMatchingCycle, findNextDueDate };
