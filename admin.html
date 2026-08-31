@@ -1442,6 +1442,29 @@
         <div><label class="label">Lease Start</label><input type="date" id="edit-lease-start" class="form-input"></div>
         <div><label class="label">Lease End</label><input type="date" id="edit-lease-end" class="form-input"></div>
       </div>
+
+      <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+        <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">🧾 Automatic Rent Invoicing</h4>
+        <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">When enabled, a real invoice is automatically generated and emailed to this tenant ahead of their rent due date — not just a reminder.</p>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="label">Rent Due Day <span style="font-size:10px;font-weight:400;color:var(--slate);">(1–28)</span></label>
+            <input type="number" id="edit-rent-due-day" class="form-input" min="1" max="28" placeholder="1">
+          </div>
+          <div>
+            <label class="label">Generate Invoice <span style="font-size:10px;font-weight:400;color:var(--slate);">(days before due)</span></label>
+            <input type="number" id="edit-auto-invoice-lead-days" class="form-input" min="0" max="27" placeholder="5">
+          </div>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:10px;">
+          <input type="checkbox" id="edit-auto-invoice-enabled" style="width:16px;height:16px;"> Automatically generate and send this tenant's rent invoice
+        </label>
+        <div style="display:flex;gap:10px;margin-top:12px;">
+          <button type="button" onclick="testAutoInvoice()" class="btn btn-outline btn-sm" id="test-auto-invoice-btn">Send Test Invoice</button>
+        </div>
+        <div id="auto-invoice-test-result" style="font-size:12px;margin-top:8px;"></div>
+      </div>
+
       <div style="display:flex;gap:10px;margin-top:20px;">
         <button onclick="saveTenant()" class="btn btn-primary" style="flex:1;" id="tenant-save-btn">Save Changes</button>
         <button onclick="closeModal('tenant-modal')" class="btn btn-outline">Cancel</button>
@@ -3095,6 +3118,10 @@
     document.getElementById('edit-lease-start').value = t.leaseStart||'';
     document.getElementById('edit-lease-end').value = t.leaseEnd||'';
     document.getElementById('edit-property').value = t.propertyId||'';
+    document.getElementById('edit-rent-due-day').value = t.rentDueDay||1;
+    document.getElementById('edit-auto-invoice-lead-days').value = t.autoInvoiceLeadDays!==undefined?t.autoInvoiceLeadDays:5;
+    document.getElementById('edit-auto-invoice-enabled').checked = t.autoInvoiceEnabled === true;
+    document.getElementById('auto-invoice-test-result').textContent = '';
     document.getElementById('tenant-edit-alert').classList.add('hidden');
     openModal('tenant-modal');
   };
@@ -3114,11 +3141,50 @@
         monthlyRent: parseFloat(document.getElementById('edit-rent').value)||0,
         leaseStart: document.getElementById('edit-lease-start').value||null,
         leaseEnd: document.getElementById('edit-lease-end').value||null,
+        rentDueDay: Math.min(Math.max(parseInt(document.getElementById('edit-rent-due-day').value)||1,1),28),
+        autoInvoiceLeadDays: Math.min(Math.max(parseInt(document.getElementById('edit-auto-invoice-lead-days').value)||0,0),27),
+        autoInvoiceEnabled: document.getElementById('edit-auto-invoice-enabled').checked,
         updatedAt: serverTimestamp()
       });
       closeModal('tenant-modal'); await loadTenants(); updateDashboardStats();
     } catch(e) { showAlert('tenant-edit-alert', e.message); }
     btn.disabled=false; btn.textContent='Save Changes';
+  };
+  function ordinalSuffix(n) {
+    const mod100 = n % 100;
+    if (mod100 >= 11 && mod100 <= 13) return 'th';
+    switch (n % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  }
+  window.testAutoInvoice = async () => {
+    const tenantId = document.getElementById('edit-tenant-id').value;
+    const resultEl = document.getElementById('auto-invoice-test-result');
+    if (!tenantId) return;
+    const rentDueDay = Math.min(Math.max(parseInt(document.getElementById('edit-rent-due-day').value)||1,1),28);
+    const btn = document.getElementById('test-auto-invoice-btn');
+    btn.disabled = true; const original = btn.textContent; btn.textContent = 'Sending...';
+    resultEl.textContent = '';
+    try {
+      const dueDayLabel = `the ${rentDueDay}${ordinalSuffix(rentDueDay)} of each month`;
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/test-auto-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ tenantId, dueDayLabel }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      resultEl.style.color = '#16A34A';
+      resultEl.textContent = `✓ Preview sent to ${data.sentTo}. Check your inbox.`;
+    } catch (e) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = '✗ ' + e.message;
+    }
+    btn.disabled = false; btn.textContent = original;
   };
   function populateTenantSelects() {
     const opts = allTenants.map(t=>`<option value="${t.id}">${t.firstName||''} ${t.lastName||''} (${t.email||''})</option>`).join('');
