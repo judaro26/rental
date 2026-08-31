@@ -48,8 +48,9 @@ function getAdmin() {
 
 exports.handler = async () => {
   await require('./_lib/apply-email-config')();
-  const { findMatchingCycle, utcMidnightToday } = require('./_lib/reminder-cycle');
+  const { findMatchingCycle, computeCycle, utcMidnightToday } = require('./_lib/reminder-cycle');
   const { createInvoice } = require('./_lib/create-invoice');
+  const { isRentAlreadyCoveredForCycle } = require('./_lib/check-rent-paid');
   const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
   const a = getAdmin();
@@ -85,6 +86,20 @@ exports.handler = async () => {
       const cycle = findMatchingCycle(rule, todayMs);
       if (!cycle) continue; // not this tenant's day
       if (tenant.autoInvoiceLastPeriod === cycle.period) continue; // already generated this cycle
+
+      // Skip if rent for this cycle already appears covered — e.g. the
+      // tenant paid a few days early, before this scheduled window even
+      // fired. Window is the previous due date through the upcoming one.
+      const upcomingDue = new Date(cycle.dueMs);
+      const prevCycle = computeCycle(tenant.rentDueDay, 0, upcomingDue.getUTCFullYear(), upcomingDue.getUTCMonth() - 1);
+      const rentCovered = await isRentAlreadyCoveredForCycle({
+        db, tenantId: tenantDoc.id, monthlyRent: tenant.monthlyRent,
+        cycleStartMs: prevCycle.dueMs, cycleEndMs: cycle.dueMs,
+      });
+      if (rentCovered) {
+        await tenantDoc.ref.update({ autoInvoiceLastPeriod: cycle.period });
+        continue;
+      }
 
       const dueDateLabel = new Date(cycle.dueMs).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
       const tenantName = `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || 'Tenant';
