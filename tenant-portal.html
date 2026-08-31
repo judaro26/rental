@@ -97,6 +97,7 @@
   <script src="/shared/public-i18n.js"></script>
   <script src="/shared/cookie-consent.js"></script>
   <script src="/shared/theme.js"></script>
+  <script src="/shared/upload.js"></script>
 </head>
 <body>
 
@@ -1124,34 +1125,12 @@
       let imageUrls   = [];
 
       if (files.length) {
-        const cloud  = _cfg?.cloudinaryCloud;
-        const preset = _cfg?.cloudinaryPreset;
-        if (!cloud || !preset) throw new Error('Image upload not configured (Cloudinary env vars missing).');
-
         document.getElementById('maint-progress-wrap').style.display = '';
         let uploaded = 0;
 
         for (const file of files) {
-          // Signed upload so photos are publicly accessible
-          const sigRes  = await fetch('/api/sign-cloudinary-upload', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ folder: `maintenance/${currentUser.uid}` }),
-          });
-          const sigData = await sigRes.json();
-          if (!sigRes.ok) throw new Error(sigData.error || 'Could not sign upload');
-
-          const fd = new FormData();
-          fd.append('file',        file);
-          fd.append('folder',      `maintenance/${currentUser.uid}`);
-          fd.append('access_mode', 'public');
-          fd.append('timestamp',   sigData.timestamp);
-          fd.append('api_key',     sigData.apiKey);
-          fd.append('signature',   sigData.signature);
-
-          const res  = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method:'POST', body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error?.message || 'Image upload failed');
-          imageUrls.push(data.secure_url);
+          const url = await uploadFile(file, `maintenance/${currentUser.uid}`);
+          imageUrls.push(url);
           uploaded++;
           const pct = Math.round(uploaded / files.length * 100);
           document.getElementById('maint-progress-bar').style.width = pct + '%';
