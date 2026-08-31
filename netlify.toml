@@ -14,6 +14,10 @@
 [functions."send-property-reminders"]
   schedule = "0 12 * * *"
 
+# ── Scheduled: daily automated per-tenant rent invoice sweep (11:00 UTC) ─────
+[functions."send-auto-invoices"]
+  schedule = "0 11 * * *"
+
 # ── Scheduled: daily retention purge of declined/archived application docs ────
 [functions."purge-expired-applications"]
   schedule = "0 3 * * *"
