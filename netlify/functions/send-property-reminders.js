@@ -66,6 +66,7 @@ function findMatchingCycle(rule, todayMs) {
 
 exports.handler = async () => {
   await require('./_lib/apply-email-config')();
+  const { renderReminderEmailHtml, renderReminderSubject } = require('./_lib/render-reminder-email');
 
   const a = getAdmin();
   const db = a.firestore();
@@ -81,6 +82,16 @@ exports.handler = async () => {
     secure: parseInt(process.env.SMTP_PORT || '587') === 465,
     auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
   });
+
+  // One global template (colors, logo, footer) for every reminder email —
+  // fetched once, not per-property, since it's a single site-wide setting.
+  let emailTemplate = {};
+  try {
+    const settingsSnap = await db.collection('settings').doc('site').get();
+    if (settingsSnap.exists) emailTemplate = settingsSnap.data().reminderEmailTemplate || {};
+  } catch (err) {
+    console.warn('send-property-reminders: could not load email template, using defaults:', err.message);
+  }
 
   const todayMs = utcMidnightToday();
   let remindersSent = 0, tenantsNotified = 0, errors = 0;
@@ -133,7 +144,9 @@ exports.handler = async () => {
 
         if (!recipients.length) { updatedRules[i].lastSentPeriod = cycle.period; rulesChanged = true; continue; }
 
-        const dueDateLabel = new Date(cycle.dueMs).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+        const lang = rule.lang === 'es' ? 'es' : 'en'; // admin-chosen per rule, defaults to English
+        const dateLocale = lang === 'es' ? 'es-ES' : 'en-US';
+        const dueDateLabel = new Date(cycle.dueMs).toLocaleDateString(dateLocale, { month: 'long', day: 'numeric', timeZone: 'UTC' });
         const label = rule.label || 'Bill';
         const customMessage = (rule.message || '').trim();
 
@@ -142,13 +155,11 @@ exports.handler = async () => {
             await transporter.sendMail({
               from: process.env.SMTP_FROM || process.env.SMTP_USER,
               to: recipient.email,
-              subject: `Reminder: ${label} due ${dueDateLabel}`,
-              html: `
-                <p>Hi ${recipient.name},</p>
-                <p>This is a reminder that ${recipient.isAdminCopy ? 'the' : 'your'} <strong>${label}</strong> for ${property.name || 'your property'} is due on <strong>${dueDateLabel}</strong>.</p>
-                ${customMessage ? `<p>${customMessage}</p>` : ''}
-                <p style="color:#6B7280;font-size:12px;">This is an automated reminder, not an invoice — check with your property manager if you have questions about how to pay.</p>
-              `,
+              subject: renderReminderSubject({ lang, label, dueLabel: dueDateLabel }),
+              html: renderReminderEmailHtml({
+                lang, recipientName: recipient.name, label, propertyName: property.name || '',
+                dueLabel: dueDateLabel, customMessage, isAdminCopy: recipient.isAdminCopy, template: emailTemplate,
+              }),
             });
             tenantsNotified++;
           } catch (err) {
