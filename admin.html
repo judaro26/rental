@@ -831,6 +831,48 @@
       </div>
 
       <div class="card" style="margin-top:16px;">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="settings.reminderTemplateTitle">📧 Reminder Email Template</h3></div>
+        <div class="card-body">
+          <div id="reminder-template-alert" class="hidden alert"></div>
+          <p style="font-size:12px;color:var(--slate);margin-bottom:16px;" data-i18n="settings.reminderTemplateHelp">Customize the look of reminder emails sent to tenants — colors, logo, and sign-off. Applies to all reminders across every property.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="label" data-i18n="settings.headerColor">Header Color</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input type="color" id="reminder-tpl-headercolor" value="#1A1A2E" style="width:44px;height:38px;border:1.5px solid var(--border);border-radius:2px;cursor:pointer;padding:2px;">
+                <input type="text" id="reminder-tpl-headercolor-hex" class="form-input" value="#1A1A2E" style="flex:1;font-family:monospace;font-size:13px;" oninput="document.getElementById('reminder-tpl-headercolor').value=this.value">
+              </div>
+            </div>
+            <div>
+              <label class="label" data-i18n="settings.accentColor">Accent Color</label>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <input type="color" id="reminder-tpl-accentcolor" value="#C9903A" style="width:44px;height:38px;border:1.5px solid var(--border);border-radius:2px;cursor:pointer;padding:2px;">
+                <input type="text" id="reminder-tpl-accentcolor-hex" class="form-input" value="#C9903A" style="flex:1;font-family:monospace;font-size:13px;" oninput="document.getElementById('reminder-tpl-accentcolor').value=this.value">
+              </div>
+            </div>
+            <div class="col-span-2">
+              <label class="label" data-i18n="settings.footerText">Footer / Sign-off Text</label>
+              <input type="text" id="reminder-tpl-footertext" class="form-input" data-i18n-placeholder="settings.footerTextPlaceholder" placeholder="e.g. The Property Management Team">
+            </div>
+            <div class="col-span-2">
+              <label class="label" data-i18n="settings.reminderLogo">Logo (optional)</label>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div id="reminder-tpl-logo-preview" style="width:48px;height:48px;border:1.5px solid var(--border);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#FDFBF8;font-size:10px;color:var(--slate);">None</div>
+                <input type="file" id="reminder-tpl-logo-file" accept="image/*" style="display:none;" onchange="handleReminderTemplateLogoUpload(this.files)">
+                <button type="button" onclick="document.getElementById('reminder-tpl-logo-file').click()" class="btn btn-outline btn-sm">Upload Logo</button>
+                <button type="button" onclick="document.getElementById('reminder-tpl-logourl').value='';document.getElementById('reminder-tpl-logo-preview').innerHTML='None';" class="btn btn-sm" style="background:none;color:var(--slate);">Remove</button>
+                <input type="hidden" id="reminder-tpl-logourl">
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button onclick="saveReminderTemplate()" class="btn btn-primary" id="reminder-tpl-save-btn" data-i18n="settings.saveTemplate">Save Template</button>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-top:12px;" data-i18n="settings.templatePreviewHint">To see this template in action, open any property and use a reminder's "Send Test" button.</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
         <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;">🚩 Feature Flags</h3></div>
         <div class="card-body">
           <div id="flags-alert" class="hidden alert"></div>
@@ -1704,6 +1746,13 @@
       'properties.reminderDueDay':'Due day', 'properties.reminderRemind':'Remind', 'properties.reminderDaysBefore':'day(s) before', 'properties.reminderOn':'On',
       'properties.noRemindersYet':'No reminders configured yet.', 'properties.reminderLabelRequired':'Every reminder needs a label (e.g. "Electric Bill").',
       'properties.testReminder':'Send Test', 'properties.testSentTo':'Test sent to {email}. Check your inbox.',
+      'properties.reminderLanguage':'Language this reminder is sent in',
+      'settings.reminderTemplateTitle':'📧 Reminder Email Template',
+      'settings.reminderTemplateHelp':'Customize the look of reminder emails sent to tenants — colors, logo, and sign-off. Applies to all reminders across every property.',
+      'settings.headerColor':'Header Color', 'settings.accentColor':'Accent Color', 'settings.footerText':'Footer / Sign-off Text',
+      'settings.footerTextPlaceholder':'e.g. The Property Management Team', 'settings.reminderLogo':'Logo (optional)',
+      'settings.saveTemplate':'Save Template', 'settings.templateSaved':'Template saved.',
+      'settings.templatePreviewHint':'To see this template in action, open any property and use a reminder\'s "Send Test" button.',
       'properties.paymentMethodsTitle':'💳 Payment Methods',
       'properties.paymentMethodsHelp':'Add manual payment options tenants can use for this property — Venmo, PayPal, bank transfer, whatever applies — and choose which one to feature. Bold, if enabled below, is automatically included as an option here too.',
       'properties.addPaymentMethod':'+ Add Payment Method', 'properties.savePaymentMethods':'Save Payment Methods',
@@ -1791,6 +1840,13 @@
       'properties.reminderDueDay':'Día de vencimiento', 'properties.reminderRemind':'Recordar', 'properties.reminderDaysBefore':'día(s) antes', 'properties.reminderOn':'Activo',
       'properties.noRemindersYet':'Aún no hay recordatorios configurados.', 'properties.reminderLabelRequired':'Cada recordatorio necesita una etiqueta (ej. "Factura de Electricidad").',
       'properties.testReminder':'Enviar Prueba', 'properties.testSentTo':'Prueba enviada a {email}. Revisa tu correo.',
+      'properties.reminderLanguage':'Idioma en que se envía este recordatorio',
+      'settings.reminderTemplateTitle':'📧 Plantilla de Correo de Recordatorios',
+      'settings.reminderTemplateHelp':'Personaliza la apariencia de los correos de recordatorio enviados a los inquilinos — colores, logo y despedida. Se aplica a todos los recordatorios en todas las propiedades.',
+      'settings.headerColor':'Color de Encabezado', 'settings.accentColor':'Color de Acento', 'settings.footerText':'Texto de Pie / Despedida',
+      'settings.footerTextPlaceholder':'ej. El Equipo de Administración', 'settings.reminderLogo':'Logo (opcional)',
+      'settings.saveTemplate':'Guardar Plantilla', 'settings.templateSaved':'Plantilla guardada.',
+      'settings.templatePreviewHint':'Para ver esta plantilla en acción, abre cualquier propiedad y usa el botón "Enviar Prueba" de un recordatorio.',
       'properties.paymentMethodsTitle':'💳 Métodos de Pago',
       'properties.paymentMethodsHelp':'Agrega opciones de pago manuales que los inquilinos pueden usar para esta propiedad — Venmo, PayPal, transferencia bancaria, lo que aplique — y elige cuál destacar. Bold, si está habilitado abajo, se incluye automáticamente como opción aquí también.',
       'properties.addPaymentMethod':'+ Agregar Método de Pago', 'properties.savePaymentMethods':'Guardar Métodos de Pago',
@@ -4642,6 +4698,16 @@
       document.getElementById('theme-logoUrl').value = theme.logoUrl;
       document.getElementById('theme-logo-preview').innerHTML = theme.logoUrl ? `<img src="${theme.logoUrl}" style="width:100%;height:100%;object-fit:contain;">` : 'None';
 
+      // Reminder email template
+      const rtpl = s.reminderEmailTemplate || {};
+      document.getElementById('reminder-tpl-headercolor').value = rtpl.headerColor || '#1A1A2E';
+      document.getElementById('reminder-tpl-headercolor-hex').value = rtpl.headerColor || '#1A1A2E';
+      document.getElementById('reminder-tpl-accentcolor').value = rtpl.accentColor || '#C9903A';
+      document.getElementById('reminder-tpl-accentcolor-hex').value = rtpl.accentColor || '#C9903A';
+      document.getElementById('reminder-tpl-footertext').value = rtpl.footerText || '';
+      document.getElementById('reminder-tpl-logourl').value = rtpl.logoUrl || '';
+      document.getElementById('reminder-tpl-logo-preview').innerHTML = rtpl.logoUrl ? `<img src="${rtpl.logoUrl}" style="width:100%;height:100%;object-fit:contain;">` : 'None';
+
       // Feature flags
       const flags = s.featureFlags || {};
       document.getElementById('feature-flags-list').innerHTML = FEATURE_FLAGS_CONFIG.map(f => {
@@ -4657,6 +4723,8 @@
   // Keep the native color picker and its hex text field in sync both ways.
   document.getElementById('theme-primaryColor')?.addEventListener('input', e => { document.getElementById('theme-primaryColor-hex').value = e.target.value; });
   document.getElementById('theme-accentColor')?.addEventListener('input', e => { document.getElementById('theme-accentColor-hex').value = e.target.value; });
+  document.getElementById('reminder-tpl-headercolor')?.addEventListener('input', e => { document.getElementById('reminder-tpl-headercolor-hex').value = e.target.value; });
+  document.getElementById('reminder-tpl-accentcolor')?.addEventListener('input', e => { document.getElementById('reminder-tpl-accentcolor-hex').value = e.target.value; });
 
   window.saveTheme = async () => {
     const btn = document.getElementById('theme-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
@@ -4713,6 +4781,54 @@
     }
     document.getElementById('theme-logo-file').value = '';
   };
+
+  window.saveReminderTemplate = async () => {
+    const btn = document.getElementById('reminder-tpl-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
+    const template = {
+      headerColor: document.getElementById('reminder-tpl-headercolor-hex').value.trim() || '#1A1A2E',
+      accentColor: document.getElementById('reminder-tpl-accentcolor-hex').value.trim() || '#C9903A',
+      footerText: document.getElementById('reminder-tpl-footertext').value.trim(),
+      logoUrl: document.getElementById('reminder-tpl-logourl').value.trim(),
+    };
+    try {
+      await setDoc(doc(db,'settings','site'), { reminderEmailTemplate: template, updatedAt: serverTimestamp() }, { merge: true });
+      logAdminAction('reminder_template_updated', 'settings', 'reminderEmailTemplate', 'Reminder Email Template');
+      showAlert('reminder-template-alert', t('settings.templateSaved'), 'success');
+    } catch (e) { showAlert('reminder-template-alert', e.message); }
+    btn.disabled = false; btn.textContent = t('settings.saveTemplate');
+  };
+  window.handleReminderTemplateLogoUpload = async (fileList) => {
+    const file = fileList?.[0]; if (!file) return;
+    const cloud = _cfg?.cloudinaryCloud;
+    if (!cloud) { alert('Image upload is not configured (Cloudinary env vars missing on the server).'); return; }
+    const preview = document.getElementById('reminder-tpl-logo-preview');
+    preview.innerHTML = 'Uploading...';
+    try {
+      const sigRes = await fetch('/api/sign-cloudinary-upload', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: 'properties/branding' }),
+      });
+      const sigData = await sigRes.json();
+      if (!sigRes.ok) throw new Error(sigData.error || 'Could not sign upload');
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'properties/branding');
+      fd.append('access_mode', 'public');
+      fd.append('timestamp', sigData.timestamp);
+      fd.append('api_key', sigData.apiKey);
+      fd.append('signature', sigData.signature);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error?.message || 'Logo upload failed');
+      document.getElementById('reminder-tpl-logourl').value = data.secure_url;
+      preview.innerHTML = `<img src="${data.secure_url}" style="width:100%;height:100%;object-fit:contain;">`;
+    } catch (e) {
+      preview.innerHTML = 'None';
+      alert('Logo upload failed: ' + e.message);
+    }
+    document.getElementById('reminder-tpl-logo-file').value = '';
+  };
+
   window.saveFeatureFlag = async (key, value) => {
     try {
       await setDoc(doc(db,'settings','site'), { featureFlags: { [key]: value }, updatedAt: serverTimestamp() }, { merge: true });
@@ -5584,6 +5700,10 @@
           <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;">
             <input type="checkbox" ${r.enabled!==false?'checked':''} onchange="updateReminderField(${idx},'enabled',this.checked)"> ${t('properties.reminderOn')}
           </label>
+          <select class="form-input" style="width:70px;font-size:11px;" onchange="updateReminderField(${idx},'lang',this.value)" title="${t('properties.reminderLanguage')}">
+            <option value="en" ${r.lang!=='es'?'selected':''}>EN</option>
+            <option value="es" ${r.lang==='es'?'selected':''}>ES</option>
+          </select>
           <button type="button" onclick="removeReminderRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding-left:2px;">
@@ -5610,14 +5730,15 @@
     }
     const propertyId = document.getElementById('prop-id').value;
     const occurrence = getNextReminderOccurrence(r);
-    const dateLocale = CURRENT_LANG === 'es' ? 'es-ES' : 'en-US';
+    const reminderLang = r.lang === 'es' ? 'es' : 'en'; // the reminder's OWN language, not the admin's UI language
+    const dateLocale = reminderLang === 'es' ? 'es-ES' : 'en-US';
     const dueDayLabel = occurrence ? occurrence.dueDate.toLocaleDateString(dateLocale, { month: 'long', day: 'numeric', timeZone: 'UTC' }) : '';
 
     btnEl.disabled = true;
     const original = btnEl.textContent; btnEl.textContent = t('common.testing');
     resultEl.textContent = '';
     try {
-      const result = await callManagePropertyPayments('test_reminder', { propertyId, label: r.label, message: r.message || '', dueDayLabel });
+      const result = await callManagePropertyPayments('test_reminder', { propertyId, label: r.label, message: r.message || '', dueDayLabel, lang: reminderLang });
       resultEl.style.color = '#16A34A';
       resultEl.textContent = '✓ ' + t('properties.testSentTo').replace('{email}', result.sentTo);
     } catch (e) {
@@ -5628,7 +5749,11 @@
   };
 
   window.addReminderRow = () => {
-    currentReminders.push({ id: 'rem_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), label: '', dayOfMonth: 1, leadDays: 3, enabled: true });
+    // Default the language to match the property's own country, same
+    // convention used for the public site's own EN/CO defaulting — still
+    // freely overridable per reminder via the dropdown.
+    const propertyCountry = document.getElementById('prop-country').value;
+    currentReminders.push({ id: 'rem_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), label: '', dayOfMonth: 1, leadDays: 3, enabled: true, lang: propertyCountry === 'CO' ? 'es' : 'en' });
     renderReminderRows(currentReminders);
   };
 
