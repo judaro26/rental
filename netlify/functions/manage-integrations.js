@@ -76,6 +76,9 @@ function maskProvider(id, d, activeId) {
   if (d.type === 'envelope') {
     return { ...base, provider: 'documenso', apiUrl: d.apiUrl, appUrl: d.appUrl, templateId: d.templateId, apiKeyMasked: mask(d.apiKey), webhookSecretMasked: mask(d.webhookSecret) };
   }
+  if (d.type === 'screening') {
+    return { ...base, provider: 'singlekey', environment: d.environment || 'sandbox', sandboxTokenMasked: mask(d.sandboxToken), productionTokenMasked: mask(d.productionToken), handshakeTokenMasked: mask(d.handshakeToken), tenantPays: d.tenantPays === true, minScore: d.minScore || null };
+  }
   return base;
 }
 
@@ -112,7 +115,7 @@ exports.handler = async (event) => {
     // ── ADD a new provider ───────────────────────────────────────────────────
     if (action === 'add_provider') {
       const { type, label } = body;
-      if (!['email', 'storage', 'envelope'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", or "envelope".' }) };
+      if (!['email', 'storage', 'envelope', 'screening'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", "envelope", or "screening".' }) };
 
       let fields;
       if (type === 'email') {
@@ -123,7 +126,7 @@ exports.handler = async (event) => {
         const { cloudName, apiKey, apiSecret } = body;
         if (!cloudName || !apiKey || !apiSecret) return { statusCode: 400, body: JSON.stringify({ error: 'cloudName, apiKey, and apiSecret are required for a new storage provider.' }) };
         fields = { cloudName, apiKey, apiSecret };
-      } else {
+      } else if (type === 'envelope') {
         const { apiKey, templateId, apiUrl, appUrl, webhookSecret } = body;
         if (!apiKey) return { statusCode: 400, body: JSON.stringify({ error: 'apiKey is required for a new envelope provider.' }) };
         fields = {
@@ -132,9 +135,20 @@ exports.handler = async (event) => {
           appUrl: (appUrl || 'https://app.documenso.com').replace(/\/+$/, ''),
           webhookSecret: webhookSecret || null,
         };
+      } else {
+        const { sandboxToken, productionToken, environment, handshakeToken, tenantPays, minScore } = body;
+        if (!sandboxToken && !productionToken) return { statusCode: 400, body: JSON.stringify({ error: 'At least a sandbox token is required for a new screening provider.' }) };
+        fields = {
+          sandboxToken: sandboxToken || null,
+          productionToken: productionToken || null,
+          environment: environment === 'production' ? 'production' : 'sandbox',
+          handshakeToken: handshakeToken || null,
+          tenantPays: tenantPays === true,
+          minScore: minScore ? parseInt(minScore) : null,
+        };
       }
 
-      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider' }[type];
+      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider', screening: 'Screening Provider' }[type];
       const ref = await coll.add({
         type, label: label || defaultLabel,
         ...fields,
@@ -181,6 +195,13 @@ exports.handler = async (event) => {
         if (body.appUrl !== undefined) update.appUrl = body.appUrl.replace(/\/+$/, '');
         if (body.apiKey) update.apiKey = body.apiKey; // blank = keep existing
         if (body.webhookSecret) update.webhookSecret = body.webhookSecret; // blank = keep existing
+      } else if (d.type === 'screening') {
+        if (body.environment !== undefined) update.environment = body.environment === 'production' ? 'production' : 'sandbox';
+        if (body.tenantPays !== undefined) update.tenantPays = body.tenantPays === true;
+        if (body.minScore !== undefined) update.minScore = body.minScore ? parseInt(body.minScore) : null;
+        if (body.sandboxToken) update.sandboxToken = body.sandboxToken; // blank = keep existing
+        if (body.productionToken) update.productionToken = body.productionToken; // blank = keep existing
+        if (body.handshakeToken) update.handshakeToken = body.handshakeToken; // blank = keep existing
       }
 
       await ref.update(update);
@@ -349,6 +370,42 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           success: true,
           message: `Connected successfully. Template found with ${recipientCount} recipient(s) and ${fieldCount} field(s).`,
+        }),
+      };
+    }
+
+    // ── TEST SCREENING — SingleKey's own auth docs confirm GET /api/payments
+    //    is the way to verify a token works; it's read-only and doesn't
+    //    create or charge anything. ─────────────────────────────────────
+    if (action === 'test_screening') {
+      const { id, sandboxToken, productionToken, environment } = body;
+      let token, baseUrl;
+      const env = environment === 'production' ? 'production' : 'sandbox';
+      baseUrl = env === 'production' ? 'https://platform.singlekey.com' : 'https://sandbox.singlekey.com';
+
+      if (sandboxToken || productionToken) {
+        token = env === 'production' ? productionToken : sandboxToken;
+      } else if (id) {
+        const snap = await coll.doc(id).get();
+        if (!snap.exists || snap.data().type !== 'screening') return { statusCode: 404, body: JSON.stringify({ error: 'Screening provider not found.' }) };
+        const d = snap.data();
+        token = d.environment === 'production' ? d.productionToken : d.sandboxToken;
+        baseUrl = d.environment === 'production' ? 'https://platform.singlekey.com' : 'https://sandbox.singlekey.com';
+      }
+      if (!token) return { statusCode: 400, body: JSON.stringify({ error: `No ${env} token given to test with.` }) };
+
+      const res = await fetch(`${baseUrl}/api/payments`, {
+        headers: { Authorization: `Token ${token}` },
+      });
+      let data = null; try { data = await res.json(); } catch {}
+      if (!res.ok) {
+        return { statusCode: 400, body: JSON.stringify({ error: data?.detail || `SingleKey rejected this ${env} token (HTTP ${res.status}). Check it's correct for this environment.` }) };
+      }
+      return {
+        statusCode: 200,
+        body: JSON.stringify({
+          success: true,
+          message: `${env === 'production' ? 'Production' : 'Sandbox'} token validated successfully.${data?.has_payment_method === false ? ' Note: no payment method on file yet — needed before real screenings can be purchased.' : ''}`,
         }),
       };
     }
