@@ -1459,9 +1459,11 @@
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:10px;">
           <input type="checkbox" id="edit-auto-invoice-enabled" style="width:16px;height:16px;"> Automatically generate and send this tenant's rent invoice
         </label>
-        <div style="display:flex;gap:10px;margin-top:12px;">
+        <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
           <button type="button" onclick="testAutoInvoice()" class="btn btn-outline btn-sm" id="test-auto-invoice-btn">Send Test Invoice</button>
+          <button type="button" onclick="generateInvoiceNow()" class="btn btn-sm" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;" id="generate-invoice-now-btn">⚡ Generate &amp; Send Real Invoice Now</button>
         </div>
+        <p style="font-size:10px;color:var(--slate);margin-top:6px;">Use this if the automatic generate-window for the upcoming due date already passed — e.g. you just turned this on. This creates and sends a real invoice immediately, for the next upcoming due date.</p>
         <div id="auto-invoice-test-result" style="font-size:12px;margin-top:8px;"></div>
       </div>
 
@@ -3180,6 +3182,43 @@
       if (!res.ok) throw new Error(data.error || 'Request failed');
       resultEl.style.color = '#16A34A';
       resultEl.textContent = `✓ Preview sent to ${data.sentTo}. Check your inbox.`;
+    } catch (e) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = '✗ ' + e.message;
+    }
+    btn.disabled = false; btn.textContent = original;
+  };
+  window.generateInvoiceNow = async () => {
+    const tenantId = document.getElementById('edit-tenant-id').value;
+    const resultEl = document.getElementById('auto-invoice-test-result');
+    if (!tenantId) return;
+    const tenant = allTenants.find(t => t.id === tenantId);
+    const tenantLabel = tenant ? `${tenant.firstName||''} ${tenant.lastName||''}`.trim() || tenant.email : 'this tenant';
+    if (!confirm(`This sends a REAL rent invoice to ${tenantLabel} right now — not a test. Continue?`)) return;
+
+    const btn = document.getElementById('generate-invoice-now-btn');
+    btn.disabled = true; const original = btn.textContent; btn.textContent = 'Generating...';
+    resultEl.textContent = '';
+    try {
+      // Persist current form values first, so the invoice reflects what's
+      // shown on screen even if "Save Changes" hasn't been clicked yet.
+      await updateDoc(doc(db,'tenants',tenantId), {
+        monthlyRent: parseFloat(document.getElementById('edit-rent').value)||0,
+        rentDueDay: Math.min(Math.max(parseInt(document.getElementById('edit-rent-due-day').value)||1,1),28),
+        autoInvoiceLeadDays: Math.min(Math.max(parseInt(document.getElementById('edit-auto-invoice-lead-days').value)||0,0),27),
+        updatedAt: serverTimestamp(),
+      });
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/generate-invoice-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ tenantId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      resultEl.style.color = '#16A34A';
+      resultEl.textContent = `✓ Invoice #${data.invoiceNumber} sent to ${data.tenantEmail}, due ${data.dueDate}.`;
+      await loadTenants();
     } catch (e) {
       resultEl.style.color = '#DC2626';
       resultEl.textContent = '✗ ' + e.message;
