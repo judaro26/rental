@@ -251,8 +251,24 @@
       <div class="card">
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;" data-i18n="properties.title">Manage Properties</h3>
-          <div style="display:flex;gap:10px;align-items:center;">
-            <input type="text" id="property-search" class="form-input" style="width:220px;" placeholder="Search by name, address, city..." oninput="filterProperties()">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="property-search" class="form-input" style="width:200px;" placeholder="Search by name, address, city..." oninput="filterProperties()">
+            <select id="property-country-filter" class="form-input" style="width:120px;" onchange="filterProperties()">
+              <option value="">All Countries</option>
+              <option value="US">🇺🇸 US</option>
+              <option value="CO">🇨🇴 CO</option>
+              <option value="unclassified">Unclassified</option>
+            </select>
+            <select id="property-avail-filter" class="form-input" style="width:130px;" onchange="filterProperties()">
+              <option value="">All Statuses</option>
+              <option value="available">Available</option>
+              <option value="hidden">Hidden</option>
+            </select>
+            <select id="property-bold-filter" class="form-input" style="width:150px;" onchange="filterProperties()">
+              <option value="">All (Bold)</option>
+              <option value="enabled">Bold Enabled</option>
+              <option value="not-configured">Bold Not Set Up</option>
+            </select>
             <button onclick="openPropertyModal()" class="btn btn-primary btn-sm" data-i18n="properties.add">+ Add Property</button>
           </div>
         </div>
@@ -1234,16 +1250,16 @@
     </div>
 
     <div id="prop-paymentmethods-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
-      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">💳 Payment Methods</h4>
-      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">Add manual payment options tenants can use for this property — Venmo, PayPal, bank transfer, whatever applies — and choose which one to feature. Bold, if enabled below, is automatically included as an option here too.</p>
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;" data-i18n="properties.paymentMethodsTitle">💳 Payment Methods</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="properties.paymentMethodsHelp">Add manual payment options tenants can use for this property — Venmo, PayPal, bank transfer, whatever applies — and choose which one to feature. Bold, if enabled below, is automatically included as an option here too.</p>
       <div id="prop-paymentmethods-alert" class="hidden alert" style="margin-bottom:10px;"></div>
       <div id="prop-paymentmethods-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
-      <button type="button" onclick="addPaymentMethodRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Payment Method</button>
+      <button type="button" onclick="addPaymentMethodRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;" data-i18n="properties.addPaymentMethod">+ Add Payment Method</button>
       <div style="margin-top:14px;">
-        <label class="label">Preferred Payment Method <span style="font-size:10px;font-weight:400;color:var(--slate);">(shown first to tenants)</span></label>
+        <label class="label"><span data-i18n="properties.preferredMethod">Preferred Payment Method</span> <span style="font-size:10px;font-weight:400;color:var(--slate);" data-i18n="properties.preferredMethodHint">(shown first to tenants)</span></label>
         <select id="prop-preferred-method" class="form-input"></select>
       </div>
-      <button type="button" onclick="savePropertyPaymentMethods()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-paymentmethods-save-btn">Save Payment Methods</button>
+      <button type="button" onclick="savePropertyPaymentMethods()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-paymentmethods-save-btn" data-i18n="properties.savePaymentMethods">Save Payment Methods</button>
     </div>
 
     <div id="prop-bold-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
@@ -1687,6 +1703,14 @@
       'properties.addReminder':'+ Add Reminder', 'properties.saveReminders':'Save Reminders',
       'properties.reminderDueDay':'Due day', 'properties.reminderRemind':'Remind', 'properties.reminderDaysBefore':'day(s) before', 'properties.reminderOn':'On',
       'properties.noRemindersYet':'No reminders configured yet.', 'properties.reminderLabelRequired':'Every reminder needs a label (e.g. "Electric Bill").',
+      'properties.testReminder':'Send Test', 'properties.testSentTo':'Test sent to {email}. Check your inbox.',
+      'properties.paymentMethodsTitle':'💳 Payment Methods',
+      'properties.paymentMethodsHelp':'Add manual payment options tenants can use for this property — Venmo, PayPal, bank transfer, whatever applies — and choose which one to feature. Bold, if enabled below, is automatically included as an option here too.',
+      'properties.addPaymentMethod':'+ Add Payment Method', 'properties.savePaymentMethods':'Save Payment Methods',
+      'properties.preferredMethod':'Preferred Payment Method', 'properties.preferredMethodHint':'(shown first to tenants)',
+      'properties.noPreference':'No preference', 'properties.noPaymentMethodsYet':'No manual payment methods added yet.',
+      'properties.paymentMethodLabel':'e.g. Venmo', 'properties.paymentMethodInstructions':'e.g. @my-venmo-handle',
+      'properties.paymentMethodRequired':'Every payment method needs a label (e.g. "Venmo").', 'properties.paymentMethodsSaved':'Payment methods saved.',
       'properties.loadingStatus':'Loading status...', 'properties.leaveBlankKeepCurrent':'(leave blank to keep current: {val})',
       'properties.remindersSaved':'Reminders saved.', 'common.saving':'Saving...', 'common.testing':'Testing...',
       'properties.boldSaved':'Bold settings saved.',
@@ -1766,6 +1790,14 @@
       'properties.addReminder':'+ Agregar Recordatorio', 'properties.saveReminders':'Guardar Recordatorios',
       'properties.reminderDueDay':'Día de vencimiento', 'properties.reminderRemind':'Recordar', 'properties.reminderDaysBefore':'día(s) antes', 'properties.reminderOn':'Activo',
       'properties.noRemindersYet':'Aún no hay recordatorios configurados.', 'properties.reminderLabelRequired':'Cada recordatorio necesita una etiqueta (ej. "Factura de Electricidad").',
+      'properties.testReminder':'Enviar Prueba', 'properties.testSentTo':'Prueba enviada a {email}. Revisa tu correo.',
+      'properties.paymentMethodsTitle':'💳 Métodos de Pago',
+      'properties.paymentMethodsHelp':'Agrega opciones de pago manuales que los inquilinos pueden usar para esta propiedad — Venmo, PayPal, transferencia bancaria, lo que aplique — y elige cuál destacar. Bold, si está habilitado abajo, se incluye automáticamente como opción aquí también.',
+      'properties.addPaymentMethod':'+ Agregar Método de Pago', 'properties.savePaymentMethods':'Guardar Métodos de Pago',
+      'properties.preferredMethod':'Método de Pago Preferido', 'properties.preferredMethodHint':'(se muestra primero a los inquilinos)',
+      'properties.noPreference':'Sin preferencia', 'properties.noPaymentMethodsYet':'Aún no se han agregado métodos de pago manuales.',
+      'properties.paymentMethodLabel':'ej. Venmo', 'properties.paymentMethodInstructions':'ej. @mi-usuario-venmo',
+      'properties.paymentMethodRequired':'Cada método de pago necesita una etiqueta (ej. "Venmo").', 'properties.paymentMethodsSaved':'Métodos de pago guardados.',
       'properties.loadingStatus':'Cargando estado...', 'properties.leaveBlankKeepCurrent':'(deja en blanco para mantener el actual: {val})',
       'properties.remindersSaved':'Recordatorios guardados.', 'common.saving':'Guardando...', 'common.testing':'Probando...',
       'properties.boldSaved':'Configuración Bold guardada.',
@@ -2025,9 +2057,19 @@
 
   window.filterProperties = () => {
     const q = document.getElementById('property-search').value.toLowerCase().trim();
-    let list = q ? allProperties.filter(p =>
+    const countryFilter = document.getElementById('property-country-filter').value;
+    const availFilter = document.getElementById('property-avail-filter').value;
+    const boldFilter = document.getElementById('property-bold-filter').value;
+    let list = allProperties;
+    if (q) list = list.filter(p =>
       `${p.name||''} ${p.address||''} ${p.city||''} ${p.state||''} ${p.zip||''}`.toLowerCase().includes(q)
-    ) : allProperties;
+    );
+    if (countryFilter === 'unclassified') list = list.filter(p => !p.country);
+    else if (countryFilter) list = list.filter(p => p.country === countryFilter);
+    if (availFilter === 'available') list = list.filter(p => p.available === true);
+    else if (availFilter === 'hidden') list = list.filter(p => p.available !== true);
+    if (boldFilter === 'enabled') list = list.filter(p => p.boldPaymentsEnabled === true);
+    else if (boldFilter === 'not-configured') list = list.filter(p => p.boldPaymentsEnabled !== true);
     list = applySort(list, 'properties', PROPERTY_SORT_ACCESSORS);
     renderPropertiesTable(list);
   };
@@ -5458,14 +5500,14 @@
     currentPropertyBoldEnabled = boldEnabled;
     const list = document.getElementById('prop-paymentmethods-list');
     if (!currentPaymentMethods.length) {
-      list.innerHTML = '<p style="font-size:12px;color:var(--slate);">No manual payment methods added yet.</p>';
+      list.innerHTML = `<p style="font-size:12px;color:var(--slate);">${t('properties.noPaymentMethodsYet')}</p>`;
     } else {
       list.innerHTML = currentPaymentMethods.map((m, idx) => `
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:8px;background:#FDFBF8;border-radius:3px;">
-          <input type="text" value="${(m.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Venmo" class="form-input" style="flex:1;min-width:100px;" oninput="updatePaymentMethodField(${idx},'label',this.value)">
-          <input type="text" value="${(m.instructions||'').replace(/"/g,'&quot;')}" placeholder="e.g. @my-venmo-handle" class="form-input" style="flex:2;min-width:160px;" oninput="updatePaymentMethodField(${idx},'instructions',this.value)">
+          <input type="text" value="${(m.label||'').replace(/"/g,'&quot;')}" placeholder="${t('properties.paymentMethodLabel')}" class="form-input" style="flex:1;min-width:100px;" oninput="updatePaymentMethodField(${idx},'label',this.value)">
+          <input type="text" value="${(m.instructions||'').replace(/"/g,'&quot;')}" placeholder="${t('properties.paymentMethodInstructions')}" class="form-input" style="flex:2;min-width:160px;" oninput="updatePaymentMethodField(${idx},'instructions',this.value)">
           <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;">
-            <input type="checkbox" ${m.enabled!==false?'checked':''} onchange="updatePaymentMethodField(${idx},'enabled',this.checked)"> On
+            <input type="checkbox" ${m.enabled!==false?'checked':''} onchange="updatePaymentMethodField(${idx},'enabled',this.checked)"> ${t('properties.reminderOn')}
           </label>
           <button type="button" onclick="removePaymentMethodRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
         </div>
@@ -5477,7 +5519,7 @@
   function rebuildPreferredMethodDropdown(currentPreferred) {
     const select = document.getElementById('prop-preferred-method');
     if (!select) return;
-    const options = [{ value: '', label: 'No preference' }];
+    const options = [{ value: '', label: t('properties.noPreference') }];
     if (currentPropertyBoldEnabled) options.push({ value: 'bold', label: 'Bold' });
     currentPaymentMethods.forEach(m => { if (m.enabled !== false && m.label) options.push({ value: m.id, label: m.label }); });
     select.innerHTML = options.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
@@ -5506,18 +5548,18 @@
     const propertyId = document.getElementById('prop-id').value;
     if (!propertyId) return;
     for (const m of currentPaymentMethods) {
-      if (!m.label || !m.label.trim()) { showAlert('prop-paymentmethods-alert', 'Every payment method needs a label (e.g. "Venmo").'); return; }
+      if (!m.label || !m.label.trim()) { showAlert('prop-paymentmethods-alert', t('properties.paymentMethodRequired')); return; }
     }
-    const btn = document.getElementById('prop-paymentmethods-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    const btn = document.getElementById('prop-paymentmethods-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
     try {
       const preferred = document.getElementById('prop-preferred-method').value;
       await updateDoc(doc(db,'properties',propertyId), { paymentMethods: currentPaymentMethods, preferredPaymentMethod: preferred, updatedAt: serverTimestamp() });
       logAdminAction('property_payment_methods_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, `${currentPaymentMethods.length} method(s)`);
-      showAlert('prop-paymentmethods-alert', 'Payment methods saved.', 'success');
+      showAlert('prop-paymentmethods-alert', t('properties.paymentMethodsSaved'), 'success');
       const idx = allProperties.findIndex(p => p.id === propertyId);
       if (idx !== -1) { allProperties[idx].paymentMethods = currentPaymentMethods; allProperties[idx].preferredPaymentMethod = preferred; }
     } catch (e) { showAlert('prop-paymentmethods-alert', e.message); }
-    btn.disabled = false; btn.textContent = 'Save Payment Methods';
+    btn.disabled = false; btn.textContent = t('properties.savePaymentMethods');
   };
 
   // ===== BILL & UTILITY REMINDERS (self-serve, per-property) =====
@@ -5549,12 +5591,41 @@
           <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;color:var(--slate);">
             <input type="checkbox" ${r.notifyTenants!==false?'checked':''} onchange="updateReminderField(${idx},'notifyTenants',this.checked)"> ${t('properties.notifyTenantsToo')}
           </label>
+          <button type="button" onclick="testReminderRow(${idx},this)" class="btn btn-sm btn-outline" style="margin-left:auto;">${t('properties.testReminder')}</button>
         </div>
+        <div class="reminder-test-result" style="font-size:11px;padding-left:2px;"></div>
       </div>
     `).join('');
   }
 
   window.updateReminderField = (idx, field, value) => { if (currentReminders[idx]) currentReminders[idx][field] = value; };
+
+  window.testReminderRow = async (idx, btnEl) => {
+    const r = currentReminders[idx];
+    const resultEl = btnEl.closest('div').nextElementSibling;
+    if (!r || !r.label || !r.label.trim()) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = t('properties.reminderLabelRequired');
+      return;
+    }
+    const propertyId = document.getElementById('prop-id').value;
+    const occurrence = getNextReminderOccurrence(r);
+    const dateLocale = CURRENT_LANG === 'es' ? 'es-ES' : 'en-US';
+    const dueDayLabel = occurrence ? occurrence.dueDate.toLocaleDateString(dateLocale, { month: 'long', day: 'numeric', timeZone: 'UTC' }) : '';
+
+    btnEl.disabled = true;
+    const original = btnEl.textContent; btnEl.textContent = t('common.testing');
+    resultEl.textContent = '';
+    try {
+      const result = await callManagePropertyPayments('test_reminder', { propertyId, label: r.label, message: r.message || '', dueDayLabel });
+      resultEl.style.color = '#16A34A';
+      resultEl.textContent = '✓ ' + t('properties.testSentTo').replace('{email}', result.sentTo);
+    } catch (e) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = '✗ ' + e.message;
+    }
+    btnEl.disabled = false; btnEl.textContent = original;
+  };
 
   window.addReminderRow = () => {
     currentReminders.push({ id: 'rem_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), label: '', dayOfMonth: 1, leadDays: 3, enabled: true });
