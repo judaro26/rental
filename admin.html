@@ -1042,16 +1042,36 @@
       <!-- STORAGE PROVIDER MODAL -->
       <div id="storage-provider-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="modal-backdrop absolute inset-0" onclick="closeModal('storage-provider-modal')"></div>
-        <div style="background:#fff;width:100%;max-width:440px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+        <div style="background:#fff;width:100%;max-width:460px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
           <button onclick="closeModal('storage-provider-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
           <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" id="storage-provider-modal-title">Add Storage Provider</h3>
           <input type="hidden" id="int-storage-id">
           <div id="storage-provider-modal-alert" class="hidden alert" style="margin-bottom:16px;"></div>
           <div style="display:flex;flex-direction:column;gap:14px;">
-            <div><label class="label">Label <span style="font-size:10px;font-weight:400;color:var(--slate);">(e.g. "Acme Properties' Cloudinary")</span></label><input type="text" id="int-storage-label" class="form-input" placeholder="My Cloudinary Account"></div>
-            <div><label class="label">Cloud Name</label><input type="text" id="int-storage-cloud" class="form-input" placeholder="my-cloud-name"></div>
-            <div><label class="label">API Key</label><input type="text" id="int-storage-key" class="form-input" placeholder="123456789012345"></div>
-            <div><label class="label">API Secret <span id="storage-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-storage-secret" class="form-input" placeholder="••••••••"></div>
+            <div><label class="label">Label <span style="font-size:10px;font-weight:400;color:var(--slate);">(e.g. "Acme Properties' Cloudinary")</span></label><input type="text" id="int-storage-label" class="form-input" placeholder="My Storage Account"></div>
+            <div>
+              <label class="label">Backend</label>
+              <select id="int-storage-backend" class="form-input" onchange="toggleStorageBackendFields()">
+                <option value="cloudinary">Cloudinary</option>
+                <option value="r2">Cloudflare R2</option>
+              </select>
+              <span id="storage-backend-lock-hint" class="hidden" style="font-size:10px;color:var(--slate);display:block;margin-top:4px;">The backend can't be changed after saving — add a new provider instead to switch.</span>
+            </div>
+
+            <div id="storage-fields-cloudinary" style="display:flex;flex-direction:column;gap:14px;">
+              <div><label class="label">Cloud Name</label><input type="text" id="int-storage-cloud" class="form-input" placeholder="my-cloud-name"></div>
+              <div><label class="label">API Key</label><input type="text" id="int-storage-key" class="form-input" placeholder="123456789012345"></div>
+              <div><label class="label">API Secret <span id="storage-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-storage-secret" class="form-input" placeholder="••••••••"></div>
+            </div>
+
+            <div id="storage-fields-r2" class="hidden" style="display:flex;flex-direction:column;gap:14px;">
+              <p style="font-size:11px;color:var(--slate);background:#F0F9FF;border:1px solid #BAE6FD;border-radius:3px;padding:10px 12px;">R2 buckets are private by default. Before this works, enable public access on your bucket (custom domain or the <code>r2.dev</code> subdomain) in the Cloudflare dashboard, and enter that URL as "Public URL" below.</p>
+              <div><label class="label">Account ID</label><input type="text" id="int-storage-accountid" class="form-input" placeholder="Cloudflare dashboard → R2 → Account ID"></div>
+              <div><label class="label">Bucket Name</label><input type="text" id="int-storage-bucketname" class="form-input" placeholder="my-bucket"></div>
+              <div><label class="label">Public URL <span style="font-size:10px;font-weight:400;color:var(--slate);">(no trailing slash)</span></label><input type="text" id="int-storage-publicurl" class="form-input" placeholder="https://my-bucket.<account-id>.r2.dev"></div>
+              <div><label class="label">Access Key ID <span id="storage-r2-key-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="text" id="int-storage-accesskeyid" class="form-input" placeholder="Cloudflare → Manage R2 API Tokens"></div>
+              <div><label class="label">Secret Access Key <span id="storage-r2-secret-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-storage-secretaccesskey" class="form-input" placeholder="••••••••"></div>
+            </div>
           </div>
           <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;">
             <button onclick="saveStorageProvider()" class="btn btn-primary" style="flex:1;" id="storage-int-save-btn">Save</button>
@@ -1692,6 +1712,7 @@
   </div>
 </div>
 
+<script src="/shared/upload.js"></script>
 <!-- FIREBASE + ADMIN LOGIC -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -4994,29 +5015,12 @@
   };
   window.handleThemeLogoUpload = async (fileList) => {
     const file = fileList?.[0]; if (!file) return;
-    const cloud = _cfg?.cloudinaryCloud;
-    if (!cloud) { alert('Image upload is not configured (Cloudinary env vars missing on the server).'); return; }
     const preview = document.getElementById('theme-logo-preview');
     preview.innerHTML = 'Uploading...';
     try {
-      const sigRes = await fetch('/api/sign-cloudinary-upload', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder: 'properties/branding' }),
-      });
-      const sigData = await sigRes.json();
-      if (!sigRes.ok) throw new Error(sigData.error || 'Could not sign upload');
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('folder', 'properties/branding');
-      fd.append('access_mode', 'public');
-      fd.append('timestamp', sigData.timestamp);
-      fd.append('api_key', sigData.apiKey);
-      fd.append('signature', sigData.signature);
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || 'Logo upload failed');
-      document.getElementById('theme-logoUrl').value = data.secure_url;
-      preview.innerHTML = `<img src="${data.secure_url}" style="width:100%;height:100%;object-fit:contain;">`;
+      const url = await uploadFile(file, 'properties/branding');
+      document.getElementById('theme-logoUrl').value = url;
+      preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain;">`;
     } catch (e) {
       preview.innerHTML = 'None';
       alert('Logo upload failed: ' + e.message);
@@ -5041,29 +5045,12 @@
   };
   window.handleReminderTemplateLogoUpload = async (fileList) => {
     const file = fileList?.[0]; if (!file) return;
-    const cloud = _cfg?.cloudinaryCloud;
-    if (!cloud) { alert('Image upload is not configured (Cloudinary env vars missing on the server).'); return; }
     const preview = document.getElementById('reminder-tpl-logo-preview');
     preview.innerHTML = 'Uploading...';
     try {
-      const sigRes = await fetch('/api/sign-cloudinary-upload', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ folder: 'properties/branding' }),
-      });
-      const sigData = await sigRes.json();
-      if (!sigRes.ok) throw new Error(sigData.error || 'Could not sign upload');
-      const fd = new FormData();
-      fd.append('file', file);
-      fd.append('folder', 'properties/branding');
-      fd.append('access_mode', 'public');
-      fd.append('timestamp', sigData.timestamp);
-      fd.append('api_key', sigData.apiKey);
-      fd.append('signature', sigData.signature);
-      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: fd });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error?.message || 'Logo upload failed');
-      document.getElementById('reminder-tpl-logourl').value = data.secure_url;
-      preview.innerHTML = `<img src="${data.secure_url}" style="width:100%;height:100%;object-fit:contain;">`;
+      const url = await uploadFile(file, 'properties/branding');
+      document.getElementById('reminder-tpl-logourl').value = url;
+      preview.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain;">`;
     } catch (e) {
       preview.innerHTML = 'None';
       alert('Logo upload failed: ' + e.message);
@@ -5140,7 +5127,7 @@
       const statusBadge = p.isActive ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-pending">Inactive</span>';
       const openFn = openFns[type];
       const middleCell = type === 'email' ? `<td style="font-size:12px;">${p.host || '—'}</td>`
-        : type === 'storage' ? `<td style="font-size:12px;">${p.cloudName || '—'}</td>`
+        : type === 'storage' ? `<td style="font-size:12px;">${p.backend === 'r2' ? `R2: ${p.bucketName || '—'}` : `Cloudinary: ${p.cloudName || '—'}`}</td>`
         : type === 'screening' ? `<td style="font-size:12px;text-transform:capitalize;">${p.environment || 'sandbox'}</td>`
         : `<td style="font-size:12px;">${p.templateId || '—'}</td>`;
       return `<tr>
@@ -5253,27 +5240,61 @@
   };
 
   // ── Storage provider modal ─────────────────────────────────────────────
+  window.toggleStorageBackendFields = () => {
+    const backend = document.getElementById('int-storage-backend').value;
+    document.getElementById('storage-fields-cloudinary').classList.toggle('hidden', backend !== 'cloudinary');
+    document.getElementById('storage-fields-r2').classList.toggle('hidden', backend !== 'r2');
+  };
   window.openStorageProviderModal = (id) => {
     const p = id ? allIntegrationProviders.find(x => x.id === id) : null;
+    const backend = p?.backend || 'cloudinary';
     document.getElementById('int-storage-id').value = id || '';
     document.getElementById('int-storage-label').value = p?.label || '';
+    document.getElementById('int-storage-backend').value = backend;
+    document.getElementById('int-storage-backend').disabled = !!p; // backend is fixed once saved — add a new provider to switch
+    document.getElementById('storage-backend-lock-hint').classList.toggle('hidden', !p);
+    toggleStorageBackendFields();
+
+    // Cloudinary fields
     document.getElementById('int-storage-cloud').value = p?.cloudName || '';
     document.getElementById('int-storage-key').value = p?.apiKey || '';
     document.getElementById('int-storage-secret').value = '';
-    document.getElementById('storage-secret-hint').textContent = p ? `(leave blank to keep current: ${p.apiSecretMasked || '••••'})` : '';
+    document.getElementById('storage-secret-hint').textContent = (p && backend === 'cloudinary') ? `(leave blank to keep current: ${p.apiSecretMasked || '••••'})` : '';
+
+    // R2 fields
+    document.getElementById('int-storage-accountid').value = p?.accountId || '';
+    document.getElementById('int-storage-bucketname').value = p?.bucketName || '';
+    document.getElementById('int-storage-publicurl').value = p?.publicUrl || '';
+    document.getElementById('int-storage-accesskeyid').value = '';
+    document.getElementById('int-storage-secretaccesskey').value = '';
+    document.getElementById('storage-r2-key-hint').textContent = (p && backend === 'r2') ? `(leave blank to keep current: ${p.accessKeyIdMasked || '••••'})` : '';
+    document.getElementById('storage-r2-secret-hint').textContent = (p && backend === 'r2') ? `(leave blank to keep current: ${p.secretAccessKeyMasked || '••••'})` : '';
+
     document.getElementById('storage-provider-modal-title').textContent = p ? 'Edit Storage Provider' : 'Add Storage Provider';
     document.getElementById('storage-provider-modal-alert').classList.add('hidden');
     openModal('storage-provider-modal');
   };
   window.saveStorageProvider = async () => {
     const id = document.getElementById('int-storage-id').value;
+    const backend = document.getElementById('int-storage-backend').value;
     const btn = document.getElementById('storage-int-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
-    const payload = {
-      label: document.getElementById('int-storage-label').value.trim(),
-      cloudName: document.getElementById('int-storage-cloud').value.trim(),
-      apiKey: document.getElementById('int-storage-key').value.trim(),
-      apiSecret: document.getElementById('int-storage-secret').value, // blank on edit = keep existing
-    };
+    const payload = backend === 'r2'
+      ? {
+          label: document.getElementById('int-storage-label').value.trim(),
+          backend: 'r2',
+          accountId: document.getElementById('int-storage-accountid').value.trim(),
+          bucketName: document.getElementById('int-storage-bucketname').value.trim(),
+          publicUrl: document.getElementById('int-storage-publicurl').value.trim(),
+          accessKeyId: document.getElementById('int-storage-accesskeyid').value.trim(), // blank on edit = keep existing
+          secretAccessKey: document.getElementById('int-storage-secretaccesskey').value, // blank on edit = keep existing
+        }
+      : {
+          label: document.getElementById('int-storage-label').value.trim(),
+          backend: 'cloudinary',
+          cloudName: document.getElementById('int-storage-cloud').value.trim(),
+          apiKey: document.getElementById('int-storage-key').value.trim(),
+          apiSecret: document.getElementById('int-storage-secret').value, // blank on edit = keep existing
+        };
     try {
       if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('storage_provider_updated', 'settings', id, payload.label); }
       else { await callManageIntegrations('add_provider', { type: 'storage', ...payload }); logAdminAction('storage_provider_added', 'settings', null, payload.label); }
@@ -5284,14 +5305,24 @@
   };
   window.testStorageIntegration = async () => {
     const id = document.getElementById('int-storage-id').value;
+    const backend = document.getElementById('int-storage-backend').value;
     const btn = document.getElementById('storage-int-test-btn'); btn.disabled = true; btn.textContent = 'Testing...';
     try {
-      const result = await callManageIntegrations('test_storage', {
-        id: id || undefined,
-        cloudName: document.getElementById('int-storage-cloud').value.trim(),
-        apiKey: document.getElementById('int-storage-key').value.trim(),
-        apiSecret: document.getElementById('int-storage-secret').value,
-      });
+      const payload = backend === 'r2'
+        ? {
+            id: id || undefined, backend: 'r2',
+            accountId: document.getElementById('int-storage-accountid').value.trim(),
+            bucketName: document.getElementById('int-storage-bucketname').value.trim(),
+            accessKeyId: document.getElementById('int-storage-accesskeyid').value.trim(),
+            secretAccessKey: document.getElementById('int-storage-secretaccesskey').value,
+          }
+        : {
+            id: id || undefined, backend: 'cloudinary',
+            cloudName: document.getElementById('int-storage-cloud').value.trim(),
+            apiKey: document.getElementById('int-storage-key').value.trim(),
+            apiSecret: document.getElementById('int-storage-secret').value,
+          };
+      const result = await callManageIntegrations('test_storage', payload);
       showAlert('storage-provider-modal-alert', '✓ ' + result.message, 'success');
     } catch (e) { showAlert('storage-provider-modal-alert', 'Test failed: ' + e.message); }
     btn.disabled = false; btn.textContent = 'Test Connection';
@@ -6171,8 +6202,6 @@
   window.handlePropertyImageUpload = async (fileList) => {
     const files = Array.from(fileList || []);
     if (!files.length) return;
-    const cloud = _cfg?.cloudinaryCloud;
-    if (!cloud) { alert('Image upload is not configured (Cloudinary env vars missing on the server).'); return; }
     const statusEl = document.getElementById('prop-upload-status');
     statusEl.style.display = '';
     const propId = document.getElementById('prop-id').value || 'unsaved';
@@ -6180,28 +6209,10 @@
     for (const file of files) {
       statusEl.textContent = `Uploading ${uploaded + failed + 1} of ${files.length}...`;
       try {
-        const sigRes = await fetch('/api/sign-cloudinary-upload', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ folder: `properties/${propId}` }),
-        });
-        const sigData = await sigRes.json();
-        if (!sigRes.ok) throw new Error(sigData.error || 'Could not sign upload');
-
-        const fd = new FormData();
-        fd.append('file', file);
-        fd.append('folder', `properties/${propId}`);
-        fd.append('access_mode', 'public');
-        fd.append('timestamp', sigData.timestamp);
-        fd.append('api_key', sigData.apiKey);
-        fd.append('signature', sigData.signature);
-
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloud}/image/upload`, { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message || 'Image upload failed');
-
+        const url = await uploadFile(file, `properties/${propId}`);
         // Drop the upload into the first empty row if one exists, else add a new row.
         const emptyInput = Array.from(document.querySelectorAll('.prop-img-input')).find(i => !i.value.trim());
-        if (emptyInput) emptyInput.value = data.secure_url; else addImageRow(data.secure_url);
+        if (emptyInput) emptyInput.value = url; else addImageRow(url);
         uploaded++;
       } catch (e) {
         console.error('Property image upload failed:', e);
