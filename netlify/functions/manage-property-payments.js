@@ -176,6 +176,42 @@ exports.handler = async (event) => {
       };
     }
 
+    // ── TEST REMINDER — always sent to the verified caller's own email,
+    //    never to real tenants or the configured notifyEmail, so testing a
+    //    rule can never spam or confuse an actual recipient. Doesn't touch
+    //    lastSentPeriod, so a real send still happens on its real date. ───
+    if (action === 'test_reminder') {
+      const { label, message, dueDayLabel } = body;
+      if (!label || !label.trim()) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a label to test with.' }) };
+
+      await require('./_lib/apply-email-config')();
+      if (!process.env.SMTP_HOST) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
+      }
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      });
+      const dueLabel = dueDayLabel || 'its next due date';
+      const customMessage = (message || '').trim();
+      await transporter.sendMail({
+        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        to: caller.email,
+        subject: `[TEST] Reminder: ${label} due ${dueLabel}`,
+        html: `
+          <p style="background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:4px;font-size:12px;">This is a test, sent only to you — not to tenants or any configured notify email.</p>
+          <p>Hi there,</p>
+          <p>This is a reminder that <strong>${label}</strong> for ${caller.propertyName || 'your property'} is due on <strong>${dueLabel}</strong>.</p>
+          ${customMessage ? `<p>${customMessage}</p>` : ''}
+          <p style="color:#6B7280;font-size:12px;">This is an automated reminder, not an invoice — check with your property manager if you have questions about how to pay.</p>
+        `,
+      });
+      return { statusCode: 200, body: JSON.stringify({ success: true, sentTo: caller.email }) };
+    }
+
     return { statusCode: 400, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
 
   } catch (err) {
