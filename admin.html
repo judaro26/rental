@@ -441,6 +441,22 @@
             <div><label class="label">Title *</label><input type="text" id="ann-title" class="form-input" placeholder="e.g. Water Shutoff Notice"></div>
             <div><label class="label">Send To</label><select id="ann-property" class="form-input"><option value="">All Properties</option></select></div>
             <div class="col-span-2"><label class="label">Message *</label><textarea id="ann-message" class="form-input" rows="4" placeholder="Write your announcement..."></textarea></div>
+            <div class="col-span-2">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:8px;">
+                <input type="checkbox" id="ann-use-specific-tenants" onchange="toggleAnnSpecificTenants()"> Instead, notify specific tenants only (overrides "Send To" above)
+              </label>
+              <div id="ann-specific-tenants-wrap" class="hidden" style="border:1px solid var(--border);border-radius:3px;padding:10px;">
+                <input type="text" id="ann-tenant-search" class="form-input" style="margin-bottom:8px;" placeholder="Search tenants by name, email, or property..." oninput="renderAnnTenantChecklist()">
+                <div id="ann-tenant-checklist" style="max-height:200px;overflow-y:auto;"></div>
+                <div style="font-size:11px;color:var(--slate);margin-top:6px;" id="ann-tenant-count"></div>
+              </div>
+            </div>
+            <div class="col-span-2">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;color:#DC2626;font-weight:500;">
+                <input type="checkbox" id="ann-urgent" style="width:16px;height:16px;"> 🚨 Mark as Urgent
+              </label>
+              <p style="font-size:11px;color:var(--slate);margin-top:2px;margin-left:24px;">For safety notices (earthquakes, evacuations, etc.) — sends with red styling and a distinct subject line so it stands out in an inbox.</p>
+            </div>
           </div>
           <button onclick="postAnnouncement()" class="btn btn-primary">Post Announcement</button>
         </div>
@@ -3849,6 +3865,8 @@
   };
 
   // ===== ANNOUNCEMENTS =====
+  let selectedAnnouncementTenantIds = new Set(); // persists across search re-renders, unlike reading checked state from the DOM
+
   async function loadAnnouncements() {
     const snap = await getDocs(query(collection(db,'announcements'), orderBy('createdAt','desc')));
     allAnnouncements = scopeByCountry(snap.docs.map(d=>({ id:d.id, ...d.data() })), { allowGlobal: true });
@@ -3859,24 +3877,73 @@
     if (!allAnnouncements.length) { tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--slate);padding:24px;">No announcements posted yet.</td></tr>'; return; }
     tbody.innerHTML = allAnnouncements.map(a => {
       const date = a.createdAt?.toDate ? a.createdAt.toDate().toLocaleDateString() : '—';
-      const propName = a.propertyId ? allProperties.find(p=>p.id===a.propertyId)?.name||'—' : 'All';
-      return `<tr><td>${date}</td><td><strong>${a.title}</strong></td><td style="font-size:12px;max-width:200px;">${a.message}</td><td>${propName}</td><td><button onclick="deleteAnnouncement('${a.id}')" class="btn btn-sm btn-danger">Delete</button></td></tr>`;
+      const sentTo = (Array.isArray(a.tenantIds) && a.tenantIds.length)
+        ? `${a.tenantIds.length} specific tenant${a.tenantIds.length===1?'':'s'}`
+        : (a.propertyId ? allProperties.find(p=>p.id===a.propertyId)?.name||'—' : 'All');
+      const titleCell = a.urgent ? `<strong style="color:#DC2626;">🚨 ${a.title}</strong>` : `<strong>${a.title}</strong>`;
+      return `<tr><td>${date}</td><td>${titleCell}</td><td style="font-size:12px;max-width:200px;">${a.message}</td><td>${sentTo}</td><td><button onclick="deleteAnnouncement('${a.id}')" class="btn btn-sm btn-danger">Delete</button></td></tr>`;
     }).join('');
   }
+  window.toggleAnnSpecificTenants = () => {
+    const use = document.getElementById('ann-use-specific-tenants').checked;
+    document.getElementById('ann-specific-tenants-wrap').classList.toggle('hidden', !use);
+    document.getElementById('ann-property').disabled = use; // irrelevant once specific tenants are hand-picked
+    if (use) renderAnnTenantChecklist();
+  };
+  function renderAnnTenantChecklist() {
+    const search = (document.getElementById('ann-tenant-search').value || '').toLowerCase();
+    const container = document.getElementById('ann-tenant-checklist');
+    const activeTenants = allTenants.filter(t => t.status === 'active');
+    const filtered = search
+      ? activeTenants.filter(t => {
+          const propName = allProperties.find(p=>p.id===t.propertyId)?.name || '';
+          return `${t.firstName||''} ${t.lastName||''} ${t.email||''} ${propName}`.toLowerCase().includes(search);
+        })
+      : activeTenants;
+    if (!filtered.length) { container.innerHTML = '<p style="font-size:12px;color:var(--slate);">No matching tenants.</p>'; }
+    else {
+      container.innerHTML = filtered.map(t => {
+        const propName = allProperties.find(p=>p.id===t.propertyId)?.name || '—';
+        const checked = selectedAnnouncementTenantIds.has(t.id) ? 'checked' : '';
+        return `<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;cursor:pointer;">
+          <input type="checkbox" onchange="toggleAnnTenantSelection('${t.id}',this.checked)" ${checked}>
+          ${t.firstName||''} ${t.lastName||''} <span style="color:var(--slate);">— ${propName}</span>
+        </label>`;
+      }).join('');
+    }
+    document.getElementById('ann-tenant-count').textContent = selectedAnnouncementTenantIds.size
+      ? `${selectedAnnouncementTenantIds.size} tenant(s) selected`
+      : '';
+  }
+  window.toggleAnnTenantSelection = (tenantId, checked) => {
+    if (checked) selectedAnnouncementTenantIds.add(tenantId);
+    else selectedAnnouncementTenantIds.delete(tenantId);
+    document.getElementById('ann-tenant-count').textContent = selectedAnnouncementTenantIds.size
+      ? `${selectedAnnouncementTenantIds.size} tenant(s) selected`
+      : '';
+  };
   window.postAnnouncement = async () => {
     const title = document.getElementById('ann-title').value.trim();
     const message = document.getElementById('ann-message').value.trim();
-    const propId = document.getElementById('ann-property').value;
+    const useSpecific = document.getElementById('ann-use-specific-tenants').checked;
+    const tenantIds = useSpecific ? Array.from(selectedAnnouncementTenantIds) : [];
+    const propId = useSpecific ? '' : document.getElementById('ann-property').value;
+    const urgent = document.getElementById('ann-urgent').checked;
     if (!title||!message) { showAlert('ann-alert','Title and message are required.'); return; }
+    if (useSpecific && !tenantIds.length) { showAlert('ann-alert','Select at least one tenant, or uncheck "notify specific tenants only".'); return; }
     const btn = document.querySelector('#section-announcements button[onclick="postAnnouncement()"]');
     if (btn) { btn.disabled=true; btn.textContent='Posting...'; }
-    await addDoc(collection(db,'announcements'),{title,message,propertyId:propId||null,createdAt:serverTimestamp()});
+    await addDoc(collection(db,'announcements'),{title,message,propertyId:propId||null,tenantIds:tenantIds.length?tenantIds:null,urgent,createdAt:serverTimestamp()});
     let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
     const propName = propId?(allProperties.find(p=>p.id===propId)?.name||''):'';
-    fetch('/api/announce-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,propertyId:propId||null,propertyName:propName,siteName})})
+    fetch('/api/announce-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,siteName})})
       .then(r=>r.json()).then(d=>{if(d.sent>0)showAlert('ann-alert',`✓ Announcement posted and emailed to ${d.sent} tenant${d.sent>1?'s':''}.`,'success');else showAlert('ann-alert','✓ Announcement posted.','success');})
       .catch(()=>showAlert('ann-alert','✓ Announcement posted.','success'));
     document.getElementById('ann-title').value=''; document.getElementById('ann-message').value='';
+    document.getElementById('ann-urgent').checked = false;
+    selectedAnnouncementTenantIds.clear();
+    document.getElementById('ann-use-specific-tenants').checked = false;
+    toggleAnnSpecificTenants();
     if (btn) { btn.disabled=false; btn.textContent='Post Announcement'; }
     await loadAnnouncements();
   };
