@@ -18,6 +18,10 @@
 [functions."send-auto-invoices"]
   schedule = "0 11 * * *"
 
+# ── Scheduled: daily annual event reminder sweep (14:00 UTC) ─────────────────
+[functions."send-annual-event-reminders"]
+  schedule = "0 14 * * *"
+
 # ── Scheduled: daily retention purge of declined/archived application docs ────
 [functions."purge-expired-applications"]
   schedule = "0 3 * * *"
