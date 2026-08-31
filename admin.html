@@ -1399,6 +1399,15 @@
       <button type="button" onclick="addReminderRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;" data-i18n="properties.addReminder">+ Add Reminder</button>
       <button type="button" onclick="savePropertyReminders()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-reminders-save-btn" data-i18n="properties.saveReminders">Save Reminders</button>
     </div>
+
+    <div id="prop-annual-events-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">📅 Annual Events</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">For yearly events like a board or HOA meeting — sends a reminder email with a calendar file attached (one click to add it to Google Calendar, Outlook, or Apple Calendar), at each lead time you set.</p>
+      <div id="prop-annual-events-alert" class="hidden alert" style="margin-bottom:10px;"></div>
+      <div id="prop-annual-events-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
+      <button type="button" onclick="addAnnualEventRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Annual Event</button>
+      <button type="button" onclick="savePropertyAnnualEvents()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-annual-events-save-btn">Save Annual Events</button>
+    </div>
     </div>
 
     <div style="display:flex;gap:10px;padding:16px 28px;border-top:1px solid var(--border);flex-shrink:0;">
@@ -2345,6 +2354,7 @@
     document.getElementById('prop-bold-section').classList.add('hidden'); // needs a saved property first
     document.getElementById('prop-reminders-section').classList.add('hidden');
     document.getElementById('prop-paymentmethods-section').classList.add('hidden');
+    document.getElementById('prop-annual-events-section').classList.add('hidden');
     openModal('property-modal');
   };
   window.editProperty = id => {
@@ -2371,6 +2381,8 @@
     renderReminderRows(p.reminders || []);
     document.getElementById('prop-paymentmethods-section').classList.remove('hidden');
     renderPaymentMethodRows(p.paymentMethods || [], p.preferredPaymentMethod || '', p.boldPaymentsEnabled === true);
+    document.getElementById('prop-annual-events-section').classList.remove('hidden');
+    renderAnnualEventRows(p.annualEvents || []);
     openModal('property-modal');
   };
   window.saveProperty = async () => {
@@ -6106,6 +6118,107 @@
       renderUpcomingBills();
     } catch (e) { showAlert('prop-reminders-alert', e.message); }
     btn.disabled = false; btn.textContent = t('properties.saveReminders');
+  };
+
+  // ===== ANNUAL EVENTS (self-serve, per-property) — yearly recurring
+  // events like a board/HOA meeting, with a calendar-file attachment and
+  // one or more lead-time reminders. Genuinely different recurrence
+  // pattern than Bill & Utility Reminders above (annual vs. monthly,
+  // several lead-times per event vs. one), so kept as its own list rather
+  // than shoehorned into the monthly reminder rows. =====
+  let currentAnnualEvents = [];
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function renderAnnualEventRows(events) {
+    currentAnnualEvents = (events || []).map(e => ({ ...e }));
+    const list = document.getElementById('prop-annual-events-list');
+    if (!currentAnnualEvents.length) {
+      list.innerHTML = '<p style="font-size:12px;color:var(--slate);">No annual events configured yet.</p>';
+      return;
+    }
+    list.innerHTML = currentAnnualEvents.map((e, idx) => `
+      <div style="display:flex;flex-direction:column;gap:6px;padding:8px;background:#FDFBF8;border-radius:3px;">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input type="text" value="${(e.label||'').replace(/"/g,'&quot;')}" placeholder="e.g. Annual Board Meeting" class="form-input" style="flex:2;min-width:140px;" oninput="updateAnnualEventField(${idx},'label',this.value)">
+          <select class="form-input" style="width:110px;" onchange="updateAnnualEventField(${idx},'month',parseInt(this.value))">
+            ${MONTH_NAMES.map((m,i) => `<option value="${i+1}" ${e.month===i+1?'selected':''}>${m}</option>`).join('')}
+          </select>
+          <input type="number" value="${e.day||1}" min="1" max="28" class="form-input" style="width:58px;" title="Day of month" oninput="updateAnnualEventField(${idx},'day',Math.min(Math.max(parseInt(this.value)||1,1),28))">
+          <select class="form-input" style="width:64px;" onchange="updateAnnualEventField(${idx},'lang',this.value)">
+            <option value="en" ${e.lang!=='es'?'selected':''}>EN</option>
+            <option value="es" ${e.lang==='es'?'selected':''}>ES</option>
+          </select>
+          <button type="button" onclick="removeAnnualEventRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+          <input type="text" value="${(e.reminderLeadDays||[]).join(', ')}" placeholder="Remind this many days before, e.g. 30, 7" class="form-input" style="flex:1;min-width:200px;font-size:12px;" oninput="updateAnnualEventLeadDays(${idx},this.value)">
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding-left:2px;">
+          <input type="email" value="${(e.notifyEmail||'').replace(/"/g,'&quot;')}" placeholder="Notify this email (e.g. yourself, the board)" class="form-input" style="flex:1;min-width:220px;font-size:12px;" oninput="updateAnnualEventField(${idx},'notifyEmail',this.value)">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap;cursor:pointer;color:var(--slate);">
+            <input type="checkbox" ${e.notifyTenants===true?'checked':''} onchange="updateAnnualEventField(${idx},'notifyTenants',this.checked)"> Also notify tenants
+          </label>
+          <button type="button" onclick="testAnnualEventRow(${idx},this)" class="btn btn-sm btn-outline" style="margin-left:auto;">Send Test</button>
+        </div>
+        <div class="annual-event-test-result" style="font-size:11px;padding-left:2px;"></div>
+      </div>
+    `).join('');
+  }
+
+  window.updateAnnualEventField = (idx, field, value) => { if (currentAnnualEvents[idx]) currentAnnualEvents[idx][field] = value; };
+  window.updateAnnualEventLeadDays = (idx, value) => {
+    if (!currentAnnualEvents[idx]) return;
+    currentAnnualEvents[idx].reminderLeadDays = value.split(',')
+      .map(s => parseInt(s.trim()))
+      .filter(n => !isNaN(n) && n >= 0 && n < 365);
+  };
+  window.addAnnualEventRow = () => {
+    currentAnnualEvents.push({ id: 'evt_' + Date.now() + '_' + Math.random().toString(36).slice(2,7), label: '', month: 1, day: 1, reminderLeadDays: [30, 7], notifyEmail: '', notifyTenants: false, lang: 'en', lastSentYears: {} });
+    renderAnnualEventRows(currentAnnualEvents);
+  };
+  window.removeAnnualEventRow = (idx) => {
+    currentAnnualEvents.splice(idx, 1);
+    renderAnnualEventRows(currentAnnualEvents);
+  };
+  window.savePropertyAnnualEvents = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    for (const e of currentAnnualEvents) {
+      if (!e.label || !e.label.trim()) { showAlert('prop-annual-events-alert', 'Every event needs a label (e.g. "Annual Board Meeting").'); return; }
+      if (!e.reminderLeadDays || !e.reminderLeadDays.length) { showAlert('prop-annual-events-alert', `"${e.label}" needs at least one reminder lead time (e.g. "30, 7").`); return; }
+    }
+    const btn = document.getElementById('prop-annual-events-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
+    try {
+      await updateDoc(doc(db,'properties',propertyId), { annualEvents: currentAnnualEvents, updatedAt: serverTimestamp() });
+      logAdminAction('property_annual_events_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, `${currentAnnualEvents.length} event(s)`);
+      showAlert('prop-annual-events-alert', 'Annual events saved.', 'success');
+      const idx = allProperties.findIndex(p => p.id === propertyId);
+      if (idx !== -1) allProperties[idx].annualEvents = currentAnnualEvents;
+    } catch (e) { showAlert('prop-annual-events-alert', e.message); }
+    btn.disabled = false; btn.textContent = 'Save Annual Events';
+  };
+  window.testAnnualEventRow = async (idx, btnEl) => {
+    const e = currentAnnualEvents[idx];
+    const resultEl = btnEl.closest('div').nextElementSibling;
+    if (!e || !e.label || !e.label.trim()) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = 'Enter a label first.';
+      return;
+    }
+    btnEl.disabled = true; const original = btnEl.textContent; btnEl.textContent = t('common.testing');
+    resultEl.textContent = '';
+    try {
+      const result = await callManagePropertyPayments('test_annual_event', {
+        propertyId: document.getElementById('prop-id').value,
+        label: e.label, month: e.month, day: e.day, lang: e.lang,
+      });
+      resultEl.style.color = '#16A34A';
+      resultEl.textContent = `✓ Test sent to ${result.sentTo}, with a calendar file attached. Check your inbox.`;
+    } catch (err) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = '✗ ' + err.message;
+    }
+    btnEl.disabled = false; btnEl.textContent = original;
   };
 
   // ===== BOLD PAYMENT SETTINGS (self-serve, per-property) =====
