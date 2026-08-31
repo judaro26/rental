@@ -3209,12 +3209,21 @@
         updatedAt: serverTimestamp(),
       });
       const idToken = await auth.currentUser.getIdToken();
-      const res = await fetch('/api/generate-invoice-now', {
+      let res = await fetch('/api/generate-invoice-now', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({ tenantId }),
       });
-      const data = await res.json();
+      let data = await res.json();
+      if (res.status === 409 && data.error === 'ALREADY_PAID') {
+        if (!confirm(data.message)) { btn.disabled = false; btn.textContent = original; return; }
+        res = await fetch('/api/generate-invoice-now', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+          body: JSON.stringify({ tenantId, force: true }),
+        });
+        data = await res.json();
+      }
       if (!res.ok) throw new Error(data.error || 'Request failed');
       resultEl.style.color = '#16A34A';
       resultEl.textContent = `✓ Invoice #${data.invoiceNumber} sent to ${data.tenantEmail}, due ${data.dueDate}.`;
