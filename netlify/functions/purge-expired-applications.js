@@ -27,6 +27,7 @@ function getAdmin() {
   }
   return admin;
 }
+const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
 // Normalize a Firestore Timestamp | ISO string | Date to epoch ms (or null).
 function toMs(v) {
@@ -36,7 +37,7 @@ function toMs(v) {
   return isNaN(t) ? null : t;
 }
 
-exports.handler = async () => {
+async function runPurgeExpiredApplications() {
   if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
     console.warn('purge-expired-applications: FIREBASE_SERVICE_ACCOUNT not set — skipping.');
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
@@ -75,6 +76,7 @@ exports.handler = async () => {
 
   const snap = await db.collection('applications').get();
   let purgedApps = 0, purgedFiles = 0, deletedApps = 0, deletedFiles = 0;
+  const errorMessages = [];
 
   for (const docSnap of snap.docs) {
     const app = docSnap.data();
@@ -108,6 +110,7 @@ exports.handler = async () => {
         deletedApps++; deletedFiles += filesRemoved;
       } catch (e) {
         console.error(`purge: failed to delete application ${docSnap.id}:`, e.message);
+        errorMessages.push(`delete application ${docSnap.id}: ${e.message}`);
       }
       continue;
     }
@@ -136,10 +139,22 @@ exports.handler = async () => {
         purgedApps++; purgedFiles += filesRemoved;
       } catch (e) {
         console.error(`purge: failed to update application ${docSnap.id}:`, e.message);
+        errorMessages.push(`purge documents ${docSnap.id}: ${e.message}`);
       }
     }
   }
 
   console.log(`purge-expired-applications: purged docs from ${purgedApps} app(s) (${purgedFiles} files); fully deleted ${deletedApps} app(s) (${deletedFiles} files). Retention ${retentionDays}d / delete ${deleteDays}d.`);
+  await notifyAdminOnFailure({ functionName: 'purge-expired-applications', errorCount: errorMessages.length, sampleErrors: errorMessages });
   return { statusCode: 200, body: JSON.stringify({ success: true, purgedApps, purgedFiles, deletedApps, deletedFiles, retentionDays, deleteDays }) };
+}
+
+exports.handler = async () => {
+  try {
+    return await runPurgeExpiredApplications();
+  } catch (err) {
+    console.error('purge-expired-applications error:', err);
+    await notifyAdminOnFailure({ functionName: 'purge-expired-applications', fatalError: err.message });
+    return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
+  }
 };
