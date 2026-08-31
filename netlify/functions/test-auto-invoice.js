@@ -83,18 +83,28 @@ exports.handler = async (event) => {
       if (settingsSnap.exists) siteName = settingsSnap.data().siteName || siteName;
     } catch { /* use default siteName */ }
 
-    const { buildHtml, buildEmail } = require('./_lib/create-invoice');
+    const { buildHtml, buildEmail, getStore } = require('./_lib/create-invoice');
     const tenantName = `${tenant.firstName || ''} ${tenant.lastName || ''}`.trim() || 'Tenant';
     const total = Number(tenant.monthlyRent);
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const dueLabel = dueDayLabel || 'its next due date';
 
     const html = buildHtml({
-      type: 'invoice', invoiceNumber: 'TEST-PREVIEW', date, dueDate: dueLabel, siteName, siteUrl,
+      type: 'invoice', invoiceNumber: 'PREVIEW', date, dueDate: dueLabel, siteName, siteUrl,
       tenantName, tenantEmail: tenant.email || '', unit: tenant.unit || '', propertyName: tenant.propertyName || '',
       lineItems: [{ description: 'Monthly Rent', quantity: 1, unitPrice: total, amount: total }],
       subtotal: total, taxRate: 0, taxAmount: 0, total, notes: '', isPaid: false,
     });
+
+    // Stored as a real blob (so it's a real link the caller can open, with
+    // the same "Print / Save as PDF" button the real invoice page already
+    // has) but with a "test_preview_" key, distinct from real invoice blob
+    // keys, and never written to Firestore at all — so this never appears
+    // in the tenant's actual invoice history or consumes a real invoice number.
+    const store = getStore();
+    const blobKey = `test_preview_${tenantId}_${Date.now()}.html`;
+    await store.set(blobKey, Buffer.from(html, 'utf8'), { metadata: { contentType: 'text/html', fileName: blobKey } });
+    const previewUrl = `${siteUrl}/api/view-invoice?key=${encodeURIComponent(blobKey)}`;
 
     if (!process.env.SMTP_HOST) {
       return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
@@ -107,19 +117,17 @@ exports.handler = async (event) => {
       auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
     });
 
-    // Send the caller a copy of the actual rendered invoice HTML (as an
-    // attachment) plus the normal "your invoice is ready" email shell, so
-    // they see exactly what the tenant would receive — without a fake
-    // invoice record ever touching Firestore or Blobs.
+    // Same email shell and same "view invoice" link pattern the real flow
+    // uses — no fake invoice record, no consumed invoice number, and no
+    // odd HTML file attachment that looks out of place in an inbox.
     await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: callerEmail,
       subject: `[TEST PREVIEW] Rent invoice for ${tenantName} — $${total.toFixed(2)}`,
       html: `
-        <p style="background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:4px;font-size:12px;font-family:Arial,sans-serif;">This is a preview only — sent to you, not ${tenant.email || 'the tenant'}. Nothing was saved or sent to anyone else.</p>
-        ${buildEmail({ isReceipt: false, invoiceNumber: 'TEST-PREVIEW', tenantName, total, dueDate: dueLabel, invoiceUrl: '#', siteName })}
+        <p style="background:#FEF3C7;color:#92400E;padding:8px 12px;border-radius:4px;font-size:12px;font-family:Arial,sans-serif;">This is a preview only — sent to you, not ${tenant.email || 'the tenant'}. Nothing was saved or sent to anyone else. Open the link below to view it — it has the same "Print / Save as PDF" option a real invoice does.</p>
+        ${buildEmail({ isReceipt: false, invoiceNumber: 'PREVIEW', tenantName, total, dueDate: dueLabel, invoiceUrl: previewUrl, siteName })}
       `,
-      attachments: [{ filename: 'invoice-preview.html', content: html, contentType: 'text/html' }],
     });
 
     return { statusCode: 200, body: JSON.stringify({ success: true, sentTo: callerEmail }) };
