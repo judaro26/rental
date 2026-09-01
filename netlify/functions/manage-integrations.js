@@ -86,6 +86,9 @@ function maskProvider(id, d, activeId) {
     if (d.provider === 'twilio') {
       return { ...base, provider: 'twilio', accountSid: d.accountSid, authTokenMasked: mask(d.authToken), fromNumber: d.fromNumber };
     }
+    if (d.provider === 'clicksend') {
+      return { ...base, provider: 'clicksend', username: d.username, apiKeyMasked: mask(d.apiKey) };
+    }
     return { ...base, provider: 'telnyx', apiKeyMasked: mask(d.apiKey), fromNumber: d.fromNumber, messagingProfileId: d.messagingProfileId };
   }
   return base;
@@ -163,12 +166,16 @@ exports.handler = async (event) => {
           minScore: minScore ? parseInt(minScore) : null,
         };
       } else {
-        const { provider, apiKey, messagingProfileId, accountSid, authToken, fromNumber } = body;
-        if (!fromNumber) return { statusCode: 400, body: JSON.stringify({ error: 'fromNumber is required for a new SMS provider (the phone number to send from, in +E.164 format).' }) };
+        const { provider, apiKey, messagingProfileId, accountSid, authToken, fromNumber, username } = body;
         if (provider === 'twilio') {
+          if (!fromNumber) return { statusCode: 400, body: JSON.stringify({ error: 'fromNumber is required for a new Twilio SMS provider (the phone number to send from, in +E.164 format).' }) };
           if (!accountSid || !authToken) return { statusCode: 400, body: JSON.stringify({ error: 'accountSid and authToken are required for a new Twilio SMS provider.' }) };
           fields = { provider: 'twilio', accountSid, authToken, fromNumber };
+        } else if (provider === 'clicksend') {
+          if (!username || !apiKey) return { statusCode: 400, body: JSON.stringify({ error: 'username and apiKey are required for a new ClickSend SMS provider.' }) };
+          fields = { provider: 'clicksend', username, apiKey };
         } else {
+          if (!fromNumber) return { statusCode: 400, body: JSON.stringify({ error: 'fromNumber is required for a new Telnyx SMS provider (the phone number to send from, in +E.164 format).' }) };
           if (!apiKey) return { statusCode: 400, body: JSON.stringify({ error: 'apiKey is required for a new Telnyx SMS provider.' }) };
           fields = { provider: 'telnyx', apiKey, fromNumber, messagingProfileId: messagingProfileId || null };
         }
@@ -237,10 +244,13 @@ exports.handler = async (event) => {
         if (body.productionToken) update.productionToken = body.productionToken; // blank = keep existing
         if (body.handshakeToken) update.handshakeToken = body.handshakeToken; // blank = keep existing
       } else if (d.type === 'sms') {
-        if (body.fromNumber !== undefined) update.fromNumber = body.fromNumber;
+        if (body.fromNumber !== undefined) update.fromNumber = body.fromNumber; // no-op for ClickSend, which has no fromNumber field
         if (d.provider === 'twilio') {
           if (body.accountSid !== undefined) update.accountSid = body.accountSid;
           if (body.authToken) update.authToken = body.authToken; // blank = keep existing
+        } else if (d.provider === 'clicksend') {
+          if (body.username !== undefined) update.username = body.username;
+          if (body.apiKey) update.apiKey = body.apiKey; // blank = keep existing
         } else {
           if (body.messagingProfileId !== undefined) update.messagingProfileId = body.messagingProfileId;
           if (body.apiKey) update.apiKey = body.apiKey; // blank = keep existing
@@ -501,12 +511,16 @@ exports.handler = async (event) => {
     //    SMS the way Cloudinary/Bold/SingleKey do for their own APIs. The
     //    admin must supply a destination number explicitly. ─────────────
     if (action === 'test_sms') {
-      const { id, provider, apiKey, fromNumber, messagingProfileId, accountSid, authToken, toNumber } = body;
+      const { id, provider, apiKey, fromNumber, messagingProfileId, accountSid, authToken, username, toNumber } = body;
       if (!toNumber) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a phone number (in +E.164 format) to send the test to.' }) };
 
+      const hasUnsavedCreds = provider === 'twilio' ? (accountSid && authToken && fromNumber)
+        : provider === 'clicksend' ? (username && apiKey)
+        : (apiKey && fromNumber); // telnyx
+
       let creds = null;
-      if ((provider === 'twilio' && accountSid && authToken && fromNumber) || (provider !== 'twilio' && apiKey && fromNumber)) {
-        creds = { provider: provider || 'telnyx', apiKey, fromNumber, accountSid, authToken };
+      if (hasUnsavedCreds) {
+        creds = { provider: provider || 'telnyx', apiKey, fromNumber, accountSid, authToken, username };
       } else if (id) {
         const snap = await coll.doc(id).get();
         if (!snap.exists || snap.data().type !== 'sms') return { statusCode: 404, body: JSON.stringify({ error: 'SMS provider not found.' }) };
@@ -517,10 +531,11 @@ exports.handler = async (event) => {
 
       try {
         const { sendSms } = require('./_lib/send-sms');
-        const testText = `Test message from your property management portal via ${creds.provider === 'twilio' ? 'Twilio' : 'Telnyx'}. If you received this, your SMS integration is working.`;
+        const providerLabel = { twilio: 'Twilio', clicksend: 'ClickSend', telnyx: 'Telnyx' }[creds.provider] || creds.provider;
+        const testText = `Test message from your property management portal via ${providerLabel}. If you received this, your SMS integration is working.`;
         const result = await sendSms({
           provider: creds.provider, apiKey: creds.apiKey, fromNumber: creds.fromNumber,
-          accountSid: creds.accountSid, authToken: creds.authToken, to: toNumber, text: testText,
+          accountSid: creds.accountSid, authToken: creds.authToken, username: creds.username, to: toNumber, text: testText,
         });
         const cost = result.cost ? ` Cost: ${result.cost.amount} ${result.cost.currency}.` : '';
         return { statusCode: 200, body: JSON.stringify({ success: true, message: `Test SMS sent to ${toNumber} (status: ${result.status}).${cost} This was a real message, not a free validation check.` }) };
