@@ -82,6 +82,12 @@ function maskProvider(id, d, activeId) {
   if (d.type === 'screening') {
     return { ...base, provider: 'singlekey', environment: d.environment || 'sandbox', sandboxTokenMasked: mask(d.sandboxToken), productionTokenMasked: mask(d.productionToken), handshakeTokenMasked: mask(d.handshakeToken), tenantPays: d.tenantPays === true, minScore: d.minScore || null };
   }
+  if (d.type === 'sms') {
+    if (d.provider === 'twilio') {
+      return { ...base, provider: 'twilio', accountSid: d.accountSid, authTokenMasked: mask(d.authToken), fromNumber: d.fromNumber };
+    }
+    return { ...base, provider: 'telnyx', apiKeyMasked: mask(d.apiKey), fromNumber: d.fromNumber, messagingProfileId: d.messagingProfileId };
+  }
   return base;
 }
 
@@ -118,7 +124,7 @@ exports.handler = async (event) => {
     // ── ADD a new provider ───────────────────────────────────────────────────
     if (action === 'add_provider') {
       const { type, label } = body;
-      if (!['email', 'storage', 'envelope', 'screening'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", "envelope", or "screening".' }) };
+      if (!['email', 'storage', 'envelope', 'screening', 'sms'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", "envelope", "screening", or "sms".' }) };
 
       let fields;
       if (type === 'email') {
@@ -145,7 +151,7 @@ exports.handler = async (event) => {
           appUrl: (appUrl || 'https://app.documenso.com').replace(/\/+$/, ''),
           webhookSecret: webhookSecret || null,
         };
-      } else {
+      } else if (type === 'screening') {
         const { sandboxToken, productionToken, environment, handshakeToken, tenantPays, minScore } = body;
         if (!sandboxToken && !productionToken) return { statusCode: 400, body: JSON.stringify({ error: 'At least a sandbox token is required for a new screening provider.' }) };
         fields = {
@@ -156,9 +162,19 @@ exports.handler = async (event) => {
           tenantPays: tenantPays === true,
           minScore: minScore ? parseInt(minScore) : null,
         };
+      } else {
+        const { provider, apiKey, messagingProfileId, accountSid, authToken, fromNumber } = body;
+        if (!fromNumber) return { statusCode: 400, body: JSON.stringify({ error: 'fromNumber is required for a new SMS provider (the phone number to send from, in +E.164 format).' }) };
+        if (provider === 'twilio') {
+          if (!accountSid || !authToken) return { statusCode: 400, body: JSON.stringify({ error: 'accountSid and authToken are required for a new Twilio SMS provider.' }) };
+          fields = { provider: 'twilio', accountSid, authToken, fromNumber };
+        } else {
+          if (!apiKey) return { statusCode: 400, body: JSON.stringify({ error: 'apiKey is required for a new Telnyx SMS provider.' }) };
+          fields = { provider: 'telnyx', apiKey, fromNumber, messagingProfileId: messagingProfileId || null };
+        }
       }
 
-      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider', screening: 'Screening Provider' }[type];
+      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider', screening: 'Screening Provider', sms: 'SMS Provider' }[type];
       const ref = await coll.add({
         type, label: label || defaultLabel,
         ...fields,
@@ -220,6 +236,15 @@ exports.handler = async (event) => {
         if (body.sandboxToken) update.sandboxToken = body.sandboxToken; // blank = keep existing
         if (body.productionToken) update.productionToken = body.productionToken; // blank = keep existing
         if (body.handshakeToken) update.handshakeToken = body.handshakeToken; // blank = keep existing
+      } else if (d.type === 'sms') {
+        if (body.fromNumber !== undefined) update.fromNumber = body.fromNumber;
+        if (d.provider === 'twilio') {
+          if (body.accountSid !== undefined) update.accountSid = body.accountSid;
+          if (body.authToken) update.authToken = body.authToken; // blank = keep existing
+        } else {
+          if (body.messagingProfileId !== undefined) update.messagingProfileId = body.messagingProfileId;
+          if (body.apiKey) update.apiKey = body.apiKey; // blank = keep existing
+        }
       }
 
       await ref.update(update);
@@ -468,6 +493,40 @@ exports.handler = async (event) => {
           message: `${env === 'production' ? 'Production' : 'Sandbox'} token validated successfully.${data?.has_payment_method === false ? ' Note: no payment method on file yet — needed before real screenings can be purchased.' : ''}`,
         }),
       };
+    }
+
+    // ── TEST SMS — unlike every other provider's test action, this sends
+    //    a REAL message with a REAL (small) cost, since neither Telnyx nor
+    //    Twilio expose a free "just validate my credentials" endpoint for
+    //    SMS the way Cloudinary/Bold/SingleKey do for their own APIs. The
+    //    admin must supply a destination number explicitly. ─────────────
+    if (action === 'test_sms') {
+      const { id, provider, apiKey, fromNumber, messagingProfileId, accountSid, authToken, toNumber } = body;
+      if (!toNumber) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a phone number (in +E.164 format) to send the test to.' }) };
+
+      let creds = null;
+      if ((provider === 'twilio' && accountSid && authToken && fromNumber) || (provider !== 'twilio' && apiKey && fromNumber)) {
+        creds = { provider: provider || 'telnyx', apiKey, fromNumber, accountSid, authToken };
+      } else if (id) {
+        const snap = await coll.doc(id).get();
+        if (!snap.exists || snap.data().type !== 'sms') return { statusCode: 404, body: JSON.stringify({ error: 'SMS provider not found.' }) };
+        creds = snap.data();
+      } else {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No SMS configuration given to test.' }) };
+      }
+
+      try {
+        const { sendSms } = require('./_lib/send-sms');
+        const testText = `Test message from your property management portal via ${creds.provider === 'twilio' ? 'Twilio' : 'Telnyx'}. If you received this, your SMS integration is working.`;
+        const result = await sendSms({
+          provider: creds.provider, apiKey: creds.apiKey, fromNumber: creds.fromNumber,
+          accountSid: creds.accountSid, authToken: creds.authToken, to: toNumber, text: testText,
+        });
+        const cost = result.cost ? ` Cost: ${result.cost.amount} ${result.cost.currency}.` : '';
+        return { statusCode: 200, body: JSON.stringify({ success: true, message: `Test SMS sent to ${toNumber} (status: ${result.status}).${cost} This was a real message, not a free validation check.` }) };
+      } catch (err) {
+        return { statusCode: 400, body: JSON.stringify({ error: err.message || 'Could not send test SMS.' }) };
+      }
     }
 
     return { statusCode: 400, body: JSON.stringify({ error: `Unknown action: ${action}` }) };
