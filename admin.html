@@ -1029,10 +1029,11 @@
               <select id="int-sms-provider" class="form-input" onchange="toggleSmsProviderFields()">
                 <option value="telnyx">Telnyx</option>
                 <option value="twilio">Twilio</option>
+                <option value="clicksend">ClickSend</option>
               </select>
               <span id="sms-provider-lock-hint" class="hidden" style="font-size:10px;color:var(--slate);display:block;margin-top:4px;">The provider can't be changed after saving — add a new one instead to switch.</span>
             </div>
-            <div><label class="label">From Number <span style="font-size:10px;font-weight:400;color:var(--slate);">(+E.164 format, e.g. +15551234567 — must be purchased and messaging-enabled in your provider's dashboard)</span></label><input type="text" id="int-sms-fromnumber" class="form-input" placeholder="+15551234567"></div>
+            <div id="sms-fromnumber-wrap"><label class="label">From Number <span style="font-size:10px;font-weight:400;color:var(--slate);">(+E.164 format, e.g. +15551234567 — must be purchased and messaging-enabled in your provider's dashboard)</span></label><input type="text" id="int-sms-fromnumber" class="form-input" placeholder="+15551234567"></div>
 
             <div id="sms-fields-telnyx" style="display:flex;flex-direction:column;gap:14px;">
               <div><label class="label">API Key <span id="sms-telnyx-key-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-sms-apikey" class="form-input" placeholder="Telnyx Portal → API Keys"></div>
@@ -1041,6 +1042,11 @@
             <div id="sms-fields-twilio" class="hidden" style="display:flex;flex-direction:column;gap:14px;">
               <div><label class="label">Account SID</label><input type="text" id="int-sms-accountsid" class="form-input" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
               <div><label class="label">Auth Token <span id="sms-twilio-token-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-sms-authtoken" class="form-input" placeholder="Twilio Console → Account Info"></div>
+            </div>
+            <div id="sms-fields-clicksend" class="hidden" style="display:flex;flex-direction:column;gap:14px;">
+              <p style="font-size:11px;color:var(--slate);">ClickSend doesn't need a "from" number here — it uses whatever sender is configured as your account default (or a specific Sender ID) directly in your ClickSend dashboard.</p>
+              <div><label class="label">Username</label><input type="text" id="int-sms-username" class="form-input" placeholder="ClickSend Dashboard → API Credentials"></div>
+              <div><label class="label">API Key <span id="sms-clicksend-key-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-sms-clicksend-apikey" class="form-input" placeholder="ClickSend Dashboard → API Credentials"></div>
             </div>
           </div>
           <p style="font-size:11px;color:var(--slate);margin-top:14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:10px 12px;">⚠️ Testing sends a real SMS with a real (small) cost — there's no free credential-only check available for SMS.</p>
@@ -5600,6 +5606,8 @@
     const provider = document.getElementById('int-sms-provider').value;
     document.getElementById('sms-fields-telnyx').classList.toggle('hidden', provider !== 'telnyx');
     document.getElementById('sms-fields-twilio').classList.toggle('hidden', provider !== 'twilio');
+    document.getElementById('sms-fields-clicksend').classList.toggle('hidden', provider !== 'clicksend');
+    document.getElementById('sms-fromnumber-wrap').classList.toggle('hidden', provider === 'clicksend'); // ClickSend has no fromNumber concept
   };
   window.openSmsProviderModal = (id) => {
     const p = id ? allIntegrationProviders.find(x => x.id === id) : null;
@@ -5620,6 +5628,10 @@
     document.getElementById('int-sms-authtoken').value = '';
     document.getElementById('sms-twilio-token-hint').textContent = (p && provider === 'twilio') ? `(leave blank to keep current: ${p.authTokenMasked || '••••'})` : '';
 
+    document.getElementById('int-sms-username').value = p?.username || '';
+    document.getElementById('int-sms-clicksend-apikey').value = '';
+    document.getElementById('sms-clicksend-key-hint').textContent = (p && provider === 'clicksend') ? `(leave blank to keep current: ${p.apiKeyMasked || '••••'})` : '';
+
     document.getElementById('int-sms-test-to').value = '';
     document.getElementById('sms-provider-modal-title').textContent = p ? 'Edit SMS Provider' : 'Add SMS Provider';
     document.getElementById('sms-provider-modal-alert').classList.add('hidden');
@@ -5629,21 +5641,29 @@
     const id = document.getElementById('int-sms-id').value;
     const provider = document.getElementById('int-sms-provider').value;
     const btn = document.getElementById('sms-int-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
-    const payload = provider === 'twilio'
-      ? {
-          label: document.getElementById('int-sms-label').value.trim(),
-          provider: 'twilio',
-          fromNumber: document.getElementById('int-sms-fromnumber').value.trim(),
-          accountSid: document.getElementById('int-sms-accountsid').value.trim(),
-          authToken: document.getElementById('int-sms-authtoken').value, // blank on edit = keep existing
-        }
-      : {
-          label: document.getElementById('int-sms-label').value.trim(),
-          provider: 'telnyx',
-          fromNumber: document.getElementById('int-sms-fromnumber').value.trim(),
-          apiKey: document.getElementById('int-sms-apikey').value.trim(), // blank on edit = keep existing
-          messagingProfileId: document.getElementById('int-sms-messagingprofileid').value.trim(),
-        };
+    const label = document.getElementById('int-sms-label').value.trim();
+    let payload;
+    if (provider === 'twilio') {
+      payload = {
+        label, provider: 'twilio',
+        fromNumber: document.getElementById('int-sms-fromnumber').value.trim(),
+        accountSid: document.getElementById('int-sms-accountsid').value.trim(),
+        authToken: document.getElementById('int-sms-authtoken').value, // blank on edit = keep existing
+      };
+    } else if (provider === 'clicksend') {
+      payload = {
+        label, provider: 'clicksend',
+        username: document.getElementById('int-sms-username').value.trim(),
+        apiKey: document.getElementById('int-sms-clicksend-apikey').value.trim(), // blank on edit = keep existing
+      };
+    } else {
+      payload = {
+        label, provider: 'telnyx',
+        fromNumber: document.getElementById('int-sms-fromnumber').value.trim(),
+        apiKey: document.getElementById('int-sms-apikey').value.trim(), // blank on edit = keep existing
+        messagingProfileId: document.getElementById('int-sms-messagingprofileid').value.trim(),
+      };
+    }
     try {
       if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('sms_provider_updated', 'settings', id, payload.label); }
       else { await callManageIntegrations('add_provider', { type: 'sms', ...payload }); logAdminAction('sms_provider_added', 'settings', null, payload.label); }
@@ -5659,9 +5679,14 @@
     const provider = document.getElementById('int-sms-provider').value;
     const btn = document.getElementById('sms-int-test-btn'); btn.disabled = true; btn.textContent = 'Sending...';
     try {
-      const payload = provider === 'twilio'
-        ? { id: id || undefined, provider: 'twilio', toNumber, fromNumber: document.getElementById('int-sms-fromnumber').value.trim(), accountSid: document.getElementById('int-sms-accountsid').value.trim(), authToken: document.getElementById('int-sms-authtoken').value }
-        : { id: id || undefined, provider: 'telnyx', toNumber, fromNumber: document.getElementById('int-sms-fromnumber').value.trim(), apiKey: document.getElementById('int-sms-apikey').value.trim() };
+      let payload;
+      if (provider === 'twilio') {
+        payload = { id: id || undefined, provider: 'twilio', toNumber, fromNumber: document.getElementById('int-sms-fromnumber').value.trim(), accountSid: document.getElementById('int-sms-accountsid').value.trim(), authToken: document.getElementById('int-sms-authtoken').value };
+      } else if (provider === 'clicksend') {
+        payload = { id: id || undefined, provider: 'clicksend', toNumber, username: document.getElementById('int-sms-username').value.trim(), apiKey: document.getElementById('int-sms-clicksend-apikey').value.trim() };
+      } else {
+        payload = { id: id || undefined, provider: 'telnyx', toNumber, fromNumber: document.getElementById('int-sms-fromnumber').value.trim(), apiKey: document.getElementById('int-sms-apikey').value.trim() };
+      }
       const result = await callManageIntegrations('test_sms', payload);
       showAlert('sms-provider-modal-alert', '✓ ' + result.message, 'success');
     } catch (e) { showAlert('sms-provider-modal-alert', 'Test failed: ' + e.message); }
