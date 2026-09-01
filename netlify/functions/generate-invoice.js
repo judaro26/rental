@@ -35,6 +35,13 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
+  const a  = getAdmin();
+  const db = a.firestore();
+
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
+
   let body;
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
@@ -50,9 +57,6 @@ exports.handler = async (event) => {
   if (!tenantId || !tenantEmail || !lineItems.length) {
     return { statusCode: 400, body: JSON.stringify({ error: 'tenantId, tenantEmail, and lineItems are required' }) };
   }
-
-  const a  = getAdmin();
-  const db = a.firestore();
 
   try {
     const { createInvoice } = require('./_lib/create-invoice');
