@@ -63,11 +63,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  if (!process.env.SMTP_HOST) {
-    return { statusCode: 200, body: JSON.stringify({ skipped: true, reason: 'SMTP not configured' }) };
-  }
-
-  const { title, message, propertyId, propertyName, siteName, tenantIds, urgent } = body;
+  const { title, message, propertyId, propertyName, siteName, tenantIds, urgent, sms } = body;
   if (!title || !message) {
     return { statusCode: 400, body: JSON.stringify({ error: 'title and message are required' }) };
   }
@@ -83,42 +79,77 @@ exports.handler = async (event) => {
       // any query size-limit question entirely for what's expected to be
       // a small, hand-picked set of specific recipients.
       const docs = await Promise.all(tenantIds.map(id => db.collection('tenants').doc(id).get()));
-      tenants = docs.filter(d => d.exists).map(d => d.data()).filter(t => t.email);
+      tenants = docs.filter(d => d.exists).map(d => d.data());
     } else {
       // Fetch active tenants — filtered by property if propertyId is set
       let tenantsQuery = db.collection('tenants').where('status', '==', 'active');
       if (propertyId) tenantsQuery = tenantsQuery.where('propertyId', '==', propertyId);
       const snap = await tenantsQuery.get();
-      tenants = snap.docs.map(d => d.data()).filter(t => t.email);
+      tenants = snap.docs.map(d => d.data());
     }
+    // Not requiring an email upfront — a tenant with only a phone number
+    // should still be reachable via SMS even with no email on file.
+    tenants = tenants.filter(t => t.email || t.phone);
 
     if (!tenants.length) {
       return { statusCode: 200, body: JSON.stringify({ sent: 0, reason: 'No matching tenants found' }) };
     }
 
-    const transporter = getTransporter();
-    let sent = 0, failed = 0;
+    let emailSent = 0, emailFailed = 0, smsSent = 0, smsFailed = 0;
 
-    // Send individually so one bad address doesn't block others
-    for (const tenant of tenants) {
-      try {
-        await transporter.sendMail({
-          from:    process.env.SMTP_FROM || process.env.SMTP_USER,
-          to:      tenant.email,
-          subject: `${urgent ? '🚨 URGENT' : '📢'}: ${title}${propertyName ? ` — ${propertyName}` : ''}`,
-          html:    buildAnnouncementEmail({
-            tenantName: `${tenant.firstName||''} ${tenant.lastName||''}`.trim(),
-            title, message, propertyName, siteName, siteUrl, urgent,
-          }),
-        });
-        sent++;
-      } catch(e) {
-        console.warn(`Failed to email ${tenant.email}:`, e.message);
-        failed++;
+    // Email — independent of SMS; only attempted if SMTP is actually configured.
+    if (process.env.SMTP_HOST) {
+      const transporter = getTransporter();
+      for (const tenant of tenants) {
+        if (!tenant.email) continue;
+        try {
+          await transporter.sendMail({
+            from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+            to:      tenant.email,
+            subject: `${urgent ? '🚨 URGENT' : '📢'}: ${title}${propertyName ? ` — ${propertyName}` : ''}`,
+            html:    buildAnnouncementEmail({
+              tenantName: `${tenant.firstName||''} ${tenant.lastName||''}`.trim(),
+              title, message, propertyName, siteName, siteUrl, urgent,
+            }),
+          });
+          emailSent++;
+        } catch(e) {
+          console.warn(`Failed to email ${tenant.email}:`, e.message);
+          emailFailed++;
+        }
       }
     }
 
-    return { statusCode: 200, body: JSON.stringify({ success: true, sent, failed }) };
+    // SMS — independent of email; only attempted if explicitly requested
+    // AND a provider is actually configured. Reuses the exact same
+    // sendSms() core the SMS integration's own test action uses.
+    if (sms) {
+      const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
+      const activeSmsId = activeSnap.exists ? activeSnap.data().sms : null;
+      const providerSnap = activeSmsId ? await db.collection('integrationSecrets').doc(activeSmsId).get() : null;
+      const smsProvider = providerSnap?.exists ? providerSnap.data() : null;
+
+      if (smsProvider) {
+        const { sendSms } = require('./_lib/send-sms');
+        const smsText = `[${siteName || 'Property'}]${urgent ? ' URGENT' : ''}: ${title} - ${message}`.slice(0, 1600);
+        for (const tenant of tenants) {
+          if (!tenant.phone) continue;
+          try {
+            await sendSms({
+              provider: smsProvider.provider, apiKey: smsProvider.apiKey, fromNumber: smsProvider.fromNumber,
+              accountSid: smsProvider.accountSid, authToken: smsProvider.authToken,
+              to: tenant.phone, text: smsText,
+            });
+            smsSent++;
+          } catch (e) {
+            console.warn(`Failed to text ${tenant.phone}:`, e.message);
+            smsFailed++;
+          }
+        }
+      }
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ success: true, sent: emailSent, failed: emailFailed, smsSent, smsFailed }) };
   } catch (err) {
     console.error('announce-notify error:', err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
