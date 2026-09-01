@@ -65,6 +65,10 @@ exports.handler = async (event) => {
     const a = getAdmin();
     const db = a.firestore();
 
+    const { verifyAdmin } = require('./_lib/verify-admin');
+    const authResult = await verifyAdmin(event, db, a);
+    if (authResult.error) return authResult.error;
+
     // Resolve Documenso credentials: a saved integration (Settings →
     // Integrations) takes priority over the environment variables, which
     // remain the fallback if nothing is configured there — same
