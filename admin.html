@@ -2598,11 +2598,7 @@
 
   window.updateApplicationStatus = async (id, status) => {
     try {
-      const res = await fetch('/api/update-application', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationId: id, status }),
-      });
+      const res = await authedFetch('/api/update-application', { applicationId: id, status });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Unable to update status.');
       const app = allApplications.find(a => a.id === id);
@@ -2628,14 +2624,10 @@
         employmentConfirmed: document.getElementById('review-employment-confirmed').checked,
       };
       const notes = document.getElementById('application-review-notes').value.trim() || null;
-      const res = await fetch('/api/update-application', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          applicationId: appId,
-          reviewChecks,
-          adminNotes: notes,
-        })
+      const res = await authedFetch('/api/update-application', {
+        applicationId: appId,
+        reviewChecks,
+        adminNotes: notes,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Unable to save review.');
@@ -2648,11 +2640,7 @@
 
   window.orderEmploymentVerification = async (id) => {
     try {
-      const res = await fetch('/api/update-application', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationId: id, employmentVerificationOrder: true }),
-      });
+      const res = await authedFetch('/api/update-application', { applicationId: id, employmentVerificationOrder: true });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Unable to order employment verification.');
       await loadApplications();
@@ -3317,7 +3305,7 @@
     const btn = document.getElementById('lease-generate-btn'); btn.disabled=true; btn.textContent='Generating...';
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await fetch('/api/generate-lease',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applicationId:id,terms,siteName})});
+      const res = await authedFetch('/api/generate-lease',{applicationId:id,terms,siteName});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed to generate lease');
       const alertEl = document.getElementById('lease-alert');
@@ -3335,7 +3323,7 @@
   window.setApplicationArchived = async (id, archived) => {
     if (archived && !confirm('Archive this application? It will be hidden from the default list — use the "Archived" filter to see it again.')) return;
     try {
-      const res = await fetch('/api/update-application',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applicationId:id,archived})});
+      const res = await authedFetch('/api/update-application',{applicationId:id,archived});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed');
       closeModal('application-preview-modal');
@@ -3589,7 +3577,7 @@
     } catch(e){}
     if (tenant) {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'receipt',tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:'Payment received via Zelle.',siteName})}).catch(e=>console.warn('Receipt failed:',e));
+      authedFetch('/api/generate-invoice',{type:'receipt',tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:'Payment received via Zelle.',siteName}).catch(e=>console.warn('Receipt failed:',e));
     }
     await loadPayments(); await loadFinancials();
     alert('✓ Payment approved and receipt emailed to tenant.');
@@ -3607,7 +3595,7 @@
     let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
     const btn = event?.target; if (btn) { btn.disabled=true; btn.textContent='Generating...'; }
     try {
-      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'receipt',tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:`Payment method: ${p.method==='zelle'?'Zelle':p.method==='stripe'?'Stripe':'Manual'}.`,siteName})});
+      const res = await authedFetch('/api/generate-invoice',{type:'receipt',tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:`Payment method: ${p.method==='zelle'?'Zelle':p.method==='stripe'?'Stripe':'Manual'}.`,siteName});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       alert(`✓ Receipt emailed to ${tenant.email}`);
@@ -4535,7 +4523,7 @@
     const btn = document.getElementById('inv-submit-btn'); btn.disabled=true; btn.textContent=sendNow?'Sending...':'Saving...';
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:tenant.propertyName||'',lineItems,taxRate:parseFloat(document.getElementById('inv-tax').value||0),dueDate:document.getElementById('inv-due-date').value,notes:document.getElementById('inv-notes').value.trim(),sendNow,scheduledSendDate,siteName})});
+      const res = await authedFetch('/api/generate-invoice',{type:'invoice',tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:tenant.propertyName||'',lineItems,taxRate:parseFloat(document.getElementById('inv-tax').value||0),dueDate:document.getElementById('inv-due-date').value,notes:document.getElementById('inv-notes').value.trim(),sendNow,scheduledSendDate,siteName});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed');
       let msg;
@@ -4565,7 +4553,7 @@
     if (!confirm(`Generate a paid receipt for ${inv.tenantName} — $${parseFloat(inv.total).toFixed(2)}?`)) return;
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...inv,type:'receipt',paidDate,existingInvoiceId:invoiceId,siteName})});
+      const res = await authedFetch('/api/generate-invoice',{...inv,type:'receipt',paidDate,existingInvoiceId:invoiceId,siteName});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed');
       alert(`Receipt generated and emailed to ${inv.tenantEmail}`);
@@ -4584,7 +4572,7 @@
     const btn = event?.target; if (btn){ btn.disabled=true; btn.textContent='Sending...'; }
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await fetch('/api/generate-invoice',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'invoice',existingInvoiceId:invoiceId,sendNow:true,tenantId:inv.tenantId,tenantName:inv.tenantName,tenantEmail:inv.tenantEmail,unit:inv.unit||'',propertyId:inv.propertyId||'',propertyName:inv.propertyName||'',lineItems:inv.lineItems||[],taxRate:inv.taxRate||0,dueDate:inv.dueDate||'',notes:inv.notes||'',siteName})});
+      const res = await authedFetch('/api/generate-invoice',{type:'invoice',existingInvoiceId:invoiceId,sendNow:true,tenantId:inv.tenantId,tenantName:inv.tenantName,tenantEmail:inv.tenantEmail,unit:inv.unit||'',propertyId:inv.propertyId||'',propertyName:inv.propertyName||'',lineItems:inv.lineItems||[],taxRate:inv.taxRate||0,dueDate:inv.dueDate||'',notes:inv.notes||'',siteName});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed');
       loadInvoices();
@@ -6483,6 +6471,20 @@
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Request failed');
     return data;
+  }
+
+  // Generic authenticated POST for endpoints that don't share the
+  // manage-*'s {action, ...payload} structure (generate-invoice,
+  // generate-lease, update-application) — returns the raw fetch response
+  // so each call site can keep handling .json()/errors exactly as before,
+  // the only change being that a real admin session is now attached.
+  async function authedFetch(url, body) {
+    const idToken = await auth.currentUser.getIdToken();
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+      body: JSON.stringify(body),
+    });
   }
 
   async function loadPropertyBoldStatus(propertyId) {
