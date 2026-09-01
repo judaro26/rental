@@ -465,6 +465,12 @@
               </label>
               <p style="font-size:11px;color:var(--slate);margin-top:2px;margin-left:24px;">For safety notices (earthquakes, evacuations, etc.) — sends with red styling and a distinct subject line so it stands out in an inbox.</p>
             </div>
+            <div class="col-span-2">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="ann-sms"> 💬 Also send via SMS
+              </label>
+              <p style="font-size:11px;color:var(--slate);margin-top:2px;margin-left:24px;">Requires an SMS provider configured above, and a phone number on file for each tenant. Real messages with a real (small) cost per tenant — not free like email.</p>
+            </div>
           </div>
           <button onclick="postAnnouncement()" class="btn btn-primary">Post Announcement</button>
         </div>
@@ -960,10 +966,24 @@
             <button onclick="openScreeningProviderModal()" class="btn btn-outline btn-sm">+ Add Screening Provider</button>
           </div>
           <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">SingleKey is currently the only supported screening backend. <strong>US properties only</strong> — this provider does not support Colombia. Tenants complete their own screening directly with SingleKey (credit, background, and identity data never passes through this app), and results appear on the applicant's page once ready.</p>
-          <div style="overflow-x:auto;">
+          <div style="overflow-x:auto;margin-bottom:20px;">
             <table class="data-table">
               <thead><tr><th>Label</th><th>Environment</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody id="screening-providers-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;">Loading...</td></tr></tbody>
+            </table>
+          </div>
+
+          <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 16px;">
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h4 style="font-size:1rem;font-weight:500;margin:0;">💬 SMS Provider</h4>
+            <button onclick="openSmsProviderModal()" class="btn btn-outline btn-sm">+ Add SMS Provider</button>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">Telnyx or Twilio. Powers SMS delivery for urgent announcements (in addition to email). Testing this sends a real text message with a real, small cost — there's no free validation check for SMS the way there is for email or storage.</p>
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead><tr><th>Label</th><th>Provider</th><th>From Number</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="sms-providers-tbody"><tr><td colspan="5" style="text-align:center;color:var(--slate);padding:16px;">Loading...</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -990,6 +1010,46 @@
           <div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;">
             <button onclick="saveEnvelopeProvider()" class="btn btn-primary" style="flex:1;" id="envelope-int-save-btn">Save</button>
             <button onclick="testEnvelopeIntegration()" class="btn btn-outline" id="envelope-int-test-btn">Test Connection</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SMS PROVIDER MODAL -->
+      <div id="sms-provider-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop absolute inset-0" onclick="closeModal('sms-provider-modal')"></div>
+        <div style="background:#fff;width:100%;max-width:460px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+          <button onclick="closeModal('sms-provider-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+          <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" id="sms-provider-modal-title">Add SMS Provider</h3>
+          <input type="hidden" id="int-sms-id">
+          <div id="sms-provider-modal-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div><label class="label">Label</label><input type="text" id="int-sms-label" class="form-input" placeholder="My Telnyx Account"></div>
+            <div>
+              <label class="label">Provider</label>
+              <select id="int-sms-provider" class="form-input" onchange="toggleSmsProviderFields()">
+                <option value="telnyx">Telnyx</option>
+                <option value="twilio">Twilio</option>
+              </select>
+              <span id="sms-provider-lock-hint" class="hidden" style="font-size:10px;color:var(--slate);display:block;margin-top:4px;">The provider can't be changed after saving — add a new one instead to switch.</span>
+            </div>
+            <div><label class="label">From Number <span style="font-size:10px;font-weight:400;color:var(--slate);">(+E.164 format, e.g. +15551234567 — must be purchased and messaging-enabled in your provider's dashboard)</span></label><input type="text" id="int-sms-fromnumber" class="form-input" placeholder="+15551234567"></div>
+
+            <div id="sms-fields-telnyx" style="display:flex;flex-direction:column;gap:14px;">
+              <div><label class="label">API Key <span id="sms-telnyx-key-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-sms-apikey" class="form-input" placeholder="Telnyx Portal → API Keys"></div>
+              <div><label class="label">Messaging Profile ID <span style="font-size:10px;font-weight:400;color:var(--slate);">(optional, for your reference)</span></label><input type="text" id="int-sms-messagingprofileid" class="form-input" placeholder="Telnyx Portal → Programmable Messaging → Profiles"></div>
+            </div>
+            <div id="sms-fields-twilio" class="hidden" style="display:flex;flex-direction:column;gap:14px;">
+              <div><label class="label">Account SID</label><input type="text" id="int-sms-accountsid" class="form-input" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
+              <div><label class="label">Auth Token <span id="sms-twilio-token-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-sms-authtoken" class="form-input" placeholder="Twilio Console → Account Info"></div>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-top:14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:10px 12px;">⚠️ Testing sends a real SMS with a real (small) cost — there's no free credential-only check available for SMS.</p>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
+            <input type="text" id="int-sms-test-to" class="form-input" placeholder="Phone number to send the test to, +E.164 format">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button onclick="saveSmsProvider()" class="btn btn-primary" style="flex:1;" id="sms-int-save-btn">Save</button>
+              <button onclick="testSmsIntegration()" class="btn btn-outline" id="sms-int-test-btn">Send Test SMS</button>
+            </div>
           </div>
         </div>
       </div>
@@ -3937,18 +3997,26 @@
     const tenantIds = useSpecific ? Array.from(selectedAnnouncementTenantIds) : [];
     const propId = useSpecific ? '' : document.getElementById('ann-property').value;
     const urgent = document.getElementById('ann-urgent').checked;
+    const sms = document.getElementById('ann-sms').checked;
     if (!title||!message) { showAlert('ann-alert','Title and message are required.'); return; }
     if (useSpecific && !tenantIds.length) { showAlert('ann-alert','Select at least one tenant, or uncheck "notify specific tenants only".'); return; }
+    if (sms && !confirm('This will send a real SMS (with a real, small cost per tenant) to everyone targeted who has a phone number on file. Continue?')) return;
     const btn = document.querySelector('#section-announcements button[onclick="postAnnouncement()"]');
     if (btn) { btn.disabled=true; btn.textContent='Posting...'; }
     await addDoc(collection(db,'announcements'),{title,message,propertyId:propId||null,tenantIds:tenantIds.length?tenantIds:null,urgent,createdAt:serverTimestamp()});
     let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
     const propName = propId?(allProperties.find(p=>p.id===propId)?.name||''):'';
-    fetch('/api/announce-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,siteName})})
-      .then(r=>r.json()).then(d=>{if(d.sent>0)showAlert('ann-alert',`✓ Announcement posted and emailed to ${d.sent} tenant${d.sent>1?'s':''}.`,'success');else showAlert('ann-alert','✓ Announcement posted.','success');})
+    fetch('/api/announce-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,sms,siteName})})
+      .then(r=>r.json()).then(d=>{
+        const parts = [];
+        if (d.sent>0) parts.push(`emailed ${d.sent} tenant${d.sent>1?'s':''}`);
+        if (d.smsSent>0) parts.push(`texted ${d.smsSent} tenant${d.smsSent>1?'s':''}`);
+        showAlert('ann-alert', parts.length ? `✓ Announcement posted and ${parts.join(', ')}.` : '✓ Announcement posted.', 'success');
+      })
       .catch(()=>showAlert('ann-alert','✓ Announcement posted.','success'));
     document.getElementById('ann-title').value=''; document.getElementById('ann-message').value='';
     document.getElementById('ann-urgent').checked = false;
+    document.getElementById('ann-sms').checked = false;
     selectedAnnouncementTenantIds.clear();
     document.getElementById('ann-use-specific-tenants').checked = false;
     toggleAnnSpecificTenants();
@@ -5197,6 +5265,7 @@
       renderProvidersTable('storage', 'storage-providers-tbody');
       renderProvidersTable('envelope', 'envelope-providers-tbody');
       renderProvidersTable('screening', 'screening-providers-tbody');
+      renderProvidersTable('sms', 'sms-providers-tbody');
     } catch (e) {
       console.error('loadIntegrationsStatus:', e);
     }
@@ -5206,20 +5275,21 @@
     const tbody = document.getElementById(tbodyId);
     const rows = allIntegrationProviders.filter(p => p.type === type);
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="${type === 'email' ? 5 : 4}" style="text-align:center;color:var(--slate);padding:16px;">No ${type} providers saved yet — using the environment default.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${type === 'email' || type === 'sms' ? 5 : 4}" style="text-align:center;color:var(--slate);padding:16px;">No ${type} providers saved yet — using the environment default.</td></tr>`;
       return;
     }
-    const openFns = { email: 'openEmailProviderModal', storage: 'openStorageProviderModal', envelope: 'openEnvelopeProviderModal', screening: 'openScreeningProviderModal' };
+    const openFns = { email: 'openEmailProviderModal', storage: 'openStorageProviderModal', envelope: 'openEnvelopeProviderModal', screening: 'openScreeningProviderModal', sms: 'openSmsProviderModal' };
     tbody.innerHTML = rows.map(p => {
       const statusBadge = p.isActive ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-pending">Inactive</span>';
       const openFn = openFns[type];
       const middleCell = type === 'email' ? `<td style="font-size:12px;">${p.host || '—'}</td>`
         : type === 'storage' ? `<td style="font-size:12px;">${p.backend === 'r2' ? `R2: ${p.bucketName || '—'}` : `Cloudinary: ${p.cloudName || '—'}`}</td>`
         : type === 'screening' ? `<td style="font-size:12px;text-transform:capitalize;">${p.environment || 'sandbox'}</td>`
+        : type === 'sms' ? `<td style="font-size:12px;">${p.fromNumber || '—'}</td>`
         : `<td style="font-size:12px;">${p.templateId || '—'}</td>`;
       return `<tr>
         <td><strong>${p.label}</strong></td>
-        ${type === 'email' ? `<td style="font-size:12px;">${p.provider}</td>` : ''}
+        ${type === 'email' || type === 'sms' ? `<td style="font-size:12px;text-transform:capitalize;">${p.provider}</td>` : ''}
         ${middleCell}
         <td>${statusBadge}</td>
         <td>
@@ -5237,12 +5307,20 @@
 
   window.testSavedProvider = async (id, type, btnEl) => {
     const resultEl = btnEl.closest('td').querySelector('.provider-test-result');
+    // SMS needs a destination number, unlike every other provider's
+    // no-input test — prompt for it rather than silently guessing one.
+    let extraParams = {};
+    if (type === 'sms') {
+      const toNumber = prompt('Send a real test SMS to which number? (+E.164 format, e.g. +15551234567)\n\nThis will incur a small real cost.');
+      if (!toNumber) return; // cancelled
+      extraParams = { toNumber };
+    }
     btnEl.disabled = true;
     const original = btnEl.textContent; btnEl.textContent = 'Testing...';
     resultEl.textContent = '';
     try {
-      const action = { email: 'test_email', storage: 'test_storage', envelope: 'test_envelope', screening: 'test_screening' }[type];
-      const result = await callManageIntegrations(action, { id });
+      const action = { email: 'test_email', storage: 'test_storage', envelope: 'test_envelope', screening: 'test_screening', sms: 'test_sms' }[type];
+      const result = await callManageIntegrations(action, { id, ...extraParams });
       resultEl.style.color = '#16A34A';
       resultEl.textContent = '✓ ' + (result.message || `Test email sent to ${result.sentTo}.`);
     } catch (e) {
@@ -5515,6 +5593,79 @@
       showAlert('screening-provider-modal-alert', '✓ ' + result.message, 'success');
     } catch (e) { showAlert('screening-provider-modal-alert', 'Test failed: ' + e.message); }
     btn.disabled = false; btn.textContent = 'Test Connection';
+  };
+
+  // ── SMS provider modal (Telnyx or Twilio) ───────────────────────────────
+  window.toggleSmsProviderFields = () => {
+    const provider = document.getElementById('int-sms-provider').value;
+    document.getElementById('sms-fields-telnyx').classList.toggle('hidden', provider !== 'telnyx');
+    document.getElementById('sms-fields-twilio').classList.toggle('hidden', provider !== 'twilio');
+  };
+  window.openSmsProviderModal = (id) => {
+    const p = id ? allIntegrationProviders.find(x => x.id === id) : null;
+    const provider = p?.provider || 'telnyx';
+    document.getElementById('int-sms-id').value = id || '';
+    document.getElementById('int-sms-label').value = p?.label || '';
+    document.getElementById('int-sms-provider').value = provider;
+    document.getElementById('int-sms-provider').disabled = !!p; // provider is fixed once saved — add a new one to switch
+    document.getElementById('sms-provider-lock-hint').classList.toggle('hidden', !p);
+    document.getElementById('int-sms-fromnumber').value = p?.fromNumber || '';
+    toggleSmsProviderFields();
+
+    document.getElementById('int-sms-apikey').value = '';
+    document.getElementById('int-sms-messagingprofileid').value = p?.messagingProfileId || '';
+    document.getElementById('sms-telnyx-key-hint').textContent = (p && provider === 'telnyx') ? `(leave blank to keep current: ${p.apiKeyMasked || '••••'})` : '';
+
+    document.getElementById('int-sms-accountsid').value = p?.accountSid || '';
+    document.getElementById('int-sms-authtoken').value = '';
+    document.getElementById('sms-twilio-token-hint').textContent = (p && provider === 'twilio') ? `(leave blank to keep current: ${p.authTokenMasked || '••••'})` : '';
+
+    document.getElementById('int-sms-test-to').value = '';
+    document.getElementById('sms-provider-modal-title').textContent = p ? 'Edit SMS Provider' : 'Add SMS Provider';
+    document.getElementById('sms-provider-modal-alert').classList.add('hidden');
+    openModal('sms-provider-modal');
+  };
+  window.saveSmsProvider = async () => {
+    const id = document.getElementById('int-sms-id').value;
+    const provider = document.getElementById('int-sms-provider').value;
+    const btn = document.getElementById('sms-int-save-btn'); btn.disabled = true; btn.textContent = 'Saving...';
+    const payload = provider === 'twilio'
+      ? {
+          label: document.getElementById('int-sms-label').value.trim(),
+          provider: 'twilio',
+          fromNumber: document.getElementById('int-sms-fromnumber').value.trim(),
+          accountSid: document.getElementById('int-sms-accountsid').value.trim(),
+          authToken: document.getElementById('int-sms-authtoken').value, // blank on edit = keep existing
+        }
+      : {
+          label: document.getElementById('int-sms-label').value.trim(),
+          provider: 'telnyx',
+          fromNumber: document.getElementById('int-sms-fromnumber').value.trim(),
+          apiKey: document.getElementById('int-sms-apikey').value.trim(), // blank on edit = keep existing
+          messagingProfileId: document.getElementById('int-sms-messagingprofileid').value.trim(),
+        };
+    try {
+      if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('sms_provider_updated', 'settings', id, payload.label); }
+      else { await callManageIntegrations('add_provider', { type: 'sms', ...payload }); logAdminAction('sms_provider_added', 'settings', null, payload.label); }
+      closeModal('sms-provider-modal');
+      await loadIntegrationsStatus();
+    } catch (e) { showAlert('sms-provider-modal-alert', e.message); }
+    btn.disabled = false; btn.textContent = 'Save';
+  };
+  window.testSmsIntegration = async () => {
+    const id = document.getElementById('int-sms-id').value;
+    const toNumber = document.getElementById('int-sms-test-to').value.trim();
+    if (!toNumber) { showAlert('sms-provider-modal-alert', 'Enter a phone number to send the test to.'); return; }
+    const provider = document.getElementById('int-sms-provider').value;
+    const btn = document.getElementById('sms-int-test-btn'); btn.disabled = true; btn.textContent = 'Sending...';
+    try {
+      const payload = provider === 'twilio'
+        ? { id: id || undefined, provider: 'twilio', toNumber, fromNumber: document.getElementById('int-sms-fromnumber').value.trim(), accountSid: document.getElementById('int-sms-accountsid').value.trim(), authToken: document.getElementById('int-sms-authtoken').value }
+        : { id: id || undefined, provider: 'telnyx', toNumber, fromNumber: document.getElementById('int-sms-fromnumber').value.trim(), apiKey: document.getElementById('int-sms-apikey').value.trim() };
+      const result = await callManageIntegrations('test_sms', payload);
+      showAlert('sms-provider-modal-alert', '✓ ' + result.message, 'success');
+    } catch (e) { showAlert('sms-provider-modal-alert', 'Test failed: ' + e.message); }
+    btn.disabled = false; btn.textContent = 'Send Test SMS';
   };
 
   // ===== PAGE BUILDER (Super Admin only — landing page layout) =====
