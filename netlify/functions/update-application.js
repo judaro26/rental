@@ -110,6 +110,10 @@ exports.handler = async (event) => {
   const db = a.firestore();
   const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
 
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
+
   try {
     const appSnap = await db.collection('applications').doc(applicationId).get();
     if (!appSnap.exists) {
