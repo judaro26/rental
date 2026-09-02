@@ -1,78 +1,68 @@
-// netlify/functions/_lib/render-reminder-email.js
-// Shared HTML template + EN/ES copy for reminder emails. Required by both
-// send-property-reminders.js (real sends) and manage-property-payments.js
-// (test sends) so there is exactly one definition of what a reminder email
-// looks like — testing a reminder and actually receiving one always match.
+// netlify/functions/_lib/invoice-reminder-email.js
+// Pure helpers for building an invoice reminder/overdue-notice email.
+// Extracted from send-invoice-reminders.js (the scheduled, rule-based
+// reminder system) so the same exact email content can also be triggered
+// on-demand from send-invoice-reminder-now.js, without duplicating the
+// markup in two places that could quietly drift apart over time.
 //
-// Deliberately NOT a raw-HTML editor for the super_admin: letting an admin
-// paste arbitrary HTML into something that gets emailed is easy to break
-// (unclosed tags, broken layout in some clients) for very little upside.
-// Instead, a small set of safe, structured knobs (colors, logo, footer
-// text) drive one well-built layout — same philosophy as the Site
-// Appearance theme system already built for the public site.
+// No side effects here - no Firestore, no email sending. Callers own
+// deciding *whether* to send and *how* (transporter setup, recording the
+// send), this file only builds the message itself.
 
-const COPY = {
-  en: {
-    eyebrow: 'Reminder',
-    subjectLine: (label, dueLabel) => `${label} due ${dueLabel}`,
-    greeting: name => `Hi ${name},`,
-    bodyTenant: (label, property, dueLabel) => `This is a reminder that your <strong>${label}</strong> for ${property} is due on <strong>${dueLabel}</strong>.`,
-    bodyAdmin: (label, property, dueLabel) => `This is a reminder that the <strong>${label}</strong> for ${property} is due on <strong>${dueLabel}</strong>.`,
-    disclaimer: 'This is an automated reminder, not an invoice — check with your property manager if you have questions about how to pay.',
-    testBanner: 'This is a test, sent only to you — not to tenants or any configured notify email.',
-    defaultFooter: 'The Property Management Team',
-  },
-  es: {
-    eyebrow: 'Recordatorio',
-    subjectLine: (label, dueLabel) => `${label} vence el ${dueLabel}`,
-    greeting: name => `Hola ${name},`,
-    bodyTenant: (label, property, dueLabel) => `Este es un recordatorio de que tu <strong>${label}</strong> para ${property} vence el <strong>${dueLabel}</strong>.`,
-    bodyAdmin: (label, property, dueLabel) => `Este es un recordatorio de que <strong>${label}</strong> para ${property} vence el <strong>${dueLabel}</strong>.`,
-    disclaimer: 'Este es un recordatorio automático, no una factura — consulta con tu administrador de propiedad si tienes preguntas sobre cómo pagar.',
-    testBanner: 'Esta es una prueba, enviada solo a ti — no a inquilinos ni a ningún correo de notificación configurado.',
-    defaultFooter: 'El Equipo de Administración',
-  },
-};
-
-function copyFor(lang) { return COPY[lang] || COPY.en; }
-
-// template: { headerColor, accentColor, logoUrl, footerText } — all
-// optional; every field falls back to a sensible default so this works
-// unchanged for anyone who never configures anything.
-function renderReminderEmailHtml({ lang, recipientName, label, propertyName, dueLabel, customMessage, isAdminCopy, isTest, template }) {
-  const c = copyFor(lang);
-  const tpl = template || {};
-  const headerColor = tpl.headerColor || '#1A1A2E';
-  const accentColor = tpl.accentColor || '#C9903A';
-  const footerText = (tpl.footerText || '').trim() || c.defaultFooter;
-  const logoHtml = tpl.logoUrl
-    ? `<img src="${tpl.logoUrl}" alt="" style="max-height:40px;margin-bottom:14px;">`
-    : '';
-  const bodyLine = isAdminCopy ? c.bodyAdmin(label, propertyName, dueLabel) : c.bodyTenant(label, propertyName, dueLabel);
-
-  return `
-<div style="font-family:Georgia,'Times New Roman',serif;max-width:520px;margin:0 auto;background:#ffffff;border:1px solid #E5E7EB;border-radius:8px;overflow:hidden;">
-  ${isTest ? `<div style="background:#FEF3C7;color:#92400E;padding:10px 24px;font-size:12px;text-align:center;font-family:Arial,sans-serif;">${c.testBanner}</div>` : ''}
-  <div style="background:${headerColor};padding:30px 32px;text-align:center;">
-    ${logoHtml}
-    <div style="color:#ffffff;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;opacity:0.7;font-family:Arial,sans-serif;">${c.eyebrow}</div>
-    <div style="color:${accentColor};font-size:26px;font-weight:600;margin-top:8px;">${label}</div>
-  </div>
-  <div style="padding:32px;">
-    <p style="font-size:15px;color:#1F2937;margin:0 0 16px;">${c.greeting(recipientName)}</p>
-    <p style="font-size:15px;color:#1F2937;line-height:1.65;margin:0 0 20px;">${bodyLine}</p>
-    ${customMessage ? `<p style="font-size:14px;color:#374151;background:#F9FAFB;border-left:3px solid ${accentColor};padding:14px 16px;border-radius:4px;margin:0 0 20px;line-height:1.5;">${customMessage}</p>` : ''}
-    <p style="font-size:12px;color:#9CA3AF;margin:20px 0 0;line-height:1.5;">${c.disclaimer}</p>
-  </div>
-  <div style="background:#F9FAFB;padding:18px 32px;text-align:center;border-top:1px solid #E5E7EB;">
-    <p style="font-size:12px;color:#6B7280;margin:0;">${footerText}</p>
-  </div>
-</div>`;
+// Parse a due date into a UTC-midnight timestamp so day math is timezone-stable.
+function toUtcMidnight(value) {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value).trim());
+  if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  const d = new Date(value);
+  if (isNaN(d)) return null;
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
-function renderReminderSubject({ lang, label, dueLabel, isTest }) {
-  const c = copyFor(lang);
-  return `${isTest ? '[TEST] ' : ''}${c.eyebrow}: ${c.subjectLine(label, dueLabel)}`;
+function fmtDate(ms) {
+  return new Date(ms).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-module.exports = { renderReminderEmailHtml, renderReminderSubject };
+function buildEmail({ siteName, tenantName, invoiceNumber, total, dueMs, daysBefore, daysOverdue, invoiceUrl, siteUrl }) {
+  const amount = `$${Number(total || 0).toFixed(2)}`;
+  const isOverdue = typeof daysOverdue === 'number';
+  const when = isOverdue
+    ? `is now ${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue`
+    : (daysBefore === 0 ? 'is due today' : `is due in ${daysBefore} day${daysBefore === 1 ? '' : 's'}`);
+  const accent = isOverdue ? '#DC2626' : '#C9903A';
+  const heading = isOverdue ? 'Overdue invoice notice' : 'Invoice reminder';
+  const tag = isOverdue ? '⚠️ Overdue Notice' : '🔔 Payment Reminder';
+  const intro = isOverdue
+    ? `Hi ${tenantName || 'there'}, our records show your invoice <strong>${invoiceNumber || ''}</strong> ${when} and remains unpaid. Please submit payment as soon as possible.`
+    : `Hi ${tenantName || 'there'}, this is a friendly reminder that your invoice <strong>${invoiceNumber || ''}</strong> ${when}.`;
+  const link = invoiceUrl || (siteUrl ? `${siteUrl}/tenant-portal` : '');
+  return `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 2px 16px rgba(26,26,46,0.08);">
+    <div style="background:#1A1A2E;padding:24px 32px;">
+      <span style="font-size:20px;font-weight:300;color:#E8D5B0;letter-spacing:0.06em;">${siteName || 'Tenant Portal'}</span>
+      <span style="float:right;font-size:11px;color:rgba(255,255,255,0.5);text-transform:uppercase;line-height:2.2;">${tag}</span>
+    </div>
+    <div style="padding:28px 32px;">
+      <h2 style="margin:0 0 4px;font-size:22px;font-weight:400;color:#1A1A2E;">${heading}</h2>
+      <p style="font-size:14px;color:#374151;margin:0 0 20px;">${intro}</p>
+      <table width="100%" style="background:#F9FAFB;border-radius:3px;padding:16px;margin-bottom:20px;" cellpadding="0" cellspacing="0">
+        <tr><td style="font-size:13px;color:#6B7280;padding-bottom:8px;">Invoice</td><td style="font-size:13px;font-weight:500;text-align:right;padding-bottom:8px;">${invoiceNumber || '—'}</td></tr>
+        <tr><td style="font-size:13px;color:#6B7280;padding-bottom:8px;">Due date</td><td style="font-size:13px;text-align:right;padding-bottom:8px;">${fmtDate(dueMs)}</td></tr>
+        <tr><td style="font-size:16px;font-weight:700;color:#1A1A2E;padding-top:8px;">Amount due</td><td style="font-size:20px;font-weight:700;color:${accent};text-align:right;padding-top:8px;">${amount}</td></tr>
+      </table>
+      ${link ? `<a href="${link}" style="display:inline-block;background:${accent};color:#fff;text-decoration:none;padding:10px 24px;font-size:12px;letter-spacing:0.1em;text-transform:uppercase;border-radius:2px;">View invoice →</a>` : ''}
+      <p style="font-size:12px;color:#9CA3AF;margin:20px 0 0;">If you have already made this payment, please disregard this reminder.</p>
+    </div>
+    <div style="background:#F7F4EF;padding:16px 32px;text-align:center;">
+      <p style="margin:0;font-size:11px;color:#9CA3AF;">Automated reminder from ${siteName || 'Tenant Portal'}.</p>
+    </div>
+  </div>`;
+}
+
+function buildSubject({ invoiceNumber, total, daysUntil, daysOverdue }) {
+  const isOverdue = typeof daysOverdue === 'number';
+  return isOverdue
+    ? `⚠️ Overdue — Invoice ${invoiceNumber || ''} is ${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue · $${Number(total || 0).toFixed(2)}`
+    : `🔔 Reminder — Invoice ${invoiceNumber || ''} ${daysUntil === 0 ? 'is due today' : `due in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`} · $${Number(total || 0).toFixed(2)}`;
+}
+
+module.exports = { toUtcMidnight, fmtDate, buildEmail, buildSubject };
