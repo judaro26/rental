@@ -2193,6 +2193,11 @@
       'invoices.remindersSentCount':'{n} reminder(s) sent', 'invoices.autoSendsTitle':'This draft will be emailed automatically on its scheduled date',
       'invoices.autoSends':'Auto-sends', 'invoices.receiptTag':'Receipt', 'invoices.invoiceTag':'Invoice',
       'invoices.draftTag':'Draft', 'invoices.unitLabel':'Unit', 'invoices.send':'Send', 'invoices.markPaid':'Mark Paid',
+      'invoices.remind':'Remind', 'invoices.confirmReminder':'Send a payment reminder to {email} right now?',
+      'invoices.confirmOverdueNotice':'Send an overdue notice to {email} right now?',
+      'invoices.reminderSentUpcoming':'✓ Reminder sent to {email} (invoice is due in {n} day(s)).',
+      'invoices.reminderSentOverdue':'✓ Overdue notice sent to {email} (invoice is {n} day(s) overdue).',
+      'invoices.reminderFailed':'Could not send reminder: ',
       'invoiceModal.newTitle':'New Invoice', 'invoiceModal.emailHint':'An email will be sent to the tenant with a link to view.',
       'invoiceModal.dueDate':'Due Date', 'invoiceModal.taxRate':'Tax Rate %', 'invoiceModal.notesPlaceholder':'e.g. Payment due by end of month',
       'invoiceModal.lineItems':'Line Items *', 'invoiceModal.addItem':'+ Add Item', 'invoiceModal.qty':'Qty', 'invoiceModal.unitPrice':'Unit $',
@@ -2676,6 +2681,11 @@
       'invoices.remindersSentCount':'{n} recordatorio(s) enviado(s)', 'invoices.autoSendsTitle':'Este borrador se enviará por correo automáticamente en su fecha programada',
       'invoices.autoSends':'Auto-envío', 'invoices.receiptTag':'Recibo', 'invoices.invoiceTag':'Factura',
       'invoices.draftTag':'Borrador', 'invoices.unitLabel':'Unidad', 'invoices.send':'Enviar', 'invoices.markPaid':'Marcar Pagada',
+      'invoices.remind':'Recordar', 'invoices.confirmReminder':'¿Enviar un recordatorio de pago a {email} ahora mismo?',
+      'invoices.confirmOverdueNotice':'¿Enviar un aviso de vencimiento a {email} ahora mismo?',
+      'invoices.reminderSentUpcoming':'✓ Recordatorio enviado a {email} (la factura vence en {n} día(s)).',
+      'invoices.reminderSentOverdue':'✓ Aviso de vencimiento enviado a {email} (la factura está vencida hace {n} día(s)).',
+      'invoices.reminderFailed':'No se pudo enviar el recordatorio: ',
       'invoiceModal.newTitle':'Nueva Factura', 'invoiceModal.emailHint':'Se enviará un correo al inquilino con un enlace para verla.',
       'invoiceModal.dueDate':'Fecha de Vencimiento', 'invoiceModal.taxRate':'Tasa de Impuesto %', 'invoiceModal.notesPlaceholder':'ej. Pago vence a fin de mes',
       'invoiceModal.lineItems':'Conceptos *', 'invoiceModal.addItem':'+ Agregar Concepto', 'invoiceModal.qty':'Cant', 'invoiceModal.unitPrice':'Precio Unit.',
@@ -5421,6 +5431,7 @@
             <a href="${inv.invoiceUrl||'#'}" target="_blank" class="btn btn-sm btn-outline" style="text-decoration:none;font-size:11px;">${t('common.view')}</a>
             ${inv.status==='draft'&&inv.type==='invoice'?`<button onclick="sendInvoiceNow('${inv.id}')" class="btn btn-sm btn-primary" style="font-size:11px;">${t('invoices.send')}</button>`:''}
             ${inv.status!=='paid'&&inv.status!=='draft'&&inv.type==='invoice'?`<button onclick="markInvoicePaid('${inv.id}')" class="btn btn-sm" style="background:#F0FDF4;color:#16A34A;border:1px solid #BBF7D0;font-size:11px;">${t('invoices.markPaid')}</button>`:''}
+            ${inv.status!=='paid'&&inv.status!=='draft'&&inv.type==='invoice'&&inv.tenantEmail&&inv.dueDate?`<button onclick="sendInvoiceReminderNow('${inv.id}',this)" class="btn btn-sm btn-outline" style="font-size:11px;">🔔 ${t('invoices.remind')}</button>`:''}
             ${inv.status!=='paid'&&inv.status!=='draft'?`<button onclick="generateReceipt('${inv.id}')" class="btn btn-sm btn-primary" style="font-size:11px;">${t('invoices.receiptTag')}</button>`:''}
             <button onclick="deleteInvoice('${inv.id}')" class="btn btn-sm btn-danger" style="font-size:11px;">×</button>
           </div>
@@ -5575,6 +5586,29 @@
       if (!res.ok) throw new Error(data.error||'Failed');
       loadInvoices();
     } catch(e) { alert(t('invoiceModal.errorSending')+e.message); if (btn){ btn.disabled=false; btn.textContent=t('invoices.send'); } }
+  };
+  window.sendInvoiceReminderNow = async (invoiceId, btnEl) => {
+    const inv = allInvoices.find(i=>i.id===invoiceId); if (!inv) return;
+    const dueDate = new Date(inv.dueDate + 'T00:00:00');
+    const isLikelyOverdue = dueDate < new Date(new Date().toDateString());
+    const confirmMsg = isLikelyOverdue
+      ? t('invoices.confirmOverdueNotice').replace('{email}', inv.tenantEmail)
+      : t('invoices.confirmReminder').replace('{email}', inv.tenantEmail);
+    if (!confirm(confirmMsg)) return;
+    btnEl.disabled = true; const original = btnEl.textContent; btnEl.textContent = t('common.sending');
+    try {
+      const res = await authedFetch('/api/send-invoice-reminder-now', { invoiceId });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      const resultMsg = data.isOverdue
+        ? t('invoices.reminderSentOverdue').replace('{email}', data.sentTo).replace('{n}', data.daysOverdue)
+        : t('invoices.reminderSentUpcoming').replace('{email}', data.sentTo).replace('{n}', data.daysUntil);
+      alert(resultMsg);
+      loadInvoices();
+    } catch (e) {
+      alert(t('invoices.reminderFailed') + e.message);
+      btnEl.disabled = false; btnEl.textContent = original;
+    }
   };
   window.deleteInvoice = async (invoiceId) => {
     if (!confirm(t('invoiceModal.confirmDelete'))) return;
