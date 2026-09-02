@@ -261,22 +261,22 @@
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;" data-i18n="properties.title">Manage Properties</h3>
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-            <input type="text" id="property-search" class="form-input" style="width:200px;" placeholder="Search by name, address, city..." oninput="filterProperties()">
+            <input type="text" id="property-search" class="form-input" style="width:200px;" data-i18n-placeholder="properties.searchPlaceholder" placeholder="Search by name, address, city..." oninput="filterProperties()">
             <select id="property-country-filter" class="form-input" style="width:120px;" onchange="filterProperties()">
-              <option value="">All Countries</option>
+              <option value="" data-i18n="properties.allCountries">All Countries</option>
               <option value="US">🇺🇸 US</option>
               <option value="CO">🇨🇴 CO</option>
-              <option value="unclassified">Unclassified</option>
+              <option value="unclassified" data-i18n="properties.unclassified">Unclassified</option>
             </select>
             <select id="property-avail-filter" class="form-input" style="width:130px;" onchange="filterProperties()">
-              <option value="">All Statuses</option>
-              <option value="available">Available</option>
-              <option value="hidden">Hidden</option>
+              <option value="" data-i18n="properties.allStatuses">All Statuses</option>
+              <option value="available" data-i18n="properties.availableOption">Available</option>
+              <option value="hidden" data-i18n="properties.hiddenOption">Hidden</option>
             </select>
             <select id="property-bold-filter" class="form-input" style="width:150px;" onchange="filterProperties()">
-              <option value="">All (Bold)</option>
-              <option value="enabled">Bold Enabled</option>
-              <option value="not-configured">Bold Not Set Up</option>
+              <option value="" data-i18n="properties.allBold">All (Bold)</option>
+              <option value="enabled" data-i18n="properties.boldEnabled">Bold Enabled</option>
+              <option value="not-configured" data-i18n="properties.boldNotSetUp">Bold Not Set Up</option>
             </select>
             <button onclick="openPropertyModal()" class="btn btn-primary btn-sm" data-i18n="properties.add">+ Add Property</button>
           </div>
@@ -285,7 +285,7 @@
         <div style="overflow-x:auto;">
           <table class="data-table">
             <thead><tr><th></th><th data-sort-section="properties" data-sort-col="name" onclick="handleSort('properties','name')" style="cursor:pointer;user-select:none;"><span data-i18n="common.name">Name</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="country" onclick="handleSort('properties','country')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.country">Country</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="address" onclick="handleSort('properties','address')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.address">Address</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="units" onclick="handleSort('properties','units')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.units">Units</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="available" onclick="handleSort('properties','available')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.available">Available</span><span class="sort-arrow"></span></th><th data-i18n="common.actions">Actions</th></tr></thead>
-            <tbody id="properties-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+            <tbody id="properties-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;" data-i18n="common.loading">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1304,45 +1304,45 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('admin-modal')"></div>
   <div style="background:#fff;width:100%;max-width:440px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('admin-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:24px;" id="admin-modal-title">Invite Admin</h3>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:24px;" id="admin-modal-title" data-i18n="admins.inviteAdminTitle">Invite Admin</h3>
     <input type="hidden" id="admin-uid">
     <div id="admin-modal-alert" class="hidden alert" style="margin-bottom:16px;"></div>
     <div style="display:flex;flex-direction:column;gap:16px;">
       <div>
-        <label class="label">Email *</label>
+        <label class="label" data-i18n="admins.emailRequired">Email *</label>
         <input type="email" id="admin-email" class="form-input" placeholder="colleague@company.com">
       </div>
       <div>
-        <label class="label">Display Name</label>
+        <label class="label" data-i18n="admins.displayName">Display Name</label>
         <input type="text" id="admin-name" class="form-input" placeholder="Jane Doe">
       </div>
       <div>
-        <label class="label">Role *</label>
+        <label class="label" data-i18n="admins.roleRequired">Role *</label>
         <select id="admin-role" class="form-input" onchange="window._onAdminRoleChange()">
-          <option value="restricted_admin">Restricted Admin (one country only)</option>
-          <option value="super_admin">Super Admin (full access)</option>
+          <option value="restricted_admin" data-i18n="admins.restrictedAdminOption">Restricted Admin (one country only)</option>
+          <option value="super_admin" data-i18n="admins.superAdminOption">Super Admin (full access)</option>
         </select>
       </div>
       <div id="admin-country-wrap">
-        <label class="label">Country Scope *</label>
+        <label class="label" data-i18n="admins.countryScopeRequired">Country Scope *</label>
         <select id="admin-country" class="form-input">
           <option value="US">🇺🇸 United States</option>
           <option value="CO">🇨🇴 Colombia</option>
         </select>
       </div>
       <div id="admin-expiry-wrap">
-        <label class="label">Invite Link Expires After</label>
+        <label class="label" data-i18n="admins.inviteExpiresAfter">Invite Link Expires After</label>
         <select id="admin-expiry" class="form-input">
-          <option value="24" selected>24 hours (1 day)</option>
-          <option value="48">48 hours (2 days)</option>
-          <option value="72">72 hours (3 days)</option>
-          <option value="168">7 days</option>
+          <option value="24" selected data-i18n="admins.hours24">24 hours (1 day)</option>
+          <option value="48" data-i18n="admins.hours48">48 hours (2 days)</option>
+          <option value="72" data-i18n="admins.hours72">72 hours (3 days)</option>
+          <option value="168" data-i18n="admins.days7">7 days</option>
         </select>
       </div>
     </div>
     <div style="display:flex;gap:10px;margin-top:24px;">
-      <button onclick="saveAdmin()" class="btn btn-primary" style="flex:1;" id="admin-save-btn">Send Invite</button>
-      <button onclick="closeModal('admin-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="saveAdmin()" class="btn btn-primary" style="flex:1;" id="admin-save-btn" data-i18n="admins.sendInvite">Send Invite</button>
+      <button onclick="closeModal('admin-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1350,17 +1350,17 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('doc-edit-modal')"></div>
   <div style="background:#fff;width:100%;max-width:460px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('doc-edit-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.6rem;font-weight:400;margin-bottom:20px;">Edit Document</h3>
+    <h3 style="font-size:1.6rem;font-weight:400;margin-bottom:20px;" data-i18n="documents.editDocumentTitle">Edit Document</h3>
     <input type="hidden" id="doc-edit-id">
     <div id="doc-edit-alert" class="hidden alert"></div>
     <div class="grid grid-cols-1 gap-4 mb-4">
-      <div><label class="label">Document Name *</label><input type="text" id="doc-edit-name" class="form-input"></div>
-      <div><label class="label">Category</label><select id="doc-edit-category" class="form-input"><option>Lease Agreement</option><option>Rent Receipt</option><option>Move-in Inspection</option><option>Notice</option><option>Rules &amp; Regulations</option><option>Other</option></select></div>
-      <div><label class="label">Visibility</label><select id="doc-edit-scope" class="form-input"><option value="tenant">Tenant Document</option><option value="property">Property-Wide</option><option value="admin">Admin Only 🔒</option></select></div>
+      <div><label class="label" data-i18n="documents.nameLabel">Document Name *</label><input type="text" id="doc-edit-name" class="form-input"></div>
+      <div><label class="label" data-i18n="common.category">Category</label><select id="doc-edit-category" class="form-input"><option data-i18n="documents.catLease">Lease Agreement</option><option data-i18n="documents.catReceipt">Rent Receipt</option><option data-i18n="documents.catInspection">Move-in Inspection</option><option data-i18n="documents.catNotice">Notice</option><option data-i18n="documents.catRules">Rules &amp; Regulations</option><option data-i18n="documents.catOther">Other</option></select></div>
+      <div><label class="label" data-i18n="documents.visibility">Visibility</label><select id="doc-edit-scope" class="form-input"><option value="tenant" data-i18n="documents.scopeTenant">Tenant Document</option><option value="property" data-i18n="documents.scopeProperty">Property-Wide</option><option value="admin" data-i18n="documents.adminOnlyLock">Admin Only 🔒</option></select></div>
     </div>
     <div style="display:flex;gap:10px;">
-      <button onclick="saveDocEdit()" class="btn btn-primary" style="flex:1;">Save Changes</button>
-      <button onclick="closeModal('doc-edit-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="saveDocEdit()" class="btn btn-primary" style="flex:1;" data-i18n="tenants.saveChanges">Save Changes</button>
+      <button onclick="closeModal('doc-edit-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1712,20 +1712,20 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('invite-modal')"></div>
   <div style="background:#fff;width:100%;max-width:480px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('invite-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:6px;">Invite Tenant</h3>
-    <p style="font-size:13px;color:var(--slate);margin-bottom:24px;">An activation email will be sent with a link to set their password.</p>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:6px;" data-i18n="invitations.inviteTenantTitle">Invite Tenant</h3>
+    <p style="font-size:13px;color:var(--slate);margin-bottom:24px;" data-i18n="invitations.activationEmailHint">An activation email will be sent with a link to set their password.</p>
     <div id="invite-alert" class="hidden alert"></div>
     <div class="grid grid-cols-2 gap-4">
-      <div><label class="label">First Name *</label><input type="text" id="inv-first" class="form-input" placeholder="Jane"></div>
-      <div><label class="label">Last Name</label><input type="text" id="inv-last" class="form-input" placeholder="Smith"></div>
-      <div class="col-span-2"><label class="label">Email Address *</label><input type="email" id="inv-email" class="form-input" placeholder="jane@email.com"></div>
-      <div><label class="label">Property</label><select id="inv-property" class="form-input" onchange="updateInvitePropertyName()"><option value="">— None —</option></select></div>
-      <div><label class="label">Unit</label><input type="text" id="inv-unit" class="form-input" placeholder="101"></div>
-      <div class="col-span-2"><label class="label">Monthly Rent ($)</label><input type="number" id="inv-rent" class="form-input" placeholder="0" min="0"></div>
+      <div><label class="label" data-i18n="invitations.firstName">First Name *</label><input type="text" id="inv-first" class="form-input" placeholder="Jane"></div>
+      <div><label class="label" data-i18n="invitations.lastName">Last Name</label><input type="text" id="inv-last" class="form-input" placeholder="Smith"></div>
+      <div class="col-span-2"><label class="label" data-i18n="invitations.emailAddress">Email Address *</label><input type="email" id="inv-email" class="form-input" placeholder="jane@email.com"></div>
+      <div><label class="label" data-i18n="common.property">Property</label><select id="inv-property" class="form-input" onchange="updateInvitePropertyName()"><option value="" data-i18n="invitations.noneOption">— None —</option></select></div>
+      <div><label class="label" data-i18n="invitations.unit">Unit</label><input type="text" id="inv-unit" class="form-input" placeholder="101"></div>
+      <div class="col-span-2"><label class="label" data-i18n="invitations.monthlyRent">Monthly Rent ($)</label><input type="number" id="inv-rent" class="form-input" placeholder="0" min="0"></div>
     </div>
     <div style="display:flex;gap:10px;margin-top:20px;">
-      <button onclick="sendInvite()" class="btn btn-primary" style="flex:1;" id="inv-send-btn">Send Invitation</button>
-      <button onclick="closeModal('invite-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="sendInvite()" class="btn btn-primary" style="flex:1;" id="inv-send-btn" data-i18n="invitations.sendInvitation">Send Invitation</button>
+      <button onclick="closeModal('invite-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1736,49 +1736,49 @@
   <div style="display:flex;align-items:flex-start;justify-content:center;min-height:100vh;padding:40px 16px;">
     <div style="background:#fff;width:100%;max-width:560px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;margin:auto;">
       <button onclick="closeModal('tenant-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-      <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:24px;">Edit Tenant</h3>
+      <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:24px;" data-i18n="tenants.editTenantTitle">Edit Tenant</h3>
       <input type="hidden" id="edit-tenant-id">
       <div id="tenant-edit-alert" class="hidden alert"></div>
       <div class="grid grid-cols-2 gap-4">
-        <div><label class="label">First Name</label><input type="text" id="edit-first" class="form-input"></div>
-        <div><label class="label">Last Name</label><input type="text" id="edit-last" class="form-input"></div>
-        <div class="col-span-2"><label class="label">Email</label><input type="email" id="edit-email" class="form-input" readonly style="background:#F3F0EB;"></div>
-        <div><label class="label">Phone</label><input type="tel" id="edit-phone" class="form-input"></div>
-        <div><label class="label">Property</label><select id="edit-property" class="form-input"><option value="">— None —</option></select></div>
-        <div><label class="label">Unit</label><input type="text" id="edit-unit" class="form-input" placeholder="2B"></div>
-        <div><label class="label">Status</label><select id="edit-status" class="form-input"><option value="pending">Pending</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
-        <div><label class="label">Monthly Rent ($)</label><input type="number" id="edit-rent" class="form-input" placeholder="0.00" step="0.01"></div>
-        <div><label class="label">Lease Start</label><input type="date" id="edit-lease-start" class="form-input"></div>
-        <div><label class="label">Lease End</label><input type="date" id="edit-lease-end" class="form-input"></div>
+        <div><label class="label" data-i18n="invitations.firstName">First Name</label><input type="text" id="edit-first" class="form-input"></div>
+        <div><label class="label" data-i18n="invitations.lastName">Last Name</label><input type="text" id="edit-last" class="form-input"></div>
+        <div class="col-span-2"><label class="label" data-i18n="common.email">Email</label><input type="email" id="edit-email" class="form-input" readonly style="background:#F3F0EB;"></div>
+        <div><label class="label" data-i18n="vendors.phone">Phone</label><input type="tel" id="edit-phone" class="form-input"></div>
+        <div><label class="label" data-i18n="common.property">Property</label><select id="edit-property" class="form-input"><option value="" data-i18n="invitations.noneOption">— None —</option></select></div>
+        <div><label class="label" data-i18n="invitations.unit">Unit</label><input type="text" id="edit-unit" class="form-input" placeholder="2B"></div>
+        <div><label class="label" data-i18n="common.status">Status</label><select id="edit-status" class="form-input"><option value="pending" data-i18n="applications.pending">Pending</option><option value="active" data-i18n="tenants.activeOption">Active</option><option value="inactive" data-i18n="tenants.inactiveOption">Inactive</option></select></div>
+        <div><label class="label" data-i18n="invitations.monthlyRent">Monthly Rent ($)</label><input type="number" id="edit-rent" class="form-input" placeholder="0.00" step="0.01"></div>
+        <div><label class="label" data-i18n="tenants.leaseStart">Lease Start</label><input type="date" id="edit-lease-start" class="form-input"></div>
+        <div><label class="label" data-i18n="tenants.colLeaseEnd">Lease End</label><input type="date" id="edit-lease-end" class="form-input"></div>
       </div>
 
       <div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
-        <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">🧾 Automatic Rent Invoicing</h4>
-        <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">When enabled, a real invoice is automatically generated and emailed to this tenant ahead of their rent due date — not just a reminder.</p>
+        <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;" data-i18n="tenants.autoInvoicingTitle">🧾 Automatic Rent Invoicing</h4>
+        <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="tenants.autoInvoicingHelp">When enabled, a real invoice is automatically generated and emailed to this tenant ahead of their rent due date — not just a reminder.</p>
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="label">Rent Due Day <span style="font-size:10px;font-weight:400;color:var(--slate);">(1–28)</span></label>
+            <label class="label"><span data-i18n="tenants.rentDueDay">Rent Due Day</span> <span style="font-size:10px;font-weight:400;color:var(--slate);">(1–28)</span></label>
             <input type="number" id="edit-rent-due-day" class="form-input" min="1" max="28" placeholder="1">
           </div>
           <div>
-            <label class="label">Generate Invoice <span style="font-size:10px;font-weight:400;color:var(--slate);">(days before due)</span></label>
+            <label class="label"><span data-i18n="tenants.generateInvoice">Generate Invoice</span> <span style="font-size:10px;font-weight:400;color:var(--slate);" data-i18n="tenants.daysBeforeDue">(days before due)</span></label>
             <input type="number" id="edit-auto-invoice-lead-days" class="form-input" min="0" max="27" placeholder="5">
           </div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:10px;">
-          <input type="checkbox" id="edit-auto-invoice-enabled" style="width:16px;height:16px;"> Automatically generate and send this tenant's rent invoice
+          <input type="checkbox" id="edit-auto-invoice-enabled" style="width:16px;height:16px;"> <span data-i18n="tenants.autoGenerateCheckbox">Automatically generate and send this tenant's rent invoice</span>
         </label>
         <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
-          <button type="button" onclick="testAutoInvoice()" class="btn btn-outline btn-sm" id="test-auto-invoice-btn">Send Test Invoice</button>
-          <button type="button" onclick="generateInvoiceNow()" class="btn btn-sm" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;" id="generate-invoice-now-btn">⚡ Generate &amp; Send Real Invoice Now</button>
+          <button type="button" onclick="testAutoInvoice()" class="btn btn-outline btn-sm" id="test-auto-invoice-btn" data-i18n="tenants.sendTestInvoice">Send Test Invoice</button>
+          <button type="button" onclick="generateInvoiceNow()" class="btn btn-sm" style="background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;" id="generate-invoice-now-btn" data-i18n="tenants.generateSendRealInvoice">⚡ Generate &amp; Send Real Invoice Now</button>
         </div>
-        <p style="font-size:10px;color:var(--slate);margin-top:6px;">Use this if the automatic generate-window for the upcoming due date already passed — e.g. you just turned this on. This creates and sends a real invoice immediately, for the next upcoming due date.</p>
+        <p style="font-size:10px;color:var(--slate);margin-top:6px;" data-i18n="tenants.generateNowHint">Use this if the automatic generate-window for the upcoming due date already passed — e.g. you just turned this on. This creates and sends a real invoice immediately, for the next upcoming due date.</p>
         <div id="auto-invoice-test-result" style="font-size:12px;margin-top:8px;"></div>
       </div>
 
       <div style="display:flex;gap:10px;margin-top:20px;">
         <button onclick="saveTenant()" class="btn btn-primary" style="flex:1;" id="tenant-save-btn" data-i18n="tenants.saveChanges">Save Changes</button>
-        <button onclick="closeModal('tenant-modal')" class="btn btn-outline">Cancel</button>
+        <button onclick="closeModal('tenant-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
       </div>
     </div>
   </div>
@@ -1809,25 +1809,25 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('lease-modal')"></div>
   <div style="background:#fff;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('lease-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;">Generate Lease Agreement</h3>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;" data-i18n="lease.title">Generate Lease Agreement</h3>
     <p id="lease-modal-to" style="font-size:13px;color:var(--slate);margin-bottom:16px;"></p>
     <div id="lease-alert" class="hidden alert"></div>
     <div class="grid grid-cols-2 gap-4">
-      <div class="col-span-2"><label class="label">Landlord / lessor name</label><input type="text" id="lease-landlord-name" class="form-input" placeholder="Defaults to your site/brand name"></div>
-      <div class="col-span-2"><label class="label">Landlord email (for countersigning)</label><input type="email" id="lease-landlord-email" class="form-input" placeholder="Defaults to your Settings contact email"></div>
-      <div><label class="label">Lease start</label><input type="date" id="lease-start" class="form-input"></div>
-      <div><label class="label">Lease end</label><input type="date" id="lease-end" class="form-input"></div>
-      <div><label class="label">Monthly rent ($)</label><input type="number" id="lease-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
-      <div><label class="label">Security deposit ($)</label><input type="number" id="lease-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="col-span-2"><label class="label">Property type</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="single" onchange="updateLeaseVisibility()" checked> Single-Family Home / Condo</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="multi" onchange="updateLeaseVisibility()"> Multi-Family / Studio Unit</label></div></div><div class="col-span-2"><label class="label">Rent control (AB 1482)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="exempt" checked> Exempt</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="subject"> Subject to rent control</label></div></div><div><label class="label">Late fee day of month</label><input type="number" id="lease-late-fee-day" class="form-input" min="1" max="31" placeholder="5"></div>
-      <div><label class="label">Late fee ($)</label><input type="number" id="lease-late-fee" class="form-input" min="0" step="0.01" placeholder="0.00"></div><div class="col-span-2"><label class="label">Utilities provided</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="a" onchange="updateLeaseVisibility()" checked> Tenant pays all utilities</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="b" onchange="updateLeaseVisibility()"> Landlord provides some utilities</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="c" onchange="updateLeaseVisibility()"> Shared / sub-metered utilities</label></div></div><div id="lease-utilities-b-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><label class="label">Utilities included by landlord</label><div style="display:flex;gap:16px;font-size:13px;flex-wrap:wrap;"><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="electricity"> Electricity</label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="gas"> Gas</label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="water"> Water</label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="trash"> Trash</label></div></div><div id="lease-utilities-c-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><label class="label">Shared meter utilities (select all that apply)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;flex-wrap:wrap;"><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-shared-meter-included" value="electricity" checked> Electricity</label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-shared-meter-included" value="gas"> Gas</label></div><label class="label" style="margin-top:8px;">Shared meter billing</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-shared-meter-billing" value="absorbed" onchange="updateLeaseVisibility()" checked> Landlord absorbs cost</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-shared-meter-billing" value="prorated" onchange="updateLeaseVisibility()"> Prorated to tenant</label></div><div id="lease-shared-meter-pct-row" class="hidden" style="margin-top:8px;"><label class="label">Tenant share (%)</label><input type="number" id="lease-shared-meter-pct" class="form-input" min="0" max="100" placeholder="50"></div></div>
-      <div class="col-span-2"><label class="label">Pets</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="none" onchange="updateLeaseVisibility()" checked> No pets allowed</label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="allowed" onchange="updateLeaseVisibility()"> Pet allowed (with restriction)</label></div></div><div id="lease-pets-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><div class="grid grid-cols-2 gap-4"><div><label class="label">Pet breed</label><input type="text" id="lease-pet-breed" class="form-input" placeholder="e.g. Labrador"></div><div><label class="label">Pet weight</label><input type="text" id="lease-pet-weight" class="form-input" placeholder="e.g. 45 lbs"></div><div><label class="label">Pet name</label><input type="text" id="lease-pet-name" class="form-input" placeholder="e.g. Max"></div><div><label class="label">Pet rent ($/mo)</label><input type="number" id="lease-pet-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div></div></div>
-      <div class="col-span-2"><label class="label">Additional terms</label><textarea id="lease-additional" class="form-input" rows="3" placeholder="Any extra clauses to include..."></textarea></div>
+      <div class="col-span-2"><label class="label" data-i18n="lease.landlordName">Landlord / lessor name</label><input type="text" id="lease-landlord-name" class="form-input" data-i18n-placeholder="lease.landlordNamePlaceholder" placeholder="Defaults to your site/brand name"></div>
+      <div class="col-span-2"><label class="label" data-i18n="lease.landlordEmail">Landlord email (for countersigning)</label><input type="email" id="lease-landlord-email" class="form-input" data-i18n-placeholder="lease.landlordEmailPlaceholder" placeholder="Defaults to your Settings contact email"></div>
+      <div><label class="label" data-i18n="lease.leaseStart">Lease start</label><input type="date" id="lease-start" class="form-input"></div>
+      <div><label class="label" data-i18n="lease.leaseEnd">Lease end</label><input type="date" id="lease-end" class="form-input"></div>
+      <div><label class="label" data-i18n="lease.monthlyRent">Monthly rent ($)</label><input type="number" id="lease-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
+      <div><label class="label" data-i18n="lease.securityDeposit">Security deposit ($)</label><input type="number" id="lease-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="col-span-2"><label class="label" data-i18n="lease.propertyType">Property type</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="single" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.singleFamily">Single-Family Home / Condo</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="multi" onchange="updateLeaseVisibility()"> <span data-i18n="lease.multiFamily">Multi-Family / Studio Unit</span></label></div></div><div class="col-span-2"><label class="label" data-i18n="lease.rentControl">Rent control (AB 1482)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="exempt" checked> <span data-i18n="lease.exempt">Exempt</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="subject"> <span data-i18n="lease.subjectToRentControl">Subject to rent control</span></label></div></div><div><label class="label" data-i18n="lease.lateFeeDayOfMonth">Late fee day of month</label><input type="number" id="lease-late-fee-day" class="form-input" min="1" max="31" placeholder="5"></div>
+      <div><label class="label" data-i18n="lease.lateFee">Late fee ($)</label><input type="number" id="lease-late-fee" class="form-input" min="0" step="0.01" placeholder="0.00"></div><div class="col-span-2"><label class="label" data-i18n="lease.utilitiesProvided">Utilities provided</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="a" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.tenantPaysAllUtilities">Tenant pays all utilities</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="b" onchange="updateLeaseVisibility()"> <span data-i18n="lease.landlordProvidesSome">Landlord provides some utilities</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="c" onchange="updateLeaseVisibility()"> <span data-i18n="lease.sharedUtilities">Shared / sub-metered utilities</span></label></div></div><div id="lease-utilities-b-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><label class="label" data-i18n="lease.utilitiesIncludedByLandlord">Utilities included by landlord</label><div style="display:flex;gap:16px;font-size:13px;flex-wrap:wrap;"><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="electricity"> <span data-i18n="lease.electricity">Electricity</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="gas"> <span data-i18n="lease.gas">Gas</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="water"> <span data-i18n="lease.water">Water</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="trash"> <span data-i18n="lease.trash">Trash</span></label></div></div><div id="lease-utilities-c-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><label class="label" data-i18n="lease.sharedMeterUtilities">Shared meter utilities (select all that apply)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;flex-wrap:wrap;"><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-shared-meter-included" value="electricity" checked> <span data-i18n="lease.electricity">Electricity</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-shared-meter-included" value="gas"> <span data-i18n="lease.gas">Gas</span></label></div><label class="label" style="margin-top:8px;" data-i18n="lease.sharedMeterBilling">Shared meter billing</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-shared-meter-billing" value="absorbed" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.landlordAbsorbsCost">Landlord absorbs cost</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-shared-meter-billing" value="prorated" onchange="updateLeaseVisibility()"> <span data-i18n="lease.proratedToTenant">Prorated to tenant</span></label></div><div id="lease-shared-meter-pct-row" class="hidden" style="margin-top:8px;"><label class="label" data-i18n="lease.tenantSharePct">Tenant share (%)</label><input type="number" id="lease-shared-meter-pct" class="form-input" min="0" max="100" placeholder="50"></div></div>
+      <div class="col-span-2"><label class="label" data-i18n="lease.pets">Pets</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="none" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.noPetsAllowed">No pets allowed</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="allowed" onchange="updateLeaseVisibility()"> <span data-i18n="lease.petAllowed">Pet allowed (with restriction)</span></label></div></div><div id="lease-pets-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><div class="grid grid-cols-2 gap-4"><div><label class="label" data-i18n="lease.petBreed">Pet breed</label><input type="text" id="lease-pet-breed" class="form-input" placeholder="e.g. Labrador"></div><div><label class="label" data-i18n="lease.petWeight">Pet weight</label><input type="text" id="lease-pet-weight" class="form-input" placeholder="e.g. 45 lbs"></div><div><label class="label" data-i18n="lease.petName">Pet name</label><input type="text" id="lease-pet-name" class="form-input" placeholder="e.g. Max"></div><div><label class="label" data-i18n="lease.petRent">Pet rent ($/mo)</label><input type="number" id="lease-pet-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div></div></div>
+      <div class="col-span-2"><label class="label" data-i18n="lease.additionalTerms">Additional terms</label><textarea id="lease-additional" class="form-input" rows="3" data-i18n-placeholder="lease.additionalTermsPlaceholder" placeholder="Any extra clauses to include..."></textarea></div>
     </div>
-    <p style="font-size:11px;color:var(--slate);margin-top:12px;line-height:1.6;">These details are prefilled into your Documenso lease template. The applicant (Tenant) and you (Landlord) will receive signing invitations from Documenso by email.</p>
+    <p style="font-size:11px;color:var(--slate);margin-top:12px;line-height:1.6;" data-i18n="lease.documensoHint">These details are prefilled into your Documenso lease template. The applicant (Tenant) and you (Landlord) will receive signing invitations from Documenso by email.</p>
     <div style="display:flex;gap:10px;margin-top:18px;">
       <button onclick="generateLease()" class="btn btn-primary" style="flex:1;" id="lease-generate-btn" data-i18n="applications.generateSendSignature">Generate &amp; Send for Signature</button>
-      <button onclick="closeModal('lease-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="closeModal('lease-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1837,19 +1837,19 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('doc-request-modal')"></div>
   <div style="background:#fff;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('doc-request-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;">Request Documents</h3>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;" data-i18n="applications.requestDocumentsTitle">Request Documents</h3>
     <p id="doc-request-to" style="font-size:13px;color:var(--slate);margin-bottom:18px;"></p>
     <div id="doc-request-alert" class="hidden alert"></div>
-    <label class="label">Documents to request</label>
+    <label class="label" data-i18n="applications.documentsToRequest">Documents to request</label>
     <div id="doc-request-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
-    <label class="label">Add custom items <span style="font-size:10px;font-weight:400;">(comma-separated)</span></label>
-    <input type="text" id="doc-request-custom" class="form-input" placeholder="e.g. Proof of renters insurance, Co-signer form">
-    <label class="label" style="margin-top:14px;">Note to applicant <span style="font-size:10px;font-weight:400;">(optional)</span></label>
-    <textarea id="doc-request-note" class="form-input" rows="3" placeholder="Optional message included in the email..."></textarea>
-    <p style="font-size:11px;color:var(--slate);margin-top:10px;line-height:1.6;">The applicant receives a secure upload link. They must give consent to how their documents are used before they can upload — that consent is recorded with a timestamp and IP address.</p>
+    <label class="label"><span data-i18n="applications.addCustomItems">Add custom items</span> <span style="font-size:10px;font-weight:400;" data-i18n="applications.commaSeparated">(comma-separated)</span></label>
+    <input type="text" id="doc-request-custom" class="form-input" data-i18n-placeholder="applications.customItemsPlaceholder" placeholder="e.g. Proof of renters insurance, Co-signer form">
+    <label class="label" style="margin-top:14px;"><span data-i18n="applications.noteToApplicant">Note to applicant</span> <span style="font-size:10px;font-weight:400;" data-i18n="common.optionalParen">(optional)</span></label>
+    <textarea id="doc-request-note" class="form-input" rows="3" data-i18n-placeholder="applications.noteToApplicantPlaceholder" placeholder="Optional message included in the email..."></textarea>
+    <p style="font-size:11px;color:var(--slate);margin-top:10px;line-height:1.6;" data-i18n="applications.uploadConsentHint">The applicant receives a secure upload link. They must give consent to how their documents are used before they can upload — that consent is recorded with a timestamp and IP address.</p>
     <div style="display:flex;gap:10px;margin-top:20px;">
       <button onclick="sendDocRequest()" class="btn btn-primary" style="flex:1;" id="doc-request-btn" data-i18n="applications.sendRequest">Send Request</button>
-      <button onclick="closeModal('doc-request-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="closeModal('doc-request-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1859,22 +1859,22 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('message-applicant-modal')"></div>
   <div style="background:#fff;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('message-applicant-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;">Message Applicant</h3>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;" data-i18n="applications.messageApplicantTitle">Message Applicant</h3>
     <p id="message-applicant-to" style="font-size:13px;color:var(--slate);margin-bottom:18px;"></p>
     <div id="message-alert" class="hidden alert"></div>
-    <label class="label">Template</label>
+    <label class="label" data-i18n="applications.template">Template</label>
     <select id="msg-template" class="form-input" onchange="applyMessageTemplate()"></select>
-    <label class="label" style="margin-top:14px;">Subject</label>
-    <input type="text" id="msg-subject" class="form-input" placeholder="Subject line">
-    <label class="label" style="margin-top:14px;">Message</label>
-    <textarea id="msg-body" class="form-input" rows="10" placeholder="Write your message..."></textarea>
+    <label class="label" style="margin-top:14px;" data-i18n="support.colSubject">Subject</label>
+    <input type="text" id="msg-subject" class="form-input" data-i18n-placeholder="applications.subjectLinePlaceholder" placeholder="Subject line">
+    <label class="label" style="margin-top:14px;" data-i18n="announcements.messageLabel2">Message</label>
+    <textarea id="msg-body" class="form-input" rows="10" data-i18n-placeholder="applications.writeMessagePlaceholder" placeholder="Write your message..."></textarea>
     <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:#374151;cursor:pointer;margin-top:14px;background:#F9FAFB;border:1px solid var(--border);border-radius:3px;padding:12px 14px;">
       <input type="checkbox" id="msg-include-form" style="width:16px;height:16px;margin-top:2px;flex-shrink:0;">
-      <span>Include a secure form link so the applicant can confirm the <strong>names and ages of prospective residents</strong>, their <strong>desired move-in date</strong>, and <strong>references</strong>. Their answers update this application automatically.</span>
+      <span data-i18n="applications.includeFormLinkHint">Include a secure form link so the applicant can confirm the <strong>names and ages of prospective residents</strong>, their <strong>desired move-in date</strong>, and <strong>references</strong>. Their answers update this application automatically.</span>
     </label>
     <div style="display:flex;gap:10px;margin-top:22px;">
       <button onclick="sendApplicantMessage()" class="btn btn-primary" style="flex:1;" id="msg-send-btn" data-i18n="applications.sendMessage">Send Message</button>
-      <button onclick="closeModal('message-applicant-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="closeModal('message-applicant-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1884,13 +1884,13 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('blank-app-modal')"></div>
   <div style="background:#fff;width:100%;max-width:460px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('blank-app-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:6px;">Print Blank Application</h3>
-    <p style="font-size:13px;color:var(--slate);margin-bottom:20px;">Generate a printable, fill-by-hand application to hand out. Pick a property to include its address and state-specific disclosures, or leave it generic.</p>
-    <label class="label">Property <span style="font-size:10px;font-weight:400;">(optional)</span></label>
-    <select id="blank-app-property" class="form-input"><option value="">— Generic (no specific property) —</option></select>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:6px;" data-i18n="applications.printBlankTitle">Print Blank Application</h3>
+    <p style="font-size:13px;color:var(--slate);margin-bottom:20px;" data-i18n="applications.printBlankHint">Generate a printable, fill-by-hand application to hand out. Pick a property to include its address and state-specific disclosures, or leave it generic.</p>
+    <label class="label"><span data-i18n="common.property">Property</span> <span style="font-size:10px;font-weight:400;" data-i18n="common.optionalParen">(optional)</span></label>
+    <select id="blank-app-property" class="form-input"><option value="" data-i18n="applications.genericOption">— Generic (no specific property) —</option></select>
     <div style="display:flex;gap:10px;margin-top:22px;">
-      <button onclick="printBlankApplication()" class="btn btn-primary" style="flex:1;">Print Form</button>
-      <button onclick="closeModal('blank-app-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="printBlankApplication()" class="btn btn-primary" style="flex:1;" data-i18n="applications.printForm">Print Form</button>
+      <button onclick="closeModal('blank-app-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -1900,12 +1900,12 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('maint-modal')"></div>
   <div style="background:#fff;width:100%;max-width:440px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('maint-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;">Update Request</h3>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" data-i18n="maintenance.updateRequestTitle">Update Request</h3>
     <input type="hidden" id="maint-edit-id">
     <div id="maint-comment-thread" style="display:none;margin-bottom:16px;max-height:180px;overflow-y:auto;padding:4px 0;"></div>
-    <div class="mb-4"><label class="label">Status</label><select id="maint-edit-status" class="form-input"><option value="open">Open</option><option value="in-progress">In Progress</option><option value="resolved">Resolved</option></select></div>
-    <div class="mb-4"><label class="label">Admin Notes <span style="font-size:10px;font-weight:400;opacity:0.6;">(visible to tenant)</span></label><textarea id="maint-edit-notes" class="form-input" rows="3" placeholder="Update message for tenant..."></textarea></div>
-    <button onclick="saveMaintenance()" class="btn btn-primary" style="width:100%;">Update Request</button>
+    <div class="mb-4"><label class="label" data-i18n="common.status">Status</label><select id="maint-edit-status" class="form-input"><option value="open" data-i18n="maintenance.open">Open</option><option value="in-progress" data-i18n="maintenance.inProgress">In Progress</option><option value="resolved" data-i18n="maintenance.resolved">Resolved</option></select></div>
+    <div class="mb-4"><label class="label"><span data-i18n="maintenance.adminNotes">Admin Notes</span> <span style="font-size:10px;font-weight:400;opacity:0.6;" data-i18n="maintenance.visibleToTenant">(visible to tenant)</span></label><textarea id="maint-edit-notes" class="form-input" rows="3" data-i18n-placeholder="maintenance.updateMessagePlaceholder" placeholder="Update message for tenant..."></textarea></div>
+    <button onclick="saveMaintenance()" class="btn btn-primary" style="width:100%;" data-i18n="maintenance.updateRequestTitle">Update Request</button>
   </div>
 </div>
 
@@ -1914,15 +1914,15 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('manual-payment-modal')"></div>
   <div style="background:#fff;width:100%;max-width:440px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('manual-payment-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;">Record Manual Payment</h3>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" data-i18n="payments.recordManualTitle">Record Manual Payment</h3>
     <div id="manual-pay-alert" class="hidden alert"></div>
     <div class="grid gap-4">
-      <div><label class="label">Tenant *</label><select id="manual-pay-tenant" class="form-input"><option value="">Select tenant...</option></select></div>
-      <div><label class="label">Amount ($) *</label><input type="number" id="manual-pay-amount" class="form-input" placeholder="0.00" step="0.01" min="1"></div>
-      <div><label class="label">Description</label><input type="text" id="manual-pay-desc" class="form-input" placeholder="e.g. June Rent — Cash"></div>
-      <div><label class="label">Date</label><input type="date" id="manual-pay-date" class="form-input"></div>
+      <div><label class="label" data-i18n="common.tenant">Tenant *</label><select id="manual-pay-tenant" class="form-input"><option value="" data-i18n="documents.selectTenant">Select tenant...</option></select></div>
+      <div><label class="label" data-i18n="payments.amountRequired">Amount ($) *</label><input type="number" id="manual-pay-amount" class="form-input" placeholder="0.00" step="0.01" min="1"></div>
+      <div><label class="label" data-i18n="common.description">Description</label><input type="text" id="manual-pay-desc" class="form-input" placeholder="e.g. June Rent — Cash"></div>
+      <div><label class="label" data-i18n="common.date">Date</label><input type="date" id="manual-pay-date" class="form-input"></div>
     </div>
-    <button onclick="saveManualPayment()" class="btn btn-success" style="width:100%;margin-top:20px;">Record Payment</button>
+    <button onclick="saveManualPayment()" class="btn btn-success" style="width:100%;margin-top:20px;" data-i18n="payments.recordPaymentButton">Record Payment</button>
   </div>
 </div>
 
@@ -1931,25 +1931,25 @@
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('resend-expiry-modal')"></div>
   <div style="background:#fff;width:100%;max-width:400px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
     <button onclick="closeModal('resend-expiry-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
-    <h3 style="font-size:1.6rem;font-weight:400;margin-bottom:6px;">Resend Activation Link</h3>
+    <h3 style="font-size:1.6rem;font-weight:400;margin-bottom:6px;" data-i18n="invitations.resendActivationTitle">Resend Activation Link</h3>
     <p id="resend-email-label" style="font-size:13px;color:var(--slate);margin-bottom:20px;"></p>
     <div id="resend-alert" class="hidden alert" style="margin-bottom:16px;"></div>
     <div style="margin-bottom:20px;">
-      <label class="label">Link Expires After</label>
+      <label class="label" data-i18n="invitations.linkExpiresAfter">Link Expires After</label>
       <select id="resend-expiry" class="form-input">
-        <option value="1">1 hour</option><option value="2">2 hours</option><option value="6">6 hours</option>
-        <option value="12">12 hours</option><option value="24" selected>24 hours (1 day)</option>
-        <option value="48">48 hours (2 days)</option><option value="72">72 hours (3 days)</option>
-        <option value="120">5 days</option><option value="168">7 days</option>
+        <option value="1" data-i18n="invitations.hour1">1 hour</option><option value="2" data-i18n="invitations.hours2">2 hours</option><option value="6" data-i18n="invitations.hours6">6 hours</option>
+        <option value="12" data-i18n="invitations.hours12">12 hours</option><option value="24" selected data-i18n="admins.hours24">24 hours (1 day)</option>
+        <option value="48" data-i18n="admins.hours48">48 hours (2 days)</option><option value="72" data-i18n="admins.hours72">72 hours (3 days)</option>
+        <option value="120" data-i18n="invitations.days5">5 days</option><option value="168" data-i18n="admins.days7">7 days</option>
       </select>
-      <p style="font-size:11px;color:var(--slate);margin-top:6px;line-height:1.5;">The tenant must click the link before this window closes.</p>
+      <p style="font-size:11px;color:var(--slate);margin-top:6px;line-height:1.5;" data-i18n="invitations.mustClickBeforeClose">The tenant must click the link before this window closes.</p>
     </div>
     <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:3px;padding:12px 14px;margin-bottom:20px;">
-      <p style="font-size:12px;color:#1D4ED8;margin:0;line-height:1.5;">💡 The link is single-use and generates a fresh login at click time.</p>
+      <p style="font-size:12px;color:#1D4ED8;margin:0;line-height:1.5;" data-i18n="invitations.singleUseHint">💡 The link is single-use and generates a fresh login at click time.</p>
     </div>
     <div style="display:flex;gap:10px;">
       <button id="resend-send-btn" onclick="confirmResend()" class="btn btn-primary" style="flex:1;" data-i18n="invitations.sendLink">Send Link</button>
-      <button onclick="closeModal('resend-expiry-modal')" class="btn btn-outline">Cancel</button>
+      <button onclick="closeModal('resend-expiry-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -2337,6 +2337,63 @@
       'applications.copyApplicantLink':'Copy Applicant Link',
       'settings.uploadLogo':'Upload Logo', 'settings.logoUploadFailed':'Logo upload failed: ', 'settings.couldNotSave':'Could not save: ',
       'properties.uploadingXOfY':'Uploading {current} of {total}...',
+      'properties.searchPlaceholder':'Search by name, address, city...', 'properties.allCountries':'All Countries',
+      'properties.unclassified':'Unclassified', 'properties.allStatuses':'All Statuses', 'properties.availableOption':'Available',
+      'properties.hiddenOption':'Hidden', 'properties.allBold':'All (Bold)', 'properties.boldEnabled':'Bold Enabled',
+      'properties.boldNotSetUp':'Bold Not Set Up',
+      'invitations.inviteTenantTitle':'Invite Tenant', 'invitations.activationEmailHint':'An activation email will be sent with a link to set their password.',
+      'invitations.firstName':'First Name *', 'invitations.lastName':'Last Name', 'invitations.emailAddress':'Email Address *',
+      'invitations.noneOption':'— None —', 'invitations.unit':'Unit', 'invitations.monthlyRent':'Monthly Rent ($)',
+      'tenants.editTenantTitle':'Edit Tenant', 'tenants.activeOption':'Active', 'tenants.inactiveOption':'Inactive',
+      'tenants.leaseStart':'Lease Start', 'tenants.autoInvoicingTitle':'🧾 Automatic Rent Invoicing',
+      'tenants.autoInvoicingHelp':'When enabled, a real invoice is automatically generated and emailed to this tenant ahead of their rent due date — not just a reminder.',
+      'tenants.rentDueDay':'Rent Due Day', 'tenants.generateInvoice':'Generate Invoice', 'tenants.daysBeforeDue':'(days before due)',
+      'tenants.autoGenerateCheckbox':'Automatically generate and send this tenant\'s rent invoice',
+      'tenants.sendTestInvoice':'Send Test Invoice', 'tenants.generateSendRealInvoice':'⚡ Generate &amp; Send Real Invoice Now',
+      'tenants.generateNowHint':'Use this if the automatic generate-window for the upcoming due date already passed — e.g. you just turned this on. This creates and sends a real invoice immediately, for the next upcoming due date.',
+      'lease.title':'Generate Lease Agreement', 'lease.landlordName':'Landlord / lessor name',
+      'lease.landlordNamePlaceholder':'Defaults to your site/brand name', 'lease.landlordEmail':'Landlord email (for countersigning)',
+      'lease.landlordEmailPlaceholder':'Defaults to your Settings contact email', 'lease.leaseStart':'Lease start', 'lease.leaseEnd':'Lease end',
+      'lease.monthlyRent':'Monthly rent ($)', 'lease.securityDeposit':'Security deposit ($)', 'lease.propertyType':'Property type',
+      'lease.singleFamily':'Single-Family Home / Condo', 'lease.multiFamily':'Multi-Family / Studio Unit',
+      'lease.rentControl':'Rent control (AB 1482)', 'lease.exempt':'Exempt', 'lease.subjectToRentControl':'Subject to rent control',
+      'lease.lateFeeDayOfMonth':'Late fee day of month', 'lease.lateFee':'Late fee ($)', 'lease.utilitiesProvided':'Utilities provided',
+      'lease.tenantPaysAllUtilities':'Tenant pays all utilities', 'lease.landlordProvidesSome':'Landlord provides some utilities',
+      'lease.sharedUtilities':'Shared / sub-metered utilities', 'lease.utilitiesIncludedByLandlord':'Utilities included by landlord',
+      'lease.electricity':'Electricity', 'lease.gas':'Gas', 'lease.water':'Water', 'lease.trash':'Trash',
+      'lease.sharedMeterUtilities':'Shared meter utilities (select all that apply)', 'lease.sharedMeterBilling':'Shared meter billing',
+      'lease.landlordAbsorbsCost':'Landlord absorbs cost', 'lease.proratedToTenant':'Prorated to tenant',
+      'lease.tenantSharePct':'Tenant share (%)', 'lease.pets':'Pets', 'lease.noPetsAllowed':'No pets allowed',
+      'lease.petAllowed':'Pet allowed (with restriction)', 'lease.petBreed':'Pet breed', 'lease.petWeight':'Pet weight',
+      'lease.petName':'Pet name', 'lease.petRent':'Pet rent ($/mo)', 'lease.additionalTerms':'Additional terms',
+      'lease.additionalTermsPlaceholder':'Any extra clauses to include...',
+      'lease.documensoHint':'These details are prefilled into your Documenso lease template. The applicant (Tenant) and you (Landlord) will receive signing invitations from Documenso by email.',
+      'admins.inviteAdminTitle':'Invite Admin', 'admins.emailRequired':'Email *', 'admins.displayName':'Display Name',
+      'admins.roleRequired':'Role *', 'admins.restrictedAdminOption':'Restricted Admin (one country only)',
+      'admins.superAdminOption':'Super Admin (full access)', 'admins.countryScopeRequired':'Country Scope *',
+      'admins.inviteExpiresAfter':'Invite Link Expires After', 'admins.hours24':'24 hours (1 day)', 'admins.hours48':'48 hours (2 days)',
+      'admins.hours72':'72 hours (3 days)', 'admins.days7':'7 days', 'admins.sendInvite':'Send Invite',
+      'documents.editDocumentTitle':'Edit Document', 'documents.visibility':'Visibility', 'documents.adminOnlyLock':'Admin Only 🔒',
+      'applications.messageApplicantTitle':'Message Applicant', 'applications.template':'Template',
+      'applications.subjectLinePlaceholder':'Subject line', 'announcements.messageLabel2':'Message',
+      'applications.writeMessagePlaceholder':'Write your message...',
+      'applications.includeFormLinkHint':'Include a secure form link so the applicant can confirm the <strong>names and ages of prospective residents</strong>, their <strong>desired move-in date</strong>, and <strong>references</strong>. Their answers update this application automatically.',
+      'applications.printBlankTitle':'Print Blank Application',
+      'applications.printBlankHint':'Generate a printable, fill-by-hand application to hand out. Pick a property to include its address and state-specific disclosures, or leave it generic.',
+      'applications.genericOption':'— Generic (no specific property) —', 'applications.printForm':'Print Form',
+      'maintenance.updateRequestTitle':'Update Request', 'maintenance.adminNotes':'Admin Notes', 'maintenance.visibleToTenant':'(visible to tenant)',
+      'maintenance.updateMessagePlaceholder':'Update message for tenant...',
+      'payments.recordManualTitle':'Record Manual Payment', 'payments.amountRequired':'Amount ($) *',
+      'payments.recordPaymentButton':'Record Payment',
+      'invitations.resendActivationTitle':'Resend Activation Link', 'invitations.linkExpiresAfter':'Link Expires After',
+      'invitations.hour1':'1 hour', 'invitations.hours2':'2 hours', 'invitations.hours6':'6 hours', 'invitations.hours12':'12 hours',
+      'invitations.days5':'5 days', 'invitations.mustClickBeforeClose':'The tenant must click the link before this window closes.',
+      'invitations.singleUseHint':'💡 The link is single-use and generates a fresh login at click time.',
+      'applications.requestDocumentsTitle':'Request Documents', 'applications.documentsToRequest':'Documents to request',
+      'applications.addCustomItems':'Add custom items', 'applications.commaSeparated':'(comma-separated)',
+      'applications.customItemsPlaceholder':'e.g. Proof of renters insurance, Co-signer form', 'applications.noteToApplicant':'Note to applicant',
+      'applications.noteToApplicantPlaceholder':'Optional message included in the email...',
+      'applications.uploadConsentHint':'The applicant receives a secure upload link. They must give consent to how their documents are used before they can upload — that consent is recorded with a timestamp and IP address.',
       'common.sending':'Sending...', 'common.generating':'Generating...', 'common.uploading':'Uploading...', 'common.copied':'Copied!',
       'common.checking':'Checking...', 'common.charging':'Charging...', 'common.scanningInvoices':'Scanning invoices...',
       'settings.cashappTitle':'💚 Cash App Payment Settings', 'settings.cashappHelp':'Tenants will see these details when they choose Cash App.',
@@ -2739,6 +2796,63 @@
       'applications.copyApplicantLink':'Copiar Enlace del Solicitante',
       'settings.uploadLogo':'Subir Logo', 'settings.logoUploadFailed':'Error al subir el logo: ', 'settings.couldNotSave':'No se pudo guardar: ',
       'properties.uploadingXOfY':'Subiendo {current} de {total}...',
+      'properties.searchPlaceholder':'Buscar por nombre, dirección, ciudad...', 'properties.allCountries':'Todos los Países',
+      'properties.unclassified':'Sin Clasificar', 'properties.allStatuses':'Todos los Estados', 'properties.availableOption':'Disponible',
+      'properties.hiddenOption':'Oculta', 'properties.allBold':'Todas (Bold)', 'properties.boldEnabled':'Bold Habilitado',
+      'properties.boldNotSetUp':'Bold No Configurado',
+      'invitations.inviteTenantTitle':'Invitar Inquilino', 'invitations.activationEmailHint':'Se enviará un correo de activación con un enlace para configurar su contraseña.',
+      'invitations.firstName':'Nombre *', 'invitations.lastName':'Apellido', 'invitations.emailAddress':'Correo Electrónico *',
+      'invitations.noneOption':'— Ninguna —', 'invitations.unit':'Unidad', 'invitations.monthlyRent':'Renta Mensual ($)',
+      'tenants.editTenantTitle':'Editar Inquilino', 'tenants.activeOption':'Activo', 'tenants.inactiveOption':'Inactivo',
+      'tenants.leaseStart':'Inicio de Contrato', 'tenants.autoInvoicingTitle':'🧾 Facturación Automática de Renta',
+      'tenants.autoInvoicingHelp':'Cuando está habilitado, se genera y envía automáticamente una factura real a este inquilino antes de su fecha de vencimiento de renta — no solo un recordatorio.',
+      'tenants.rentDueDay':'Día de Vencimiento de Renta', 'tenants.generateInvoice':'Generar Factura', 'tenants.daysBeforeDue':'(días antes del vencimiento)',
+      'tenants.autoGenerateCheckbox':'Generar y enviar automáticamente la factura de renta de este inquilino',
+      'tenants.sendTestInvoice':'Enviar Factura de Prueba', 'tenants.generateSendRealInvoice':'⚡ Generar y Enviar Factura Real Ahora',
+      'tenants.generateNowHint':'Usa esto si la ventana automática de generación para la próxima fecha de vencimiento ya pasó — ej. acabas de activar esto. Esto crea y envía una factura real de inmediato, para la próxima fecha de vencimiento.',
+      'lease.title':'Generar Contrato de Arrendamiento', 'lease.landlordName':'Nombre del arrendador',
+      'lease.landlordNamePlaceholder':'Predeterminado al nombre de tu sitio/marca', 'lease.landlordEmail':'Correo del arrendador (para contrafirma)',
+      'lease.landlordEmailPlaceholder':'Predeterminado a tu correo de contacto en Configuración', 'lease.leaseStart':'Inicio del contrato', 'lease.leaseEnd':'Fin del contrato',
+      'lease.monthlyRent':'Renta mensual ($)', 'lease.securityDeposit':'Depósito de seguridad ($)', 'lease.propertyType':'Tipo de propiedad',
+      'lease.singleFamily':'Casa Unifamiliar / Condominio', 'lease.multiFamily':'Multifamiliar / Unidad Estudio',
+      'lease.rentControl':'Control de renta (AB 1482)', 'lease.exempt':'Exenta', 'lease.subjectToRentControl':'Sujeta a control de renta',
+      'lease.lateFeeDayOfMonth':'Día del mes para recargo por mora', 'lease.lateFee':'Recargo por mora ($)', 'lease.utilitiesProvided':'Servicios proporcionados',
+      'lease.tenantPaysAllUtilities':'El inquilino paga todos los servicios', 'lease.landlordProvidesSome':'El arrendador proporciona algunos servicios',
+      'lease.sharedUtilities':'Servicios compartidos / con submedidor', 'lease.utilitiesIncludedByLandlord':'Servicios incluidos por el arrendador',
+      'lease.electricity':'Electricidad', 'lease.gas':'Gas', 'lease.water':'Agua', 'lease.trash':'Basura',
+      'lease.sharedMeterUtilities':'Servicios con medidor compartido (selecciona todos los que apliquen)', 'lease.sharedMeterBilling':'Facturación de medidor compartido',
+      'lease.landlordAbsorbsCost':'El arrendador absorbe el costo', 'lease.proratedToTenant':'Prorrateado al inquilino',
+      'lease.tenantSharePct':'Parte del inquilino (%)', 'lease.pets':'Mascotas', 'lease.noPetsAllowed':'No se permiten mascotas',
+      'lease.petAllowed':'Mascota permitida (con restricción)', 'lease.petBreed':'Raza de la mascota', 'lease.petWeight':'Peso de la mascota',
+      'lease.petName':'Nombre de la mascota', 'lease.petRent':'Renta por mascota ($/mes)', 'lease.additionalTerms':'Términos adicionales',
+      'lease.additionalTermsPlaceholder':'Cualquier cláusula adicional a incluir...',
+      'lease.documensoHint':'Estos detalles se prellenan en tu plantilla de contrato de Documenso. El solicitante (Inquilino) y tú (Arrendador) recibirán invitaciones de firma de Documenso por correo.',
+      'admins.inviteAdminTitle':'Invitar Administrador', 'admins.emailRequired':'Correo *', 'admins.displayName':'Nombre a Mostrar',
+      'admins.roleRequired':'Rol *', 'admins.restrictedAdminOption':'Administrador Restringido (un solo país)',
+      'admins.superAdminOption':'Super Administrador (acceso total)', 'admins.countryScopeRequired':'Ámbito de País *',
+      'admins.inviteExpiresAfter':'El Enlace de Invitación Vence Después de', 'admins.hours24':'24 horas (1 día)', 'admins.hours48':'48 horas (2 días)',
+      'admins.hours72':'72 horas (3 días)', 'admins.days7':'7 días', 'admins.sendInvite':'Enviar Invitación',
+      'documents.editDocumentTitle':'Editar Documento', 'documents.visibility':'Visibilidad', 'documents.adminOnlyLock':'Solo Administrador 🔒',
+      'applications.messageApplicantTitle':'Mensaje al Solicitante', 'applications.template':'Plantilla',
+      'applications.subjectLinePlaceholder':'Línea de asunto', 'announcements.messageLabel2':'Mensaje',
+      'applications.writeMessagePlaceholder':'Escribe tu mensaje...',
+      'applications.includeFormLinkHint':'Incluye un enlace de formulario seguro para que el solicitante confirme los <strong>nombres y edades de los residentes propuestos</strong>, su <strong>fecha de mudanza deseada</strong>, y <strong>referencias</strong>. Sus respuestas actualizan esta solicitud automáticamente.',
+      'applications.printBlankTitle':'Imprimir Solicitud en Blanco',
+      'applications.printBlankHint':'Genera una solicitud imprimible, para llenar a mano, para entregar. Elige una propiedad para incluir su dirección y divulgaciones específicas del estado, o déjala genérica.',
+      'applications.genericOption':'— Genérica (sin propiedad específica) —', 'applications.printForm':'Imprimir Formulario',
+      'maintenance.updateRequestTitle':'Actualizar Solicitud', 'maintenance.adminNotes':'Notas del Administrador', 'maintenance.visibleToTenant':'(visible para el inquilino)',
+      'maintenance.updateMessagePlaceholder':'Mensaje de actualización para el inquilino...',
+      'payments.recordManualTitle':'Registrar Pago Manual', 'payments.amountRequired':'Monto ($) *',
+      'payments.recordPaymentButton':'Registrar Pago',
+      'invitations.resendActivationTitle':'Reenviar Enlace de Activación', 'invitations.linkExpiresAfter':'El Enlace Vence Después de',
+      'invitations.hour1':'1 hora', 'invitations.hours2':'2 horas', 'invitations.hours6':'6 horas', 'invitations.hours12':'12 horas',
+      'invitations.days5':'5 días', 'invitations.mustClickBeforeClose':'El inquilino debe hacer clic en el enlace antes de que se cierre esta ventana.',
+      'invitations.singleUseHint':'💡 El enlace es de un solo uso y genera un nuevo inicio de sesión al hacer clic.',
+      'applications.requestDocumentsTitle':'Solicitar Documentos', 'applications.documentsToRequest':'Documentos a solicitar',
+      'applications.addCustomItems':'Agregar elementos personalizados', 'applications.commaSeparated':'(separados por comas)',
+      'applications.customItemsPlaceholder':'ej. Comprobante de seguro de inquilino, Formulario de codeudor', 'applications.noteToApplicant':'Nota para el solicitante',
+      'applications.noteToApplicantPlaceholder':'Mensaje opcional incluido en el correo...',
+      'applications.uploadConsentHint':'El solicitante recibe un enlace seguro de carga. Debe dar su consentimiento sobre cómo se usan sus documentos antes de poder subirlos — ese consentimiento se registra con fecha, hora y dirección IP.',
       'common.sending':'Enviando...', 'common.generating':'Generando...', 'common.uploading':'Subiendo...', 'common.copied':'¡Copiado!',
       'common.checking':'Verificando...', 'common.charging':'Cobrando...', 'common.scanningInvoices':'Escaneando facturas...',
       'settings.cashappTitle':'💚 Configuración de Pago Cash App', 'settings.cashappHelp':'Los inquilinos verán estos detalles cuando elijan Cash App.',
