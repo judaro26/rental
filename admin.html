@@ -693,10 +693,12 @@
             <select id="fin-filter-year" class="form-input" style="width:110px;font-size:12px;" onchange="filterFinancials()"><option value="">All Years</option></select>
             <button onclick="exportFinancialsCsv()" class="btn btn-outline" title="Export the currently-filtered transactions as a CSV, e.g. to hand off to an accountant">Export CSV</button>
             <button onclick="openImportCsvModal()" class="btn btn-outline">Import CSV</button>
+            <button onclick="syncIncomeFromPayments()" class="btn btn-outline" id="fin-sync-income-btn">Sync Income from Payments</button>
             <button onclick="openFinancialModal()" class="btn btn-primary">+ Add Entry</button>
           </div>
         </div>
         <div id="fin-category-breakdown" style="padding:16px 20px;border-bottom:1px solid var(--border);"></div>
+        <div id="fin-owner-breakdown" style="padding:16px 20px;border-bottom:1px solid var(--border);"></div>
         <div style="overflow-x:auto;">
           <table class="data-table">
             <thead><tr>
@@ -5022,9 +5024,16 @@
   // mapping to a specific DIAN form line. Either way, this is not tax
   // advice — a real accountant should review categorization before filing.
   const FIN_EXPENSE_CATEGORIES = {
-    US: ['Advertising','Auto and Travel','Cleaning and Maintenance','Commissions','Insurance','Legal and Professional Fees','Management Fees','Mortgage Interest','Other Interest','Repairs','Supplies','Taxes','Utilities','Depreciation','Other'],
-    CO: ['Impuesto Predial','Administración / Cuotas HOA','Servicios Públicos','Mantenimiento y Reparaciones','Seguros','Honorarios Profesionales','Depreciación','Otros'],
+    US: ['Advertising','Auto and Travel','Cleaning and Maintenance','Commissions','Insurance','Legal and Professional Fees','Management Fees','Mortgage Interest','Other Interest','Repairs','Supplies','Taxes','Utilities','Depreciation','Acquisition / Development Costs','Other'],
+    CO: ['Impuesto Predial','Administración / Cuotas HOA','Servicios Públicos','Mantenimiento y Reparaciones','Seguros','Honorarios Profesionales','Depreciación','Costos de Adquisición / Desarrollo','Otros'],
   };
+  // Acquisition/Development Costs is deliberately its own category, not
+  // folded into "Other" — money spent acquiring or preparing a property
+  // (including incidentals like meals during a purchase trip) is
+  // generally NOT a current-year operating deduction the way Schedule E's
+  // "Other" line items are; it typically adds to the property's basis and
+  // depreciates over time instead. Keeping it distinct means a category
+  // breakdown handed to an accountant doesn't quietly mix the two.
   const FIN_INCOME_CATEGORIES = ['Rent','Late Fee','Security Deposit','Pet Fee','Parking','Other Income'];
 
   window.updateFinCategoryOptions = (preserveValue) => {
@@ -5114,6 +5123,7 @@
     }
 
     renderFinCategoryBreakdown(items);
+    renderOwnerSpendBreakdown(items);
     if(!items.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">No transactions found.</td></tr>';return;}
     tbody.innerHTML=items.map(f=>{
       const prop=allProperties.find(p=>p.id===f.propertyId),isInc=f.type==='income';
@@ -5161,6 +5171,57 @@
       </div>
       <p style="font-size:10px;color:var(--slate);margin:10px 0 0;">Not tax advice — review categorization with your accountant before filing.</p>`;
   }
+  // Who spent how much, regardless of category — only meaningful scoped
+  // to a single property (ownership % is per-property), so this only
+  // renders when the property filter is set to one specific property.
+  // Reflects whatever's currently filtered, so filtering to a year first
+  // gives a year-specific reconciliation.
+  function renderOwnerSpendBreakdown(items) {
+    const container = document.getElementById('fin-owner-breakdown');
+    if (!container) return;
+    const propId = document.getElementById('fin-filter-prop').value;
+    if (!propId) { container.innerHTML = ''; return; }
+    const prop = allProperties.find(p => p.id === propId);
+    const owners = Array.isArray(prop?.owners) ? prop.owners : [];
+    const expenses = items.filter(i => i.type === 'expense');
+    if (!expenses.length) { container.innerHTML = ''; return; }
+
+    const currencies = [...new Set(expenses.map(e => e.currency || 'USD'))];
+    if (currencies.length > 1) {
+      container.innerHTML = '<p style="font-size:11px;color:var(--slate);margin:0;">Entries here span more than one currency, which usually means this property\'s country was changed after some entries were already saved — the older ones kept their original currency. Fix by re-saving those entries.</p>';
+      return;
+    }
+    const cur = currencies[0];
+    const grandTotal = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+    const spentByOwner = {};
+    for (const e of expenses) {
+      const key = e.paidByOwner || '(Unspecified)';
+      spentByOwner[key] = (spentByOwner[key] || 0) + parseFloat(e.amount || 0);
+    }
+
+    const rows = Object.entries(spentByOwner).map(([name, spent]) => {
+      const ownerRecord = owners.find(o => o.name === name);
+      const pct = spent / grandTotal * 100;
+      const fairShare = ownerRecord ? grandTotal * ownerRecord.percentage / 100 : null;
+      const delta = fairShare != null ? spent - fairShare : null;
+      return { name, spent, pct, ownershipPct: ownerRecord?.percentage ?? null, delta };
+    }).sort((a, b) => b.spent - a.spent);
+
+    container.innerHTML = `
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">👥 Spending by Owner — ${prop?.name || ''} (current filter, all categories)</h4>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        ${rows.map(r => `
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #F3F4F6;">
+            <span>${r.name}${r.ownershipPct!=null ? ` <span style="color:var(--slate);">(owns ${r.ownershipPct}%)</span>` : ''}</span>
+            <span style="display:flex;gap:14px;align-items:center;">
+              <strong>${formatFinAmount(r.spent, cur)}</strong>
+              <span style="color:var(--slate);">${r.pct.toFixed(1)}% of spend</span>
+              ${r.delta != null ? `<span style="font-weight:500;color:${r.delta>=0?'#16A34A':'#DC2626'};">${r.delta>=0?'Owed back':'Owes'} ${formatFinAmount(Math.abs(r.delta), cur)}</span>` : ''}
+            </span>
+          </div>`).join('')}
+      </div>
+      <p style="font-size:10px;color:var(--slate);margin:10px 0 0;">${owners.length ? '"Owed back"/"Owes" compares what each owner fronted against their ownership share of total spend in this filter — not a formal settlement, a starting point for one.' : 'Set ownership percentages on this property (Edit Property → Owners & Ownership Split) to see a reconciliation against what each person fronted.'}</p>`;
+  }
   window.exportFinancialsCsv = () => {
     const prop=document.getElementById('fin-filter-prop').value,type=document.getElementById('fin-filter-type').value,year=document.getElementById('fin-filter-year').value;
     let items = allFinancials;
@@ -5180,6 +5241,58 @@
     a.download = `financials_${labelParts.join('_').replace(/\s+/g,'-')}.csv`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Pulls confirmed payments (status 'paid') into Financials as income
+  // entries, so rent actually received doesn't need separate manual
+  // re-entry. Deliberately sources from `payments` only, not `invoices`
+  // too — the two can represent the same underlying transaction (an
+  // invoice gets marked paid because a payment came in), and pulling from
+  // both without very careful de-duplication would risk double-counting
+  // the same rent as income twice. Idempotent via syncedFromPaymentId, so
+  // clicking this repeatedly is always safe — already-synced payments are
+  // skipped, not duplicated.
+  window.syncIncomeFromPayments = async () => {
+    const btn = document.getElementById('fin-sync-income-btn');
+    btn.disabled = true; const original = btn.textContent; btn.textContent = 'Syncing...';
+    try {
+      const alreadySynced = new Set(allFinancials.filter(f => f.syncedFromPaymentId).map(f => f.syncedFromPaymentId));
+      const snap = await getDocs(query(collection(db, 'payments'), where('status', '==', 'paid')));
+      const paidPayments = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => !alreadySynced.has(p.id));
+
+      if (!paidPayments.length) { alert('Nothing new to sync — every paid payment already has a matching income entry.'); btn.disabled = false; btn.textContent = original; return; }
+
+      const CHUNK_SIZE = 400;
+      let synced = 0, skippedNoProperty = 0;
+      for (let i = 0; i < paidPayments.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        for (const p of paidPayments.slice(i, i + CHUNK_SIZE)) {
+          if (!p.propertyId) { skippedNoProperty++; continue; } // can't attribute income to a property without one
+          const prop = allProperties.find(pr => pr.id === p.propertyId);
+          const tenant = allTenants.find(t => t.id === p.tenantId);
+          const dateObj = p.paidAt?.toDate ? p.paidAt.toDate() : (p.createdAt?.toDate ? p.createdAt.toDate() : (p.manualDate ? new Date(p.manualDate) : new Date()));
+          const ref = doc(collection(db, 'financials'));
+          batch.set(ref, {
+            type: 'income', propertyId: p.propertyId, propertyName: prop?.name || '',
+            currency: prop?.country === 'CO' ? 'COP' : 'USD',
+            date: dateObj.toISOString().split('T')[0], category: 'Rent',
+            amount: Number(p.amount) || 0,
+            description: p.description || `Payment${tenant ? ' - ' + tenant.firstName + ' ' + tenant.lastName : ''}`,
+            vendor: '', notes: p.method ? `Synced from a ${p.method} payment.` : 'Synced from a recorded payment.',
+            syncedFromPaymentId: p.id,
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          });
+          synced++;
+        }
+        await batch.commit();
+      }
+      logAdminAction('financials_income_synced', 'financials', null, null, `${synced} payment(s) synced`);
+      await loadFinancials();
+      alert(`✓ Synced ${synced} income entr${synced===1?'y':'ies'} from payments.${skippedNoProperty ? ` (${skippedNoProperty} skipped — no property on file.)` : ''}`);
+    } catch (e) {
+      alert('Sync failed: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = original;
   };
 
   // ===== IMPORT CSV (financials) =====
