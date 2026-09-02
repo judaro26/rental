@@ -2241,6 +2241,7 @@
       'financials.exportCsv':'Export CSV', 'financials.importCsv':'Import CSV', 'financials.syncIncome':'Sync Income from Payments',
       'financials.addEntry':'+ Add Entry', 'financials.receipt':'Receipt',
       'financials.mergePayerNames':'🔀 Merge Payer Names', 'financials.allPayers':'All Payers',
+      'financials.noPayerSet':'⚠️ No Payer Set ({n})', 'financials.clickToFindThese':'Click to see just these transactions',
       'mergePayers.title':'Merge Payer Names',
       'mergePayers.subtitle':'Combines different spellings of the same person (e.g. "Juan David" and "Juan David Rodriguez") into one name across every expense. This applies everywhere, not just the current property or year filter.',
       'mergePayers.suggestedTitle':'Suggested groups', 'mergePayers.mergeThese':'Merge these',
@@ -2723,6 +2724,7 @@
       'financials.exportCsv':'Exportar CSV', 'financials.importCsv':'Importar CSV', 'financials.syncIncome':'Sincronizar Ingresos de Pagos',
       'financials.addEntry':'+ Agregar Entrada', 'financials.receipt':'Recibo',
       'financials.mergePayerNames':'🔀 Combinar Nombres de Pagadores', 'financials.allPayers':'Todos los Pagadores',
+      'financials.noPayerSet':'⚠️ Sin Pagador Asignado ({n})', 'financials.clickToFindThese':'Haz clic para ver solo estas transacciones',
       'mergePayers.title':'Combinar Nombres de Pagadores',
       'mergePayers.subtitle':'Combina diferentes formas de escribir el nombre de la misma persona (ej. "Juan David" y "Juan David Rodríguez") en un solo nombre en todos los gastos. Esto aplica en todas partes, no solo en el filtro actual de propiedad o año.',
       'mergePayers.suggestedTitle':'Grupos sugeridos', 'mergePayers.mergeThese':'Combinar estos',
@@ -5964,8 +5966,11 @@
     if(fpayer){
       const prevSelection = fpayer.value;
       const payers=[...new Set(allFinancials.map(f=>f.paidByOwner).filter(Boolean))].sort();
-      fpayer.innerHTML=`<option value="">${t('financials.allPayers')}</option>`+payers.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
-      if (payers.includes(prevSelection)) fpayer.value = prevSelection; // survives a merge that didn't touch this specific name
+      const unspecifiedCount = allFinancials.filter(f=>!f.paidByOwner).length;
+      fpayer.innerHTML=`<option value="">${t('financials.allPayers')}</option>`
+        +(unspecifiedCount ? `<option value="__unspecified__">${t('financials.noPayerSet').replace('{n}', unspecifiedCount)}</option>` : '')
+        +payers.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
+      if (prevSelection === '__unspecified__' || payers.includes(prevSelection)) fpayer.value = prevSelection; // survives a merge that didn't touch this specific name
     }
   }
 
@@ -6114,7 +6119,8 @@
     if(prop) filtered=filtered.filter(f=>f.propertyId===prop);
     if(type) filtered=filtered.filter(f=>f.type===type);
     if(year) filtered=filtered.filter(f=>f.date?.startsWith(year));
-    if(payer) filtered=filtered.filter(f=>f.paidByOwner===payer);
+    if(payer === '__unspecified__') filtered=filtered.filter(f=>!f.paidByOwner);
+    else if(payer) filtered=filtered.filter(f=>f.paidByOwner===payer);
     renderFinancials(filtered);
   };
   function formatFinAmount(amount, currency) {
@@ -6224,24 +6230,26 @@
     const grandTotal = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
     const spentByOwner = {};
     for (const e of expenses) {
-      const key = e.paidByOwner || t('financials.unspecified');
+      const key = e.paidByOwner || '__unspecified__';
       spentByOwner[key] = (spentByOwner[key] || 0) + parseFloat(e.amount || 0);
     }
 
-    const rows = Object.entries(spentByOwner).map(([name, spent]) => {
-      const ownerRecord = owners.find(o => o.name === name);
+    const rows = Object.entries(spentByOwner).map(([key, spent]) => {
+      const isUnspecified = key === '__unspecified__';
+      const name = isUnspecified ? t('financials.unspecified') : key;
+      const ownerRecord = owners.find(o => o.name === key);
       const pct = spent / grandTotal * 100;
       const fairShare = ownerRecord ? grandTotal * ownerRecord.percentage / 100 : null;
       const delta = fairShare != null ? spent - fairShare : null;
-      return { name, spent, pct, ownershipPct: ownerRecord?.percentage ?? null, delta };
+      return { key, name, isUnspecified, spent, pct, ownershipPct: ownerRecord?.percentage ?? null, delta };
     }).sort((a, b) => b.spent - a.spent);
 
     container.innerHTML = `
       <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">👥 ${t('financials.ownerBreakdownTitle').replace('{prop}', prop?.name || '')}</h4>
       <div style="display:flex;flex-direction:column;gap:4px;">
         ${rows.map(r => `
-          <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #F3F4F6;">
-            <span>${r.name}${r.ownershipPct!=null ? ` <span style="color:var(--slate);">${t('financials.ownsPct').replace('{pct}', r.ownershipPct)}</span>` : ''}</span>
+          <div ${r.isUnspecified ? `onclick="jumpToUnspecifiedPayer()" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #F3F4F6;cursor:pointer;" title="${t('financials.clickToFindThese')}" onmouseover="this.style.background='#FDFBF8'" onmouseout="this.style.background=''"` : `style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #F3F4F6;"`}>
+            <span>${r.name}${r.isUnspecified ? ' 🔍' : ''}${r.ownershipPct!=null ? ` <span style="color:var(--slate);">${t('financials.ownsPct').replace('{pct}', r.ownershipPct)}</span>` : ''}</span>
             <span style="display:flex;gap:14px;align-items:center;">
               <strong>${formatFinAmount(r.spent, cur)}</strong>
               <span style="color:var(--slate);">${t('financials.pctOfSpend').replace('{pct}', r.pct.toFixed(1))}</span>
@@ -6251,6 +6259,11 @@
       </div>
       <p style="font-size:10px;color:var(--slate);margin:10px 0 0;">${owners.length ? t('financials.reconciliationHint') : t('financials.setOwnershipHint')}</p>`;
   }
+  window.jumpToUnspecifiedPayer = () => {
+    document.getElementById('fin-filter-payer').value = '__unspecified__';
+    filterFinancials();
+    document.getElementById('financials-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Purchase catch-up tracker: independent of whatever year/type filter is
   // currently active in Financials, by design. The target is always tied
