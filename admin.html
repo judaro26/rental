@@ -14,6 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
   <script src="/shared/blocks.js"></script>
   <style>
     :root { --cream:#F7F4EF; --charcoal:#1A1A2E; --amber:#C9903A; --amber-light:#F0C97A; --slate:#5A6475; --border:#E8E2D8; --sidebar-w:240px; }
@@ -691,6 +692,7 @@
             <select id="fin-filter-type" class="form-input" style="width:130px;font-size:12px;" onchange="filterFinancials()"><option value="">All Types</option><option value="income">Income</option><option value="expense">Expense</option></select>
             <select id="fin-filter-year" class="form-input" style="width:110px;font-size:12px;" onchange="filterFinancials()"><option value="">All Years</option></select>
             <button onclick="exportFinancialsCsv()" class="btn btn-outline" title="Export the currently-filtered transactions as a CSV, e.g. to hand off to an accountant">Export CSV</button>
+            <button onclick="openImportCsvModal()" class="btn btn-outline">Import CSV</button>
             <button onclick="openFinancialModal()" class="btn btn-primary">+ Add Entry</button>
           </div>
         </div>
@@ -1350,6 +1352,10 @@
       </div>
       <div class="col-span-2"><label class="label">Description</label><input type="text" id="fin-description" class="form-input" placeholder="e.g. June rent - Unit 101"></div>
       <div class="col-span-2"><label class="label">Vendor / Payee</label><input type="text" id="fin-vendor" class="form-input" placeholder="e.g. ABC Plumbing"></div>
+      <div class="col-span-2" id="fin-paidby-wrap" style="display:none;">
+        <label class="label">Paid By <span style="font-size:10px;font-weight:400;color:var(--slate);">(which owner actually paid this)</span></label>
+        <select id="fin-paidby" class="form-input"><option value="">Not specified</option></select>
+      </div>
       <div class="col-span-2"><label class="label">Notes</label><textarea id="fin-notes" class="form-input" rows="2" placeholder="Optional notes..."></textarea></div>
       <div class="col-span-2">
         <label class="label">Receipt / Document <span style="font-size:10px;font-weight:400;color:var(--slate);">(recommended for tax records)</span></label>
@@ -1367,6 +1373,74 @@
     <div style="display:flex;gap:10px;">
       <button onclick="saveFinancial()" class="btn btn-primary" style="flex:1;" id="fin-save-btn">Save Entry</button>
       <button onclick="closeModal('financial-modal')" class="btn btn-outline">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT CSV MODAL (financials) -->
+<div id="import-csv-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('import-csv-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:680px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+    <button onclick="closeModal('import-csv-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:8px;">Import Transactions from CSV</h3>
+    <p style="font-size:12px;color:var(--slate);margin-bottom:20px;">Works with exports from spreadsheets or personal-finance apps — you'll map columns and categories yourself, and can exclude anything before it's saved.</p>
+    <div id="import-csv-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+
+    <!-- STEP 1: upload + property + parsing options -->
+    <div id="import-step-1">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div>
+          <label class="label">CSV File</label>
+          <input type="file" id="import-csv-file" accept=".csv" class="form-input" onchange="handleImportFileSelect(this.files)">
+        </div>
+        <div><label class="label">This CSV is for which property? *</label><select id="import-csv-property" class="form-input"><option value="">Select property...</option></select></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label">Header row number <span style="font-size:10px;font-weight:400;color:var(--slate);">(1 = first row)</span></label><input type="number" id="import-header-row" class="form-input" value="1" min="1" onchange="renderImportPreviewRaw()"></div>
+          <div><label class="label">Date format in file</label><select id="import-date-format" class="form-input"><option value="MDY">MM/DD/YYYY</option><option value="DMY">DD/MM/YYYY</option><option value="YMD">YYYY-MM-DD</option></select></div>
+        </div>
+        <div id="import-raw-preview" style="font-size:11px;color:var(--slate);max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;padding:8px;display:none;"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:22px;">
+        <button onclick="goToImportStep(2)" class="btn btn-primary" style="flex:1;">Next: Map Columns</button>
+        <button onclick="closeModal('import-csv-modal')" class="btn btn-outline">Cancel</button>
+      </div>
+    </div>
+
+    <!-- STEP 2: column mapping -->
+    <div id="import-step-2" class="hidden">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:10px;">Map each column from your file</h4>
+      <div id="import-column-mapping" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="display:flex;gap:10px;margin-top:22px;">
+        <button onclick="goToImportStep(1)" class="btn btn-outline">Back</button>
+        <button onclick="goToImportStep(3)" class="btn btn-primary" style="flex:1;">Next: Map Categories</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: category mapping -->
+    <div id="import-step-3" class="hidden">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">Map each category found in your file</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:10px;">Pick "Exclude" for anything that isn't actually a property expense — e.g. personal purchases mixed into a shared card statement.</p>
+      <div id="import-category-mapping" style="display:flex;flex-direction:column;gap:8px;"></div>
+      <div style="display:flex;gap:10px;margin-top:22px;">
+        <button onclick="goToImportStep(2)" class="btn btn-outline">Back</button>
+        <button onclick="goToImportStep(4)" class="btn btn-primary" style="flex:1;">Next: Preview</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: preview + confirm -->
+    <div id="import-step-4" class="hidden">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:10px;">Review before importing</h4>
+      <div id="import-summary" style="font-size:13px;margin-bottom:12px;padding:12px;background:#FDFBF8;border-radius:3px;"></div>
+      <div style="overflow-x:auto;max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;">
+        <table class="data-table" style="font-size:11px;">
+          <thead><tr><th>Date</th><th>Category</th><th>Amount</th><th>Description</th><th>Paid By</th></tr></thead>
+          <tbody id="import-preview-tbody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:22px;">
+        <button onclick="goToImportStep(3)" class="btn btn-outline">Back</button>
+        <button onclick="confirmImportCsv()" class="btn btn-primary" style="flex:1;" id="import-confirm-btn">Import Now</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1517,6 +1591,16 @@
       <div id="prop-annual-events-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;"></div>
       <button type="button" onclick="addAnnualEventRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Annual Event</button>
       <button type="button" onclick="savePropertyAnnualEvents()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-annual-events-save-btn">Save Annual Events</button>
+    </div>
+
+    <div id="prop-owners-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;">👥 Owners &amp; Ownership Split</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;">For properties owned by more than one person. Once set, expenses logged for this property can be tagged with who actually paid, and the Financials tab can show each owner's fair share vs. what they've fronted.</p>
+      <div id="prop-owners-alert" class="hidden alert" style="margin-bottom:10px;"></div>
+      <div id="prop-owners-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+      <div id="prop-owners-total" style="font-size:11px;margin-bottom:10px;"></div>
+      <button type="button" onclick="addOwnerRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;">+ Add Owner</button>
+      <button type="button" onclick="savePropertyOwners()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-owners-save-btn">Save Owners</button>
     </div>
     </div>
 
@@ -1836,7 +1920,7 @@
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
   import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, startAfter, limit, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, startAfter, limit, serverTimestamp, Timestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
   let _cfg;
   try {
@@ -2470,6 +2554,7 @@
     document.getElementById('prop-reminders-section').classList.add('hidden');
     document.getElementById('prop-paymentmethods-section').classList.add('hidden');
     document.getElementById('prop-annual-events-section').classList.add('hidden');
+    document.getElementById('prop-owners-section').classList.add('hidden');
     openModal('property-modal');
   };
   window.editProperty = id => {
@@ -2498,6 +2583,8 @@
     renderPaymentMethodRows(p.paymentMethods || [], p.preferredPaymentMethod || '', p.boldPaymentsEnabled === true);
     document.getElementById('prop-annual-events-section').classList.remove('hidden');
     renderAnnualEventRows(p.annualEvents || []);
+    document.getElementById('prop-owners-section').classList.remove('hidden');
+    renderOwnerRows(p.owners || []);
     openModal('property-modal');
   };
   window.saveProperty = async () => {
@@ -4942,7 +5029,8 @@
 
   window.updateFinCategoryOptions = (preserveValue) => {
     const propId = document.getElementById('fin-property').value;
-    const country = allProperties.find(p => p.id === propId)?.country === 'CO' ? 'CO' : 'US';
+    const prop = allProperties.find(p => p.id === propId);
+    const country = prop?.country === 'CO' ? 'CO' : 'US';
     const sel = document.getElementById('fin-category');
     const current = preserveValue || sel.value;
     const incomeOpts = FIN_INCOME_CATEGORIES.map(c => `<option>${c}</option>`).join('');
@@ -4953,6 +5041,22 @@
     // rather than silently landing on something from the wrong list.
     const stillValid = Array.from(sel.options).some(o => o.value === current);
     sel.value = stillValid ? current : (_finType === 'income' ? FIN_INCOME_CATEGORIES[0] : FIN_EXPENSE_CATEGORIES[country][0]);
+
+    // Paid By: only shown when the selected property actually has owners
+    // configured — for a single/unnamed-owner property this field would
+    // add nothing, so it stays hidden rather than showing an empty list.
+    const owners = Array.isArray(prop?.owners) ? prop.owners : [];
+    const paidByWrap = document.getElementById('fin-paidby-wrap');
+    const paidBySel = document.getElementById('fin-paidby');
+    const currentPaidBy = paidBySel.value;
+    if (owners.length) {
+      paidByWrap.style.display = '';
+      paidBySel.innerHTML = '<option value="">Not specified</option>' + owners.map(o => `<option value="${o.name}">${o.name} (${o.percentage}%)</option>`).join('');
+      paidBySel.value = owners.some(o => o.name === currentPaidBy) ? currentPaidBy : '';
+    } else {
+      paidByWrap.style.display = 'none';
+      paidBySel.innerHTML = '<option value="">Not specified</option>';
+    }
   };
 
   async function loadFinancials() {
@@ -5014,13 +5118,15 @@
     tbody.innerHTML=items.map(f=>{
       const prop=allProperties.find(p=>p.id===f.propertyId),isInc=f.type==='income';
       const cur = f.currency || 'USD';
+      const netSign = (isInc ? 1 : -1) * (parseFloat(f.amount) < 0 ? -1 : 1);
+      const amountDisplay = (netSign >= 0 ? '+' : '-') + formatFinAmount(Math.abs(parseFloat(f.amount) || 0), cur);
       return `<tr>
         <td style="font-size:12px;">${f.date||'—'}</td>
         <td style="font-size:12px;">${prop?.name||f.propertyName||'—'}</td>
         <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${isInc?'#F0FDF4':'#FEF2F2'};color:${isInc?'#16A34A':'#DC2626'};font-weight:500;">${f.type}</span></td>
         <td style="font-size:12px;">${f.category||'—'}</td>
         <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.description||''}">${f.description||'—'}${f.vendor?`<div style="font-size:11px;color:var(--slate);">${f.vendor}</div>`:''}</td>
-        <td style="font-weight:600;color:${isInc?'#16A34A':'#DC2626'};">${isInc?'+':'-'}${formatFinAmount(f.amount, cur)}</td>
+        <td style="font-weight:600;color:${isInc?'#16A34A':'#DC2626'};">${amountDisplay}</td>
         <td>${f.receiptUrl?`<a href="${f.receiptUrl}" target="_blank" title="View receipt">📎</a>`:'<span style="color:#D1D5DB;">—</span>'}</td>
         <td>
           <button onclick="editFinancial('${f.id}')" class="btn btn-sm btn-outline" style="margin-right:4px;">Edit</button>
@@ -5075,6 +5181,246 @@
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
+
+  // ===== IMPORT CSV (financials) =====
+  // State for the multi-step wizard. importRawRows is every row PapaParse
+  // returned, unfiltered — the header-row offset is applied fresh each
+  // time it's needed, since the person can go back and change it.
+  let importRawRows = [];
+  let importHeaders = [];
+  let importColumnMap = {}; // { date: colIndex, category: colIndex, amount: colIndex, description: colIndex|null, vendor: colIndex|null, paidBy: colIndex|null, notes: colIndex|null }
+  let importCategoryMap = {}; // { sourceValue: targetCategory | '__exclude__' }
+  let importComputedRows = []; // the final, mapped rows as of the last time step 4 was built
+
+  function parseImportDate(raw, format) {
+    if (!raw || !String(raw).trim()) return null;
+    const parts = String(raw).trim().split(/[-\/]/);
+    if (parts.length !== 3) return null;
+    let y, m, d;
+    if (format === 'YMD') { [y, m, d] = parts; }
+    else if (format === 'DMY') { [d, m, y] = parts; }
+    else { [m, d, y] = parts; }
+    y = parseInt(y, 10); m = parseInt(m, 10); d = parseInt(d, 10);
+    if (y < 100) y += 2000;
+    if (!y || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const test = new Date(iso + 'T00:00:00Z');
+    if (isNaN(test.getTime()) || test.getUTCFullYear() !== y || test.getUTCMonth()+1 !== m || test.getUTCDate() !== d) return null;
+    return iso;
+  }
+  function parseImportAmount(raw) {
+    if (raw == null) return null;
+    const cleaned = String(raw).replace(/[^0-9.\-]/g, '');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  }
+
+  window.openImportCsvModal = () => {
+    importRawRows = []; importHeaders = []; importColumnMap = {}; importCategoryMap = {}; importComputedRows = [];
+    document.getElementById('import-csv-file').value = '';
+    document.getElementById('import-header-row').value = '1';
+    document.getElementById('import-raw-preview').style.display = 'none';
+    document.getElementById('import-csv-alert').classList.add('hidden');
+    const psel = document.getElementById('import-csv-property');
+    psel.innerHTML = '<option value="">Select property...</option>' + allProperties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    goToImportStep(1);
+    openModal('import-csv-modal');
+  };
+
+  window.handleImportFileSelect = (files) => {
+    const file = files?.[0]; if (!file) return;
+    Papa.parse(file, {
+      skipEmptyLines: false,
+      complete: (result) => {
+        importRawRows = result.data;
+        renderImportPreviewRaw();
+      },
+      error: (err) => showAlert('import-csv-alert', 'Could not read this file: ' + err.message),
+    });
+  };
+  window.renderImportPreviewRaw = () => {
+    const container = document.getElementById('import-raw-preview');
+    if (!importRawRows.length) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+    container.innerHTML = importRawRows.slice(0, 6).map((row, i) => {
+      const rowNum = i + 1;
+      const isHeader = rowNum === headerRowNum;
+      return `<div style="${isHeader ? 'font-weight:600;color:var(--amber);' : ''}">${isHeader ? '→ ' : ''}Row ${rowNum}: ${row.join(' | ')}</div>`;
+    }).join('');
+  };
+
+  const IMPORT_FIELD_OPTIONS = [
+    { value: '', label: '— Skip this column —' },
+    { value: 'date', label: 'Date *' },
+    { value: 'category', label: 'Category *' },
+    { value: 'amount', label: 'Amount *' },
+    { value: 'description', label: 'Description' },
+    { value: 'vendor', label: 'Vendor' },
+    { value: 'paidBy', label: 'Paid By (owner)' },
+    { value: 'notes', label: 'Notes (kept as-is)' },
+  ];
+  // Best-guess default mapping from common header names (English and
+  // Spanish, given this app serves both US and Colombia properties) - the
+  // person can always override any of these.
+  function guessFieldForHeader(header) {
+    const h = (header || '').toLowerCase().trim();
+    if (/fecha|^date$/.test(h)) return 'date';
+    if (/categor/.test(h)) return 'category';
+    if (/monto|amount|total/.test(h)) return 'amount';
+    if (/descripcion|description|memo/.test(h)) return 'description';
+    if (/vendor|payee|merchant/.test(h)) return 'vendor';
+    if (/gasto de|paid by|owner|who/.test(h)) return 'paidBy';
+    if (/cuenta|account|notes|note/.test(h)) return 'notes';
+    return '';
+  }
+
+  window.goToImportStep = (step) => {
+    if (step === 2) {
+      if (!importRawRows.length) { showAlert('import-csv-alert', 'Choose a CSV file first.'); return; }
+      if (!document.getElementById('import-csv-property').value) { showAlert('import-csv-alert', 'Select which property this file is for.'); return; }
+      const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+      importHeaders = importRawRows[headerRowNum - 1] || [];
+      if (!importHeaders.length || importHeaders.every(h => !h.trim())) { showAlert('import-csv-alert', `Row ${headerRowNum} looks empty — check the header row number.`); return; }
+      renderImportColumnMapping();
+    }
+    if (step === 3) {
+      importColumnMap = {};
+      document.querySelectorAll('.import-col-select').forEach(sel => {
+        if (sel.value) importColumnMap[sel.value] = parseInt(sel.dataset.colIndex);
+      });
+      if (importColumnMap.date == null || importColumnMap.category == null || importColumnMap.amount == null) {
+        showAlert('import-csv-alert', 'Date, Category, and Amount must all be mapped to a column.'); return;
+      }
+      renderImportCategoryMapping();
+    }
+    if (step === 4) {
+      importCategoryMap = {};
+      document.querySelectorAll('.import-cat-select').forEach(sel => { importCategoryMap[sel.dataset.sourceValue] = sel.value; });
+      renderImportPreview();
+    }
+    document.getElementById('import-csv-alert').classList.add('hidden');
+    [1,2,3,4].forEach(s => document.getElementById(`import-step-${s}`).classList.toggle('hidden', s !== step));
+  };
+
+  function renderImportColumnMapping() {
+    const container = document.getElementById('import-column-mapping');
+    container.innerHTML = importHeaders.map((header, idx) => {
+      const guess = guessFieldForHeader(header);
+      return `<div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;font-size:13px;font-weight:500;">${header || `(column ${idx+1})`}</div>
+        <select class="form-input import-col-select" data-col-index="${idx}" style="flex:1;">
+          ${IMPORT_FIELD_OPTIONS.map(o => `<option value="${o.value}" ${o.value===guess?'selected':''}>${o.label}</option>`).join('')}
+        </select>
+      </div>`;
+    }).join('');
+  }
+
+  function renderImportCategoryMapping() {
+    const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+    const dataRows = importRawRows.slice(headerRowNum);
+    const catIdx = importColumnMap.category;
+    const counts = {};
+    dataRows.forEach(row => {
+      const val = (row[catIdx] || '').trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
+    });
+    const propId = document.getElementById('import-csv-property').value;
+    const country = allProperties.find(p => p.id === propId)?.country === 'CO' ? 'CO' : 'US';
+    const targetOptions = [...FIN_INCOME_CATEGORIES, ...FIN_EXPENSE_CATEGORIES[country]];
+    const container = document.getElementById('import-category-mapping');
+    const sourceValues = Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+    if (!sourceValues.length) { container.innerHTML = '<p style="font-size:12px;color:var(--slate);">No category values found in the mapped column.</p>'; return; }
+    container.innerHTML = sourceValues.map(val => `
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;font-size:13px;">${val} <span style="color:var(--slate);font-size:11px;">(${counts[val]} row${counts[val]>1?'s':''})</span></div>
+        <select class="form-input import-cat-select" data-source-value="${val.replace(/"/g,'&quot;')}" style="flex:1;">
+          <option value="__exclude__">❌ Exclude these rows</option>
+          ${targetOptions.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>`).join('');
+  }
+
+  function computeImportRows() {
+    const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+    const dateFormat = document.getElementById('import-date-format').value;
+    const dataRows = importRawRows.slice(headerRowNum);
+    const propId = document.getElementById('import-csv-property').value;
+    const prop = allProperties.find(p => p.id === propId);
+    const currency = prop?.country === 'CO' ? 'COP' : 'USD';
+    const get = (row, field) => importColumnMap[field] != null ? (row[importColumnMap[field]] || '').trim() : '';
+
+    const results = { valid: [], skippedNoDate: [], skippedExcluded: [], skippedBadAmount: [] };
+    for (const row of dataRows) {
+      if (!row.some(c => c && c.trim())) continue; // fully blank row (e.g. the separator row)
+      const dateRaw = get(row, 'date');
+      const isoDate = parseImportDate(dateRaw, dateFormat);
+      if (!isoDate) { results.skippedNoDate.push(row); continue; } // catches blank + "total" summary rows automatically
+      const sourceCategory = get(row, 'category');
+      const targetCategory = importCategoryMap[sourceCategory];
+      if (!targetCategory || targetCategory === '__exclude__') { results.skippedExcluded.push(row); continue; }
+      const rawAmount = get(row, 'amount');
+      const amount = parseImportAmount(rawAmount);
+      if (amount == null) { results.skippedBadAmount.push(row); continue; }
+      const isIncomeCategory = FIN_INCOME_CATEGORIES.includes(targetCategory);
+      results.valid.push({
+        type: isIncomeCategory ? 'income' : 'expense',
+        propertyId: propId, propertyName: prop?.name || '', currency,
+        date: isoDate, category: targetCategory, amount: Math.abs(amount),
+        description: get(row, 'description') || sourceCategory,
+        vendor: get(row, 'vendor'),
+        paidByOwner: get(row, 'paidBy') || null,
+        notes: get(row, 'notes'),
+      });
+    }
+    return results;
+  }
+
+  function renderImportPreview() {
+    const results = computeImportRows();
+    importComputedRows = results.valid;
+    const total = results.valid.reduce((s, r) => s + r.amount, 0);
+    const currency = importComputedRows[0]?.currency || 'USD';
+    document.getElementById('import-summary').innerHTML = `
+      <strong>${results.valid.length}</strong> row(s) will be imported (total ${formatFinAmount(total, currency)}).<br>
+      ${results.skippedExcluded.length ? `${results.skippedExcluded.length} row(s) excluded by category choice.<br>` : ''}
+      ${results.skippedNoDate.length ? `${results.skippedNoDate.length} row(s) skipped (no valid date — likely blank/summary rows).<br>` : ''}
+      ${results.skippedBadAmount.length ? `${results.skippedBadAmount.length} row(s) skipped (amount didn't parse).` : ''}
+    `;
+    const tbody = document.getElementById('import-preview-tbody');
+    if (!importComputedRows.length) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--slate);padding:16px;">Nothing to import.</td></tr>'; return; }
+    tbody.innerHTML = importComputedRows.map(r => `<tr>
+      <td>${r.date}</td><td>${r.category}</td><td>${formatFinAmount(r.amount, r.currency)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.description||'—'}</td>
+      <td>${r.paidByOwner||'—'}</td>
+    </tr>`).join('');
+  }
+
+  window.confirmImportCsv = async () => {
+    if (!importComputedRows.length) { showAlert('import-csv-alert', 'Nothing to import.'); return; }
+    const btn = document.getElementById('import-confirm-btn'); btn.disabled = true; btn.textContent = 'Importing...';
+    try {
+      // Chunked writeBatch calls - Firestore caps a single batch at 500
+      // operations, so this stays correct even for larger files than this
+      // one, not just the ~70-row case in front of us right now.
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < importComputedRows.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        importComputedRows.slice(i, i + CHUNK_SIZE).forEach(row => {
+          const ref = doc(collection(db, 'financials'));
+          batch.set(ref, { ...row, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        });
+        await batch.commit();
+      }
+      logAdminAction('financials_csv_imported', 'property', document.getElementById('import-csv-property').value, allProperties.find(p=>p.id===document.getElementById('import-csv-property').value)?.name, `${importComputedRows.length} row(s)`);
+      closeModal('import-csv-modal');
+      await loadFinancials();
+      alert(`✓ Imported ${importComputedRows.length} transaction(s).`);
+    } catch (e) {
+      showAlert('import-csv-alert', 'Import failed: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = 'Import Now';
+  };
   window.openFinancialModal=()=>{
     document.getElementById('fin-edit-id').value='';
     document.getElementById('fin-modal-title').textContent='Add Transaction';
@@ -5086,6 +5432,7 @@
     document.getElementById('fin-notes').value='';
     document.getElementById('fin-receiptUrl').value='';
     document.getElementById('fin-receipt-preview').innerHTML='None attached';
+    document.getElementById('fin-paidby').value='';
     const psel=document.getElementById('fin-property');
     psel.innerHTML='<option value="">Select property...</option>'+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
     setFinType('income'); updateFinCategoryOptions(); openModal('financial-modal');
@@ -5106,6 +5453,7 @@
     psel.value=f.propertyId||'';
     setFinType(f.type||'income');
     updateFinCategoryOptions(f.category);
+    document.getElementById('fin-paidby').value = f.paidByOwner || '';
     document.getElementById('fin-alert').classList.add('hidden');
     openModal('financial-modal');
   };
@@ -5127,7 +5475,7 @@
     const id=document.getElementById('fin-edit-id').value,propId=document.getElementById('fin-property').value,date=document.getElementById('fin-date').value,amount=parseFloat(document.getElementById('fin-amount').value),cat=document.getElementById('fin-category').value;
     if(!propId||!date||!amount){showAlert('fin-alert','Property, date, and amount are required.');return;}
     const currency = allProperties.find(p=>p.id===propId)?.country === 'CO' ? 'COP' : 'USD';
-    const data={type:_finType,propertyId:propId,propertyName:allProperties.find(p=>p.id===propId)?.name||'',currency,date,amount,category:cat,description:document.getElementById('fin-description').value.trim(),vendor:document.getElementById('fin-vendor').value.trim(),notes:document.getElementById('fin-notes').value.trim(),receiptUrl:document.getElementById('fin-receiptUrl').value||null,updatedAt:serverTimestamp()};
+    const data={type:_finType,propertyId:propId,propertyName:allProperties.find(p=>p.id===propId)?.name||'',currency,date,amount,category:cat,description:document.getElementById('fin-description').value.trim(),vendor:document.getElementById('fin-vendor').value.trim(),notes:document.getElementById('fin-notes').value.trim(),receiptUrl:document.getElementById('fin-receiptUrl').value||null,paidByOwner:document.getElementById('fin-paidby').value||null,updatedAt:serverTimestamp()};
     if(id){await updateDoc(doc(db,'financials',id),data);}else{await addDoc(collection(db,'financials'),{...data,createdAt:serverTimestamp()});}
     closeModal('financial-modal'); await loadFinancials();
   };
@@ -6608,6 +6956,76 @@
       resultEl.textContent = '✗ ' + err.message;
     }
     btnEl.disabled = false; btnEl.textContent = original;
+  };
+
+  // ===== OWNERS & OWNERSHIP SPLIT (self-serve, per-property) — lets a
+  // property have more than one owner, each with a percentage share.
+  // Doesn't split every expense automatically; instead each expense can
+  // separately record who actually paid it (see the Financials modal's
+  // "Paid By" field), so a settlement report can compare what someone
+  // fronted against their fair share by ownership percentage. =====
+  let currentOwners = [];
+
+  function renderOwnerRows(owners) {
+    currentOwners = (owners || []).map(o => ({ ...o }));
+    const list = document.getElementById('prop-owners-list');
+    if (!currentOwners.length) {
+      list.innerHTML = '<p style="font-size:12px;color:var(--slate);">No owners configured — this property is treated as having a single, unnamed owner.</p>';
+    } else {
+      list.innerHTML = currentOwners.map((o, idx) => `
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" value="${(o.name||'').replace(/"/g,'&quot;')}" placeholder="Owner name" class="form-input" style="flex:2;" oninput="updateOwnerField(${idx},'name',this.value)">
+          <input type="number" value="${o.percentage!=null?o.percentage:''}" placeholder="%" min="0" max="100" step="0.01" class="form-input" style="width:80px;" oninput="updateOwnerField(${idx},'percentage',parseFloat(this.value)||0)">
+          <button type="button" onclick="removeOwnerRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="Remove">×</button>
+        </div>
+      `).join('');
+    }
+    updateOwnerTotalDisplay();
+  }
+  function updateOwnerTotalDisplay() {
+    const totalEl = document.getElementById('prop-owners-total');
+    if (!currentOwners.length) { totalEl.textContent = ''; return; }
+    const total = currentOwners.reduce((s, o) => s + (parseFloat(o.percentage) || 0), 0);
+    const rounded = Math.round(total * 100) / 100;
+    totalEl.textContent = `Total: ${rounded}%`;
+    totalEl.style.color = Math.abs(rounded - 100) < 0.01 ? '#16A34A' : '#DC2626';
+  }
+  window.updateOwnerField = (idx, field, value) => {
+    if (currentOwners[idx]) currentOwners[idx][field] = value;
+    updateOwnerTotalDisplay();
+  };
+  window.addOwnerRow = () => {
+    currentOwners.push({ name: '', percentage: null });
+    renderOwnerRows(currentOwners);
+  };
+  window.removeOwnerRow = (idx) => {
+    currentOwners.splice(idx, 1);
+    renderOwnerRows(currentOwners);
+  };
+  window.savePropertyOwners = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    const cleaned = currentOwners.filter(o => o.name && o.name.trim());
+    if (cleaned.length) {
+      for (const o of cleaned) {
+        if (o.percentage == null || o.percentage < 0 || o.percentage > 100) {
+          showAlert('prop-owners-alert', `Enter a valid percentage (0-100) for "${o.name}".`); return;
+        }
+      }
+      const total = Math.round(cleaned.reduce((s, o) => s + parseFloat(o.percentage), 0) * 100) / 100;
+      if (Math.abs(total - 100) > 0.01) {
+        showAlert('prop-owners-alert', `Ownership percentages must add up to 100% (currently ${total}%).`); return;
+      }
+    }
+    const btn = document.getElementById('prop-owners-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
+    try {
+      await updateDoc(doc(db,'properties',propertyId), { owners: cleaned, updatedAt: serverTimestamp() });
+      logAdminAction('property_owners_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, `${cleaned.length} owner(s)`);
+      showAlert('prop-owners-alert', 'Owners saved.', 'success');
+      const idx = allProperties.findIndex(p => p.id === propertyId);
+      if (idx !== -1) allProperties[idx].owners = cleaned;
+    } catch (e) { showAlert('prop-owners-alert', e.message); }
+    btn.disabled = false; btn.textContent = 'Save Owners';
   };
 
   // ===== BOLD PAYMENT SETTINGS (self-serve, per-property) =====
