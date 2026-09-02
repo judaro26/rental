@@ -690,13 +690,24 @@
             <select id="fin-filter-prop" class="form-input" style="width:160px;font-size:12px;" onchange="filterFinancials()"><option value="">All Properties</option></select>
             <select id="fin-filter-type" class="form-input" style="width:130px;font-size:12px;" onchange="filterFinancials()"><option value="">All Types</option><option value="income">Income</option><option value="expense">Expense</option></select>
             <select id="fin-filter-year" class="form-input" style="width:110px;font-size:12px;" onchange="filterFinancials()"><option value="">All Years</option></select>
+            <button onclick="exportFinancialsCsv()" class="btn btn-outline" title="Export the currently-filtered transactions as a CSV, e.g. to hand off to an accountant">Export CSV</button>
             <button onclick="openFinancialModal()" class="btn btn-primary">+ Add Entry</button>
           </div>
         </div>
+        <div id="fin-category-breakdown" style="padding:16px 20px;border-bottom:1px solid var(--border);"></div>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Property</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th><th>Actions</th></tr></thead>
-            <tbody id="financials-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
+            <thead><tr>
+              <th data-sort-section="financials" data-sort-col="date" onclick="handleSort('financials','date')" style="cursor:pointer;">Date<span class="sort-arrow"></span></th>
+              <th data-sort-section="financials" data-sort-col="property" onclick="handleSort('financials','property')" style="cursor:pointer;">Property<span class="sort-arrow"></span></th>
+              <th data-sort-section="financials" data-sort-col="type" onclick="handleSort('financials','type')" style="cursor:pointer;">Type<span class="sort-arrow"></span></th>
+              <th data-sort-section="financials" data-sort-col="category" onclick="handleSort('financials','category')" style="cursor:pointer;">Category<span class="sort-arrow"></span></th>
+              <th>Description</th>
+              <th data-sort-section="financials" data-sort-col="amount" onclick="handleSort('financials','amount')" style="cursor:pointer;">Amount<span class="sort-arrow"></span></th>
+              <th>Receipt</th>
+              <th>Actions</th>
+            </tr></thead>
+            <tbody id="financials-tbody"><tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1330,19 +1341,28 @@
           <button id="fin-type-expense" onclick="setFinType('expense')" style="flex:1;padding:9px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;border:none;cursor:pointer;background:#fff;color:#6B7280;">Expense</button>
         </div>
       </div>
-      <div><label class="label">Property *</label><select id="fin-property" class="form-input"><option value="">Select...</option></select></div>
+      <div><label class="label">Property *</label><select id="fin-property" class="form-input" onchange="updateFinCategoryOptions()"><option value="">Select...</option></select></div>
       <div><label class="label">Date *</label><input type="date" id="fin-date" class="form-input"></div>
-      <div><label class="label">Amount ($) *</label><input type="number" id="fin-amount" class="form-input" placeholder="0.00" min="0" step="0.01"></div>
+      <div><label class="label">Amount *</label><input type="number" id="fin-amount" class="form-input" placeholder="0.00" min="0" step="0.01"></div>
       <div>
         <label class="label">Category *</label>
-        <select id="fin-category" class="form-input">
-          <optgroup label="Income"><option>Rent</option><option>Late Fee</option><option>Security Deposit</option><option>Pet Fee</option><option>Parking</option><option>Other Income</option></optgroup>
-          <optgroup label="Expense"><option>Mortgage / Loan</option><option>Repairs &amp; Maintenance</option><option>Insurance</option><option>Property Tax</option><option>Utilities</option><option>Property Management</option><option>Landscaping</option><option>Cleaning</option><option>Advertising</option><option>Legal &amp; Professional</option><option>Supplies</option><option>Other Expense</option></optgroup>
-        </select>
+        <select id="fin-category" class="form-input"></select>
       </div>
       <div class="col-span-2"><label class="label">Description</label><input type="text" id="fin-description" class="form-input" placeholder="e.g. June rent - Unit 101"></div>
       <div class="col-span-2"><label class="label">Vendor / Payee</label><input type="text" id="fin-vendor" class="form-input" placeholder="e.g. ABC Plumbing"></div>
       <div class="col-span-2"><label class="label">Notes</label><textarea id="fin-notes" class="form-input" rows="2" placeholder="Optional notes..."></textarea></div>
+      <div class="col-span-2">
+        <label class="label">Receipt / Document <span style="font-size:10px;font-weight:400;color:var(--slate);">(recommended for tax records)</span></label>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div id="fin-receipt-preview" style="font-size:12px;color:var(--slate);">None attached</div>
+        </div>
+        <input type="file" id="fin-receipt-file" accept="image/*,application/pdf" style="display:none;" onchange="handleFinReceiptUpload(this.files)">
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button type="button" onclick="document.getElementById('fin-receipt-file').click()" class="btn btn-outline btn-sm">Upload Receipt</button>
+          <button type="button" onclick="document.getElementById('fin-receiptUrl').value='';document.getElementById('fin-receipt-preview').innerHTML='None attached';" class="btn btn-sm" style="background:none;color:var(--slate);">Remove</button>
+        </div>
+        <input type="hidden" id="fin-receiptUrl">
+      </div>
     </div>
     <div style="display:flex;gap:10px;">
       <button onclick="saveFinancial()" class="btn btn-primary" style="flex:1;" id="fin-save-btn">Save Entry</button>
@@ -2245,6 +2265,7 @@
     payments: () => filterPayments(),
     maintenance: () => filterMaintenance(),
     invoices: () => filterInvoices(),
+    financials: () => filterFinancials(),
   };
   window.handleSort = (section, column) => {
     const state = sortState[section] || { column: null, direction: 'asc' };
@@ -2301,6 +2322,10 @@
     number: i => i.invoiceNumber || '', tenant: i => i.tenantName || '', amount: i => Number(i.total) || 0,
     type: i => i.type || '', status: i => i.status || '',
     due: i => i.dueDate ? new Date(i.dueDate).getTime() : (i.paidDate ? new Date(i.paidDate).getTime() : 0),
+  };
+  const FINANCIALS_SORT_ACCESSORS = {
+    date: f => f.date ? new Date(f.date).getTime() : 0, property: f => f.propertyName || '',
+    type: f => f.type || '', category: f => f.category || '', amount: f => Number(f.amount) || 0,
   };
 
   window.filterProperties = () => {
@@ -4895,7 +4920,41 @@
     document.getElementById('fin-type-income').style.color=type==='income'?'#fff':'#6B7280';
     document.getElementById('fin-type-expense').style.background=type==='expense'?'#DC2626':'#fff';
     document.getElementById('fin-type-expense').style.color=type==='expense'?'#fff':'#6B7280';
+    if (typeof updateFinCategoryOptions === 'function') updateFinCategoryOptions();
   };
+  // ===== FINANCIALS =====
+  // Expense categories are aligned to actual tax-reporting structures
+  // rather than generic labels, since the whole point of tracking these
+  // is to make tax time easier. US categories match IRS Schedule E's
+  // named lines exactly (e.g. "Mortgage Interest" is kept separate from
+  // principal, since only interest is deductible). Colombia's system has
+  // no equivalent numbered-line form — rental income falls under "rentas
+  // de capital" with an aggregate cap across all deductions combined, not
+  // a per-category one — so the CO list below is a reasonable organizing
+  // structure based on commonly-deductible cost types, not a verified
+  // mapping to a specific DIAN form line. Either way, this is not tax
+  // advice — a real accountant should review categorization before filing.
+  const FIN_EXPENSE_CATEGORIES = {
+    US: ['Advertising','Auto and Travel','Cleaning and Maintenance','Commissions','Insurance','Legal and Professional Fees','Management Fees','Mortgage Interest','Other Interest','Repairs','Supplies','Taxes','Utilities','Depreciation','Other'],
+    CO: ['Impuesto Predial','Administración / Cuotas HOA','Servicios Públicos','Mantenimiento y Reparaciones','Seguros','Honorarios Profesionales','Depreciación','Otros'],
+  };
+  const FIN_INCOME_CATEGORIES = ['Rent','Late Fee','Security Deposit','Pet Fee','Parking','Other Income'];
+
+  window.updateFinCategoryOptions = (preserveValue) => {
+    const propId = document.getElementById('fin-property').value;
+    const country = allProperties.find(p => p.id === propId)?.country === 'CO' ? 'CO' : 'US';
+    const sel = document.getElementById('fin-category');
+    const current = preserveValue || sel.value;
+    const incomeOpts = FIN_INCOME_CATEGORIES.map(c => `<option>${c}</option>`).join('');
+    const expenseOpts = FIN_EXPENSE_CATEGORIES[country].map(c => `<option>${c}</option>`).join('');
+    sel.innerHTML = `<optgroup label="Income">${incomeOpts}</optgroup><optgroup label="Expense">${expenseOpts}</optgroup>`;
+    // Keep the previous selection if it still exists under the new
+    // country's list; otherwise fall back to the type's first option
+    // rather than silently landing on something from the wrong list.
+    const stillValid = Array.from(sel.options).some(o => o.value === current);
+    sel.value = stillValid ? current : (_finType === 'income' ? FIN_INCOME_CATEGORIES[0] : FIN_EXPENSE_CATEGORIES[country][0]);
+  };
+
   async function loadFinancials() {
     try {
       const snap=await getDocs(query(collection(db,'financials'),orderBy('date','desc')));
@@ -4917,26 +4976,52 @@
     if(year) filtered=filtered.filter(f=>f.date?.startsWith(year));
     renderFinancials(filtered);
   };
+  function formatFinAmount(amount, currency) {
+    const n = parseFloat(amount) || 0;
+    if (currency === 'COP') return `$${Math.round(n).toLocaleString('es-CO')} COP`;
+    return `$${n.toFixed(2)}`;
+  }
   function renderFinancials(items) {
     const tbody=document.getElementById('financials-tbody'); if(!tbody) return;
-    const income=items.filter(i=>i.type==='income').reduce((s,i)=>s+parseFloat(i.amount||0),0);
-    const expense=items.filter(i=>i.type==='expense').reduce((s,i)=>s+parseFloat(i.amount||0),0);
-    const net=income-expense;
-    document.getElementById('fin-total-income').textContent='$'+income.toFixed(2);
-    document.getElementById('fin-total-expense').textContent='$'+expense.toFixed(2);
+    items = applySort(items, 'financials', FINANCIALS_SORT_ACCESSORS);
+
+    // Currencies are never summed together — a combined "$" total across
+    // USD and COP entries would be a meaningless number, not just an
+    // imprecise one, so each currency present gets its own line instead.
+    const currencies = [...new Set(items.map(i => i.currency || 'USD'))];
+    const summarize = (type) => currencies.map(cur => {
+      const total = items.filter(i => i.type === type && (i.currency||'USD') === cur).reduce((s,i)=>s+parseFloat(i.amount||0),0);
+      return total ? formatFinAmount(total, cur) : null;
+    }).filter(Boolean).join(' + ') || (formatFinAmount(0, currencies[0] || 'USD'));
+
+    document.getElementById('fin-total-income').textContent = summarize('income');
+    document.getElementById('fin-total-expense').textContent = summarize('expense');
     const netEl=document.getElementById('fin-net');
-    netEl.textContent=(net>=0?'+':'')+'$'+Math.abs(net).toFixed(2);
-    netEl.style.color=net>=0?'#16A34A':'#DC2626';
-    if(!items.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No transactions found.</td></tr>';return;}
+    if (currencies.length > 1) {
+      netEl.textContent = 'Mixed currencies — filter by property to see net';
+      netEl.style.cssText = 'font-size:13px;font-weight:400;color:var(--slate);';
+    } else {
+      const cur = currencies[0] || 'USD';
+      const income = items.filter(i=>i.type==='income').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+      const expense = items.filter(i=>i.type==='expense').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+      const net = income - expense;
+      netEl.textContent = (net>=0?'+':'-') + formatFinAmount(Math.abs(net), cur);
+      netEl.style.cssText = `font-size:24px;font-weight:600;color:${net>=0?'#16A34A':'#DC2626'};`;
+    }
+
+    renderFinCategoryBreakdown(items);
+    if(!items.length){tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">No transactions found.</td></tr>';return;}
     tbody.innerHTML=items.map(f=>{
       const prop=allProperties.find(p=>p.id===f.propertyId),isInc=f.type==='income';
+      const cur = f.currency || 'USD';
       return `<tr>
         <td style="font-size:12px;">${f.date||'—'}</td>
-        <td style="font-size:12px;">${prop?.name||'—'}</td>
+        <td style="font-size:12px;">${prop?.name||f.propertyName||'—'}</td>
         <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${isInc?'#F0FDF4':'#FEF2F2'};color:${isInc?'#16A34A':'#DC2626'};font-weight:500;">${f.type}</span></td>
         <td style="font-size:12px;">${f.category||'—'}</td>
         <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.description||''}">${f.description||'—'}${f.vendor?`<div style="font-size:11px;color:var(--slate);">${f.vendor}</div>`:''}</td>
-        <td style="font-weight:600;color:${isInc?'#16A34A':'#DC2626'};">${isInc?'+':'-'}$${parseFloat(f.amount||0).toFixed(2)}</td>
+        <td style="font-weight:600;color:${isInc?'#16A34A':'#DC2626'};">${isInc?'+':'-'}${formatFinAmount(f.amount, cur)}</td>
+        <td>${f.receiptUrl?`<a href="${f.receiptUrl}" target="_blank" title="View receipt">📎</a>`:'<span style="color:#D1D5DB;">—</span>'}</td>
         <td>
           <button onclick="editFinancial('${f.id}')" class="btn btn-sm btn-outline" style="margin-right:4px;">Edit</button>
           <button onclick="deleteFinancial('${f.id}')" class="btn btn-sm btn-danger">×</button>
@@ -4944,6 +5029,52 @@
       </tr>`;
     }).join('');
   }
+  // The actual tax-prep-ready output: expenses grouped by category (and by
+  // currency, kept separate for the same reason totals above are) for
+  // whatever is currently filtered — e.g. filter to one property and one
+  // year, and this becomes exactly the breakdown an accountant would want
+  // for that property's Schedule E (or Colombian equivalent) for that year.
+  function renderFinCategoryBreakdown(items) {
+    const container = document.getElementById('fin-category-breakdown');
+    if (!container) return;
+    const expenses = items.filter(i => i.type === 'expense');
+    if (!expenses.length) { container.innerHTML = '<p style="font-size:12px;color:var(--slate);margin:0;">No expenses in the current filter to break down.</p>'; return; }
+    const groups = {};
+    for (const e of expenses) {
+      const cur = e.currency || 'USD';
+      const key = `${e.category || 'Other'}|||${cur}`;
+      groups[key] = (groups[key] || 0) + parseFloat(e.amount || 0);
+    }
+    const rows = Object.entries(groups)
+      .map(([key, total]) => { const [category, cur] = key.split('|||'); return { category, cur, total }; })
+      .sort((a, b) => b.total - a.total);
+    container.innerHTML = `
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">📊 Expense Breakdown by Category (current filter)</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 20px;">
+        ${rows.map(r => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #F3F4F6;"><span>${r.category}</span><strong>${formatFinAmount(r.total, r.cur)}</strong></div>`).join('')}
+      </div>
+      <p style="font-size:10px;color:var(--slate);margin:10px 0 0;">Not tax advice — review categorization with your accountant before filing.</p>`;
+  }
+  window.exportFinancialsCsv = () => {
+    const prop=document.getElementById('fin-filter-prop').value,type=document.getElementById('fin-filter-type').value,year=document.getElementById('fin-filter-year').value;
+    let items = allFinancials;
+    if(prop) items=items.filter(f=>f.propertyId===prop);
+    if(type) items=items.filter(f=>f.type===type);
+    if(year) items=items.filter(f=>f.date?.startsWith(year));
+    if (!items.length) { alert('Nothing to export in the current filter.'); return; }
+    const escapeCsv = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+    const header = ['Date','Property','Type','Category','Description','Vendor','Amount','Currency','Receipt URL','Notes'];
+    const rows = items.map(f => [f.date, f.propertyName, f.type, f.category, f.description, f.vendor, f.amount, f.currency||'USD', f.receiptUrl||'', f.notes].map(escapeCsv).join(','));
+    const csv = [header.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const labelParts = [prop ? allProperties.find(p=>p.id===prop)?.name : 'all-properties', type || 'all-types', year || 'all-years'];
+    a.href = url;
+    a.download = `financials_${labelParts.join('_').replace(/\s+/g,'-')}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
   window.openFinancialModal=()=>{
     document.getElementById('fin-edit-id').value='';
     document.getElementById('fin-modal-title').textContent='Add Transaction';
@@ -4953,9 +5084,11 @@
     document.getElementById('fin-description').value='';
     document.getElementById('fin-vendor').value='';
     document.getElementById('fin-notes').value='';
+    document.getElementById('fin-receiptUrl').value='';
+    document.getElementById('fin-receipt-preview').innerHTML='None attached';
     const psel=document.getElementById('fin-property');
     psel.innerHTML='<option value="">Select property...</option>'+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-    setFinType('income'); openModal('financial-modal');
+    setFinType('income'); updateFinCategoryOptions(); openModal('financial-modal');
   };
   window.editFinancial=(id)=>{
     const f=allFinancials.find(x=>x.id===id); if(!f) return;
@@ -4966,18 +5099,35 @@
     document.getElementById('fin-description').value=f.description||'';
     document.getElementById('fin-vendor').value=f.vendor||'';
     document.getElementById('fin-notes').value=f.notes||'';
-    document.getElementById('fin-category').value=f.category||'Rent';
+    document.getElementById('fin-receiptUrl').value=f.receiptUrl||'';
+    document.getElementById('fin-receipt-preview').innerHTML=f.receiptUrl?`<a href="${f.receiptUrl}" target="_blank" style="color:var(--amber);font-size:12px;">📎 View current receipt</a>`:'None attached';
     const psel=document.getElementById('fin-property');
     psel.innerHTML='<option value="">Select property...</option>'+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
     psel.value=f.propertyId||'';
     setFinType(f.type||'income');
+    updateFinCategoryOptions(f.category);
     document.getElementById('fin-alert').classList.add('hidden');
     openModal('financial-modal');
+  };
+  window.handleFinReceiptUpload = async (fileList) => {
+    const file = fileList?.[0]; if (!file) return;
+    const preview = document.getElementById('fin-receipt-preview');
+    preview.textContent = 'Uploading...';
+    try {
+      const propId = document.getElementById('fin-property').value || 'unassigned';
+      const url = await uploadFile(file, `properties/${propId}`);
+      document.getElementById('fin-receiptUrl').value = url;
+      preview.innerHTML = `<a href="${url}" target="_blank" style="color:var(--amber);font-size:12px;">📎 ${file.name}</a>`;
+    } catch (e) {
+      preview.textContent = 'None attached';
+      alert('Receipt upload failed: ' + e.message);
+    }
   };
   window.saveFinancial=async()=>{
     const id=document.getElementById('fin-edit-id').value,propId=document.getElementById('fin-property').value,date=document.getElementById('fin-date').value,amount=parseFloat(document.getElementById('fin-amount').value),cat=document.getElementById('fin-category').value;
     if(!propId||!date||!amount){showAlert('fin-alert','Property, date, and amount are required.');return;}
-    const data={type:_finType,propertyId:propId,propertyName:allProperties.find(p=>p.id===propId)?.name||'',date,amount,category:cat,description:document.getElementById('fin-description').value.trim(),vendor:document.getElementById('fin-vendor').value.trim(),notes:document.getElementById('fin-notes').value.trim(),updatedAt:serverTimestamp()};
+    const currency = allProperties.find(p=>p.id===propId)?.country === 'CO' ? 'COP' : 'USD';
+    const data={type:_finType,propertyId:propId,propertyName:allProperties.find(p=>p.id===propId)?.name||'',currency,date,amount,category:cat,description:document.getElementById('fin-description').value.trim(),vendor:document.getElementById('fin-vendor').value.trim(),notes:document.getElementById('fin-notes').value.trim(),receiptUrl:document.getElementById('fin-receiptUrl').value||null,updatedAt:serverTimestamp()};
     if(id){await updateDoc(doc(db,'financials',id),data);}else{await addDoc(collection(db,'financials'),{...data,createdAt:serverTimestamp()});}
     closeModal('financial-modal'); await loadFinancials();
   };
