@@ -1354,9 +1354,10 @@
       </div>
       <div class="col-span-2"><label class="label">Description</label><input type="text" id="fin-description" class="form-input" placeholder="e.g. June rent - Unit 101"></div>
       <div class="col-span-2"><label class="label">Vendor / Payee</label><input type="text" id="fin-vendor" class="form-input" placeholder="e.g. ABC Plumbing"></div>
-      <div class="col-span-2" id="fin-paidby-wrap" style="display:none;">
-        <label class="label">Paid By <span style="font-size:10px;font-weight:400;color:var(--slate);">(which owner actually paid this)</span></label>
-        <select id="fin-paidby" class="form-input"><option value="">Not specified</option></select>
+      <div class="col-span-2" id="fin-paidby-wrap">
+        <label class="label">Paid By <span style="font-size:10px;font-weight:400;color:var(--slate);">(who actually paid this — pick a previous name or type a new one)</span></label>
+        <input type="text" id="fin-paidby" class="form-input" list="fin-paidby-datalist" placeholder="e.g. Juan David">
+        <datalist id="fin-paidby-datalist"></datalist>
       </div>
       <div class="col-span-2"><label class="label">Notes</label><textarea id="fin-notes" class="form-input" rows="2" placeholder="Optional notes..."></textarea></div>
       <div class="col-span-2">
@@ -5051,21 +5052,17 @@
     const stillValid = Array.from(sel.options).some(o => o.value === current);
     sel.value = stillValid ? current : (_finType === 'income' ? FIN_INCOME_CATEGORIES[0] : FIN_EXPENSE_CATEGORIES[country][0]);
 
-    // Paid By: only shown when the selected property actually has owners
-    // configured — for a single/unnamed-owner property this field would
-    // add nothing, so it stays hidden rather than showing an empty list.
-    const owners = Array.isArray(prop?.owners) ? prop.owners : [];
-    const paidByWrap = document.getElementById('fin-paidby-wrap');
-    const paidBySel = document.getElementById('fin-paidby');
-    const currentPaidBy = paidBySel.value;
-    if (owners.length) {
-      paidByWrap.style.display = '';
-      paidBySel.innerHTML = '<option value="">Not specified</option>' + owners.map(o => `<option value="${o.name}">${o.name} (${o.percentage}%)</option>`).join('');
-      paidBySel.value = owners.some(o => o.name === currentPaidBy) ? currentPaidBy : '';
-    } else {
-      paidByWrap.style.display = 'none';
-      paidBySel.innerHTML = '<option value="">Not specified</option>';
-    }
+    // Paid By: a plain text input with datalist suggestions, not gated
+    // behind formal ownership percentages being configured - someone
+    // shouldn't need to set up an owners% split just to record who
+    // fronted an expense (a CSV import's "paid by" column, for instance,
+    // already populates this independently of that). Suggestions draw
+    // from both the property's configured owners AND any payer names
+    // already used in past entries for it.
+    const ownerNames = Array.isArray(prop?.owners) ? prop.owners.map(o => o.name) : [];
+    const usedNames = allFinancials.filter(f => f.propertyId === propId && f.paidByOwner).map(f => f.paidByOwner);
+    const suggestions = [...new Set([...ownerNames, ...usedNames])].filter(Boolean).sort();
+    document.getElementById('fin-paidby-datalist').innerHTML = suggestions.map(n => `<option value="${n}">`).join('');
   };
 
   async function loadFinancials() {
