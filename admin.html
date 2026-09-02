@@ -738,6 +738,7 @@
         </div>
         <div id="fin-category-breakdown" style="padding:16px 20px;border-bottom:1px solid var(--border);"></div>
         <div id="fin-owner-breakdown" style="padding:16px 20px;border-bottom:1px solid var(--border);"></div>
+        <div id="fin-catchup-tracker" style="padding:16px 20px;border-bottom:1px solid var(--border);"></div>
         <div style="overflow-x:auto;">
           <table class="data-table">
             <thead><tr>
@@ -1674,6 +1675,31 @@
       <button type="button" onclick="addOwnerRow()" style="font-size:12px;color:var(--amber);background:none;border:1px dashed var(--amber);padding:6px 12px;border-radius:2px;cursor:pointer;width:100%;" data-i18n="properties.addOwner">+ Add Owner</button>
       <button type="button" onclick="savePropertyOwners()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-owners-save-btn" data-i18n="properties.saveOwners">Save Owners</button>
     </div>
+
+    <div id="prop-catchup-section" class="hidden" style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border);">
+      <h4 style="font-size:1rem;font-weight:500;margin-bottom:4px;" data-i18n="properties.catchupTitle">⏳ Purchase Catch-Up Agreement</h4>
+      <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="properties.catchupHelp">For the case where one owner put in less at purchase and is catching up by covering ongoing expenses. Tracks their running total against what each other owner contributed in a set target year, until they've matched it.</p>
+      <div id="prop-catchup-alert" class="hidden alert" style="margin-bottom:10px;"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:12px;">
+        <input type="checkbox" id="prop-catchup-enabled" style="width:16px;height:16px;" onchange="document.getElementById('prop-catchup-fields').classList.toggle('hidden', !this.checked)">
+        <span data-i18n="properties.catchupEnable">This property has a catch-up agreement</span>
+      </label>
+      <div id="prop-catchup-fields" class="hidden">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="label" data-i18n="properties.catchupWho">Owner who is catching up</label>
+            <select id="prop-catchup-owner" class="form-input"></select>
+          </div>
+          <div>
+            <label class="label"><span data-i18n="properties.catchupTargetYear">Target year</span> <span style="font-size:10px;font-weight:400;color:var(--slate);" data-i18n="properties.catchupTargetYearHint">(year the others' contribution is measured in)</span></label>
+            <input type="number" id="prop-catchup-year" class="form-input" placeholder="2025" min="2000" max="2100">
+          </div>
+        </div>
+        <label class="label" style="margin-top:10px;" data-i18n="properties.catchupNote">Note (optional, for your own reference)</label>
+        <textarea id="prop-catchup-note" class="form-input" rows="2" data-i18n-placeholder="properties.catchupNotePlaceholder" placeholder="e.g. Agreed equal thirds; I cover all property expenses until my total matches what Mom and Dad put in for the purchase."></textarea>
+      </div>
+      <button type="button" onclick="savePropertyCatchup()" class="btn btn-primary btn-sm" style="margin-top:12px;" id="prop-catchup-save-btn" data-i18n="properties.catchupSave">Save Catch-Up Agreement</button>
+    </div>
     </div>
 
     <div style="display:flex;gap:10px;padding:16px 28px;border-top:1px solid var(--border);flex-shrink:0;">
@@ -2359,6 +2385,19 @@
       'admins.confirmRevoke':'Revoke this admin\'s access? They will be signed out immediately and unable to log back in.',
       'properties.confirmRemoveBold':'Remove Bold payment settings for this property? Tenants will no longer see a Bold payment option.',
       'properties.saveProperty':'Save Property', 'applications.sendMessage':'Send Message', 'applications.sendRequest':'Send Request',
+      'properties.catchupTitle':'⏳ Purchase Catch-Up Agreement',
+      'properties.catchupHelp':'For the case where one owner put in less at purchase and is catching up by covering ongoing expenses. Tracks their running total against what each other owner contributed in a set target year, until they\'ve matched it.',
+      'properties.catchupEnable':'This property has a catch-up agreement', 'properties.catchupWho':'Owner who is catching up',
+      'properties.catchupTargetYear':'Target year', 'properties.catchupTargetYearHint':'(year the others\' contribution is measured in)',
+      'properties.catchupNote':'Note (optional, for your own reference)',
+      'properties.catchupNotePlaceholder':'e.g. Agreed equal thirds; I cover all property expenses until my total matches what Mom and Dad put in for the purchase.',
+      'properties.catchupSave':'Save Catch-Up Agreement', 'properties.catchupOwnerRequired':'Select which owner is catching up.',
+      'properties.catchupYearRequired':'Enter a valid target year.', 'properties.catchupSaved':'Catch-up agreement saved.',
+      'financials.catchupTrackerTitle':'Purchase Catch-Up Progress',
+      'financials.catchupNoTargetData':'No expenses recorded for the other owner(s) in {year} yet, so there\'s no target to track against.',
+      'financials.catchupExplainer':'{owner} has contributed {progress} in total toward this property.',
+      'financials.catchupVsOwner':'vs. {owner}\'s {year} contribution', 'financials.catchupMatched':'✓ Matched',
+      'financials.catchupRemaining':'{amount} to go',
       'applications.generateSendSignature':'Generate &amp; Send for Signature', 'tenants.saveChanges':'Save Changes',
       'invitations.firstNameEmailRequired':'First name and email are required.', 'invitations.sentTo':'✓ Invitation sent to {email}',
       'invitations.sendInvitation':'Send Invitation', 'invitations.sendLink':'Send Link',
@@ -2828,6 +2867,19 @@
       'admins.confirmRevoke':'¿Revocar el acceso de este administrador? Se cerrará su sesión de inmediato y no podrá volver a iniciar sesión.',
       'properties.confirmRemoveBold':'¿Eliminar la configuración de pagos Bold para esta propiedad? Los inquilinos ya no verán una opción de pago Bold.',
       'properties.saveProperty':'Guardar Propiedad', 'applications.sendMessage':'Enviar Mensaje', 'applications.sendRequest':'Enviar Solicitud',
+      'properties.catchupTitle':'⏳ Acuerdo de Nivelación de Compra',
+      'properties.catchupHelp':'Para el caso en que un propietario aportó menos en la compra y está nivelándose cubriendo los gastos en curso. Rastrea su total acumulado frente a lo que cada otro propietario aportó en un año objetivo establecido, hasta que lo haya igualado.',
+      'properties.catchupEnable':'Esta propiedad tiene un acuerdo de nivelación', 'properties.catchupWho':'Propietario que se está nivelando',
+      'properties.catchupTargetYear':'Año objetivo', 'properties.catchupTargetYearHint':'(año en que se mide el aporte de los demás)',
+      'properties.catchupNote':'Nota (opcional, para tu propia referencia)',
+      'properties.catchupNotePlaceholder':'ej. Acordamos partes iguales; cubro todos los gastos de la propiedad hasta que mi total iguale lo que mamá y papá pusieron para la compra.',
+      'properties.catchupSave':'Guardar Acuerdo de Nivelación', 'properties.catchupOwnerRequired':'Selecciona qué propietario se está nivelando.',
+      'properties.catchupYearRequired':'Ingresa un año objetivo válido.', 'properties.catchupSaved':'Acuerdo de nivelación guardado.',
+      'financials.catchupTrackerTitle':'Progreso de Nivelación de Compra',
+      'financials.catchupNoTargetData':'Aún no hay gastos registrados para el/los otro(s) propietario(s) en {year}, así que no hay un objetivo contra el cual medir.',
+      'financials.catchupExplainer':'{owner} ha aportado {progress} en total a esta propiedad.',
+      'financials.catchupVsOwner':'vs. el aporte de {owner} en {year}', 'financials.catchupMatched':'✓ Igualado',
+      'financials.catchupRemaining':'faltan {amount}',
       'applications.generateSendSignature':'Generar y Enviar para Firma', 'tenants.saveChanges':'Guardar Cambios',
       'invitations.firstNameEmailRequired':'El nombre y el correo son obligatorios.', 'invitations.sentTo':'✓ Invitación enviada a {email}',
       'invitations.sendInvitation':'Enviar Invitación', 'invitations.sendLink':'Enviar Enlace',
@@ -3378,6 +3430,7 @@
     document.getElementById('prop-paymentmethods-section').classList.add('hidden');
     document.getElementById('prop-annual-events-section').classList.add('hidden');
     document.getElementById('prop-owners-section').classList.add('hidden');
+    document.getElementById('prop-catchup-section').classList.add('hidden');
     openModal('property-modal');
   };
   window.editProperty = id => {
@@ -3408,6 +3461,13 @@
     renderAnnualEventRows(p.annualEvents || []);
     document.getElementById('prop-owners-section').classList.remove('hidden');
     renderOwnerRows(p.owners || []);
+    const catchupSection = document.getElementById('prop-catchup-section');
+    if ((p.owners || []).length >= 2) {
+      catchupSection.classList.remove('hidden');
+      renderCatchupSection(p);
+    } else {
+      catchupSection.classList.add('hidden');
+    }
     openModal('property-modal');
   };
   window.saveProperty = async () => {
@@ -6092,6 +6152,7 @@
 
     renderFinCategoryBreakdown(items);
     renderOwnerSpendBreakdown(items);
+    renderCatchupTracker();
     if(!items.length){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">${t('financials.noTransactionsFound')}</td></tr>`;return;}
     tbody.innerHTML=items.map(f=>{
       const prop=allProperties.find(p=>p.id===f.propertyId),isInc=f.type==='income';
@@ -6189,6 +6250,67 @@
           </div>`).join('')}
       </div>
       <p style="font-size:10px;color:var(--slate);margin:10px 0 0;">${owners.length ? t('financials.reconciliationHint') : t('financials.setOwnershipHint')}</p>`;
+  }
+
+  // Purchase catch-up tracker: independent of whatever year/type filter is
+  // currently active in Financials, by design. The target is always tied
+  // to a fixed historical year (typically the purchase year), and
+  // progress is always the catching-up owner's cumulative total since
+  // then - neither should shift just because someone filtered the table
+  // to look at a different year.
+  function renderCatchupTracker() {
+    const container = document.getElementById('fin-catchup-tracker');
+    if (!container) return;
+    const propId = document.getElementById('fin-filter-prop').value;
+    const prop = allProperties.find(p => p.id === propId);
+    const agreement = prop?.catchUpAgreement;
+    if (!propId || !agreement?.enabled) { container.innerHTML = ''; return; }
+
+    const propExpenses = allFinancials.filter(f => f.propertyId === propId && f.type === 'expense');
+    const currencies = [...new Set(propExpenses.map(e => e.currency || 'USD'))];
+    if (currencies.length > 1) {
+      container.innerHTML = `<p style="font-size:11px;color:var(--slate);margin:0;">${t('financials.mixedCurrencyExplanation')}</p>`;
+      return;
+    }
+    const cur = currencies[0] || 'USD';
+
+    const otherOwnerNames = [...new Set(propExpenses.map(f => f.paidByOwner).filter(n => n && n !== agreement.catchingUpOwnerName))];
+    const targets = otherOwnerNames.map(name => {
+      const total = propExpenses.filter(f => f.paidByOwner === name && f.date?.startsWith(String(agreement.targetYear))).reduce((s, f) => s + parseFloat(f.amount || 0), 0);
+      return { name, total };
+    }).filter(tgt => tgt.total > 0); // an owner with nothing recorded in the target year has no target to show
+
+    const progress = propExpenses.filter(f => f.paidByOwner === agreement.catchingUpOwnerName).reduce((s, f) => s + parseFloat(f.amount || 0), 0);
+
+    if (!targets.length) {
+      container.innerHTML = `
+        <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">⏳ ${t('financials.catchupTrackerTitle')}</h4>
+        <p style="font-size:11px;color:var(--slate);margin:0;">${t('financials.catchupNoTargetData').replace('{year}', agreement.targetYear)}</p>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">⏳ ${t('financials.catchupTrackerTitle')}</h4>
+      <p style="font-size:11px;color:var(--slate);margin:0 0 10px;">${t('financials.catchupExplainer').replace('{owner}', agreement.catchingUpOwnerName).replace('{progress}', formatFinAmount(progress, cur))}</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${targets.map(target => {
+          const pct = Math.min(100, (progress / target.total) * 100);
+          const met = progress >= target.total;
+          const barColor = met ? '#16A34A' : 'var(--amber)';
+          return `
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+              <span>${t('financials.catchupVsOwner').replace('{owner}', target.name).replace('{year}', agreement.targetYear)}</span>
+              <span style="font-weight:500;color:${met?'#16A34A':'inherit'};">${met ? t('financials.catchupMatched') : t('financials.catchupRemaining').replace('{amount}', formatFinAmount(target.total - progress, cur))}</span>
+            </div>
+            <div style="background:#F3F4F6;border-radius:10px;height:8px;overflow:hidden;">
+              <div style="background:${barColor};height:100%;width:${pct}%;transition:width 0.3s;"></div>
+            </div>
+            <div style="font-size:10px;color:var(--slate);margin-top:2px;">${formatFinAmount(progress, cur)} / ${formatFinAmount(target.total, cur)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${agreement.note ? `<p style="font-size:10px;color:var(--slate);margin:10px 0 0;font-style:italic;">"${escapeHtml(agreement.note)}"</p>` : ''}`;
   }
   window.exportFinancialsCsv = () => {
     const prop=document.getElementById('fin-filter-prop').value,type=document.getElementById('fin-filter-type').value,year=document.getElementById('fin-filter-year').value;
@@ -8118,8 +8240,55 @@
       showAlert('prop-owners-alert', t('properties.ownersSaved'), 'success');
       const idx = allProperties.findIndex(p => p.id === propertyId);
       if (idx !== -1) allProperties[idx].owners = cleaned;
+      const catchupSection = document.getElementById('prop-catchup-section');
+      if (cleaned.length >= 2) { catchupSection.classList.remove('hidden'); renderCatchupSection(allProperties[idx]); }
+      else { catchupSection.classList.add('hidden'); }
     } catch (e) { showAlert('prop-owners-alert', e.message); }
     btn.disabled = false; btn.textContent = t('properties.saveOwners');
+  };
+
+  // ===== PURCHASE CATCH-UP AGREEMENT =====
+  // For the case where one owner contributed less at purchase and is
+  // catching up by covering ongoing expenses until their cumulative total
+  // matches what each other owner put in during a fixed target year (the
+  // purchase year). Deliberately shows each other owner's target
+  // individually rather than averaging them - if they didn't contribute
+  // exactly equally to each other, only the person living the actual
+  // agreement can say which figure is the real target.
+  function renderCatchupSection(p) {
+    const ownerSel = document.getElementById('prop-catchup-owner');
+    const owners = p.owners || [];
+    ownerSel.innerHTML = owners.map(o => `<option value="${o.name.replace(/"/g,'&quot;')}">${o.name}</option>`).join('');
+    const agreement = p.catchUpAgreement;
+    const enabled = !!(agreement && agreement.enabled);
+    document.getElementById('prop-catchup-enabled').checked = enabled;
+    document.getElementById('prop-catchup-fields').classList.toggle('hidden', !enabled);
+    ownerSel.value = agreement?.catchingUpOwnerName || owners[0]?.name || '';
+    document.getElementById('prop-catchup-year').value = agreement?.targetYear || new Date().getFullYear();
+    document.getElementById('prop-catchup-note').value = agreement?.note || '';
+    document.getElementById('prop-catchup-alert').classList.add('hidden');
+  }
+  window.savePropertyCatchup = async () => {
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    const enabled = document.getElementById('prop-catchup-enabled').checked;
+    const catchingUpOwnerName = document.getElementById('prop-catchup-owner').value;
+    const targetYear = parseInt(document.getElementById('prop-catchup-year').value);
+    const note = document.getElementById('prop-catchup-note').value.trim();
+    if (enabled) {
+      if (!catchingUpOwnerName) { showAlert('prop-catchup-alert', t('properties.catchupOwnerRequired')); return; }
+      if (!targetYear || targetYear < 2000 || targetYear > 2100) { showAlert('prop-catchup-alert', t('properties.catchupYearRequired')); return; }
+    }
+    const catchUpAgreement = enabled ? { enabled: true, catchingUpOwnerName, targetYear, note } : { enabled: false };
+    const btn = document.getElementById('prop-catchup-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
+    try {
+      await updateDoc(doc(db,'properties',propertyId), { catchUpAgreement, updatedAt: serverTimestamp() });
+      logAdminAction('property_catchup_updated', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, enabled ? `Catch-up: ${catchingUpOwnerName} vs ${targetYear}` : 'Catch-up disabled');
+      showAlert('prop-catchup-alert', t('properties.catchupSaved'), 'success');
+      const idx = allProperties.findIndex(p => p.id === propertyId);
+      if (idx !== -1) allProperties[idx].catchUpAgreement = catchUpAgreement;
+    } catch (e) { showAlert('prop-catchup-alert', e.message); }
+    btn.disabled = false; btn.textContent = t('properties.catchupSave');
   };
 
   // ===== BOLD PAYMENT SETTINGS (self-serve, per-property) =====
