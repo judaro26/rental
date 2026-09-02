@@ -728,9 +728,11 @@
             <select id="fin-filter-prop" class="form-input" style="width:160px;font-size:12px;" onchange="filterFinancials()"><option value="" data-i18n="common.allProperties">All Properties</option></select>
             <select id="fin-filter-type" class="form-input" style="width:130px;font-size:12px;" onchange="filterFinancials()"><option value="" data-i18n="financials.allTypes">All Types</option><option value="income" data-i18n="financials.income">Income</option><option value="expense" data-i18n="financials.expense">Expense</option></select>
             <select id="fin-filter-year" class="form-input" style="width:110px;font-size:12px;" onchange="filterFinancials()"><option value="" data-i18n="financials.allYears">All Years</option></select>
+            <select id="fin-filter-payer" class="form-input" style="width:150px;font-size:12px;" onchange="filterFinancials()"><option value="" data-i18n="financials.allPayers">All Payers</option></select>
             <button onclick="exportFinancialsCsv()" class="btn btn-outline" data-i18n-title="financials.exportTitle" title="Export the currently-filtered transactions as a CSV, e.g. to hand off to an accountant" data-i18n="financials.exportCsv">Export CSV</button>
             <button onclick="openImportCsvModal()" class="btn btn-outline" data-i18n="financials.importCsv">Import CSV</button>
             <button onclick="syncIncomeFromPayments()" class="btn btn-outline" id="fin-sync-income-btn" data-i18n="financials.syncIncome">Sync Income from Payments</button>
+            <button onclick="openMergePayersModal()" class="btn btn-outline" data-i18n="financials.mergePayerNames">🔀 Merge Payer Names</button>
             <button onclick="openFinancialModal()" class="btn btn-primary" data-i18n="financials.addEntry">+ Add Entry</button>
           </div>
         </div>
@@ -826,6 +828,7 @@
           </div>
           <button onclick="saveSettings()" class="btn btn-primary" data-i18n="settings.saveSettings">Save Settings</button>
         </div>
+      </div>
       <div class="card" style="margin-top:16px;">
         <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="settings.socialLinks">Social &amp; Links</h3></div>
         <div class="card-body">
@@ -1365,6 +1368,35 @@
   </div>
 </div>
 
+<!-- MERGE PAYER NAMES MODAL -->
+<div id="merge-payers-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('merge-payers-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:600px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('merge-payers-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:6px;" data-i18n="mergePayers.title">Merge Payer Names</h3>
+    <p style="font-size:13px;color:var(--slate);margin-bottom:18px;" data-i18n="mergePayers.subtitle">Combines different spellings of the same person (e.g. "Juan David" and "Juan David Rodriguez") into one name across every expense. This applies everywhere, not just the current property or year filter.</p>
+    <div id="merge-payers-alert" class="hidden alert" style="margin-bottom:14px;"></div>
+
+    <div id="merge-suggestions-section" class="hidden" style="margin-bottom:18px;">
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 8px;" data-i18n="mergePayers.suggestedTitle">Suggested groups</h4>
+      <div id="merge-suggestions-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 8px;" data-i18n="mergePayers.allNamesTitle">Or select names manually</h4>
+    <div id="merge-all-names-list" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:3px;padding:10px;margin-bottom:16px;"></div>
+
+    <div id="merge-canonical-section" class="hidden">
+      <label class="label" data-i18n="mergePayers.mergeInto">Merge into this name</label>
+      <input type="text" id="merge-canonical-name" class="form-input" oninput="renderMergePreview()">
+      <div id="merge-preview" style="font-size:12px;color:var(--slate);margin-top:8px;"></div>
+      <div style="display:flex;gap:10px;margin-top:16px;">
+        <button onclick="confirmMergePayers()" class="btn btn-primary" style="flex:1;" id="merge-confirm-btn" data-i18n="mergePayers.confirmMerge">Merge Names</button>
+        <button onclick="closeModal('merge-payers-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- FINANCIAL ENTRY MODAL -->
 <div id="financial-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('financial-modal')"></div>
@@ -1406,6 +1438,7 @@
           <button type="button" onclick="document.getElementById('fin-receipt-file').click()" class="btn btn-outline btn-sm" data-i18n="financials.uploadReceipt">Upload Receipt</button>
           <button type="button" onclick="document.getElementById('fin-receiptUrl').value='';document.getElementById('fin-receipt-preview').textContent=t('financials.noneAttached');" class="btn btn-sm" style="background:none;color:var(--slate);" data-i18n="common.remove">Remove</button>
         </div>
+        <p style="font-size:10px;color:var(--slate);margin-top:6px;" data-i18n="financials.pdfSupportHint">Supports images and PDFs. If using Cloudinary for storage and an uploaded PDF doesn't open afterward, enable "Allow delivery of PDF and ZIP files" under your Cloudinary account's Settings → Security.</p>
         <input type="hidden" id="fin-receiptUrl">
       </div>
     </div>
@@ -2181,6 +2214,16 @@
       'financials.allYears':'All Years', 'financials.exportTitle':'Export the currently-filtered transactions as a CSV, e.g. to hand off to an accountant',
       'financials.exportCsv':'Export CSV', 'financials.importCsv':'Import CSV', 'financials.syncIncome':'Sync Income from Payments',
       'financials.addEntry':'+ Add Entry', 'financials.receipt':'Receipt',
+      'financials.mergePayerNames':'🔀 Merge Payer Names', 'financials.allPayers':'All Payers',
+      'mergePayers.title':'Merge Payer Names',
+      'mergePayers.subtitle':'Combines different spellings of the same person (e.g. "Juan David" and "Juan David Rodriguez") into one name across every expense. This applies everywhere, not just the current property or year filter.',
+      'mergePayers.suggestedTitle':'Suggested groups', 'mergePayers.mergeThese':'Merge these',
+      'mergePayers.allNamesTitle':'Or select names manually', 'mergePayers.entryCount':'{n} entries',
+      'mergePayers.mergeInto':'Merge into this name', 'mergePayers.confirmMerge':'Merge Names',
+      'mergePayers.previewText':'This will update <strong>{n}</strong> entries (totaling {amount}) from {names} to {canonical}.',
+      'mergePayers.selectAtLeastTwo':'Select at least two names to merge.', 'mergePayers.canonicalRequired':'Enter the name to merge into.',
+      'mergePayers.mergingEllipsis':'Merging...', 'mergePayers.mergedSuccess':'✓ Merged {n} entries into "{canonical}".',
+      'financials.pdfSupportHint':'Supports images and PDFs. If using Cloudinary for storage and an uploaded PDF doesn\'t open afterward, enable "Allow delivery of PDF and ZIP files" under your Cloudinary account\'s Settings → Security.',
       'financials.mixedCurrencies':'Mixed currencies — filter by property to see net',
       'financials.noTransactionsFound':'No transactions found.', 'financials.viewReceipt':'View receipt',
       'financials.noExpensesToBreakdown':'No expenses in the current filter to break down.',
@@ -2640,6 +2683,16 @@
       'financials.allYears':'Todos los Años', 'financials.exportTitle':'Exporta las transacciones actualmente filtradas como CSV, ej. para entregar a un contador',
       'financials.exportCsv':'Exportar CSV', 'financials.importCsv':'Importar CSV', 'financials.syncIncome':'Sincronizar Ingresos de Pagos',
       'financials.addEntry':'+ Agregar Entrada', 'financials.receipt':'Recibo',
+      'financials.mergePayerNames':'🔀 Combinar Nombres de Pagadores', 'financials.allPayers':'Todos los Pagadores',
+      'mergePayers.title':'Combinar Nombres de Pagadores',
+      'mergePayers.subtitle':'Combina diferentes formas de escribir el nombre de la misma persona (ej. "Juan David" y "Juan David Rodríguez") en un solo nombre en todos los gastos. Esto aplica en todas partes, no solo en el filtro actual de propiedad o año.',
+      'mergePayers.suggestedTitle':'Grupos sugeridos', 'mergePayers.mergeThese':'Combinar estos',
+      'mergePayers.allNamesTitle':'O selecciona nombres manualmente', 'mergePayers.entryCount':'{n} entradas',
+      'mergePayers.mergeInto':'Combinar en este nombre', 'mergePayers.confirmMerge':'Combinar Nombres',
+      'mergePayers.previewText':'Esto actualizará <strong>{n}</strong> entradas (totalizando {amount}) de {names} a {canonical}.',
+      'mergePayers.selectAtLeastTwo':'Selecciona al menos dos nombres para combinar.', 'mergePayers.canonicalRequired':'Ingresa el nombre en el que combinar.',
+      'mergePayers.mergingEllipsis':'Combinando...', 'mergePayers.mergedSuccess':'✓ Se combinaron {n} entradas en "{canonical}".',
+      'financials.pdfSupportHint':'Admite imágenes y PDFs. Si usas Cloudinary para almacenamiento y un PDF subido no se abre después, habilita "Allow delivery of PDF and ZIP files" en Settings → Security de tu cuenta de Cloudinary.',
       'financials.mixedCurrencies':'Monedas mixtas — filtra por propiedad para ver el neto',
       'financials.noTransactionsFound':'No se encontraron transacciones.', 'financials.viewReceipt':'Ver recibo',
       'financials.noExpensesToBreakdown':'No hay gastos en el filtro actual para desglosar.',
@@ -5847,13 +5900,161 @@
     if(fprop) fprop.innerHTML=`<option value="">${t('common.allProperties')}</option>`+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
     const fyear=document.getElementById('fin-filter-year');
     if(fyear){const years=[...new Set(allFinancials.map(f=>f.date?.substring(0,4)).filter(Boolean))].sort().reverse();fyear.innerHTML=`<option value="">${t('financials.allYears')}</option>`+years.map(y=>`<option value="${y}">${y}</option>`).join('');}
+    const fpayer=document.getElementById('fin-filter-payer');
+    if(fpayer){
+      const prevSelection = fpayer.value;
+      const payers=[...new Set(allFinancials.map(f=>f.paidByOwner).filter(Boolean))].sort();
+      fpayer.innerHTML=`<option value="">${t('financials.allPayers')}</option>`+payers.map(p=>`<option value="${p.replace(/"/g,'&quot;')}">${p}</option>`).join('');
+      if (payers.includes(prevSelection)) fpayer.value = prevSelection; // survives a merge that didn't touch this specific name
+    }
   }
+
+  // ===== MERGE PAYER NAMES =====
+  // Groups likely-same-person spelling variants ("Juan David" / "Juan
+  // David Rodriguez" / "Juan D Rodriguez") as suggestions only - it never
+  // merges anything automatically. The matching rule is deliberately
+  // tight: one name's words must be fully contained in the other's
+  // (treating single-letter words as initials), which correctly groups
+  // real variants without conflating two different people who happen to
+  // share a first name (e.g. "Juan David" and "Juan Manuel" never match).
+  let mergeSelectedNames = new Set();
+  let mergeSuggestionGroups = [];
+  function mergeNormalizeWords(name) {
+    return name.trim().toLowerCase().replace(/[.,]/g, '').split(/\s+/).filter(Boolean);
+  }
+  function mergeWordsContained(shortWords, longWords) {
+    return shortWords.every(sw => longWords.some(lw =>
+      sw === lw || (sw.length === 1 && lw.startsWith(sw)) || (lw.length === 1 && sw.startsWith(lw))
+    ));
+  }
+  function mergeIsPossibleMatch(a, b) {
+    if (a === b) return false;
+    const wa = mergeNormalizeWords(a), wb = mergeNormalizeWords(b);
+    const [shorter, longer] = wa.length <= wb.length ? [wa, wb] : [wb, wa];
+    return mergeWordsContained(shorter, longer);
+  }
+  function mergeGroupSuggestions(names) {
+    const parent = {}; names.forEach(n => parent[n] = n);
+    function find(x) { while (parent[x] !== x) x = parent[x]; return x; }
+    function union(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) parent[ra] = rb; }
+    for (let i = 0; i < names.length; i++)
+      for (let j = i + 1; j < names.length; j++)
+        if (mergeIsPossibleMatch(names[i], names[j])) union(names[i], names[j]);
+    const groups = {};
+    names.forEach(n => { const root = find(n); (groups[root] = groups[root] || []).push(n); });
+    return Object.values(groups).filter(g => g.length > 1);
+  }
+  function mergeNameStats(name) {
+    const matching = allFinancials.filter(f => f.paidByOwner === name);
+    const byCurrency = {};
+    for (const f of matching) { const cur = f.currency || 'USD'; byCurrency[cur] = (byCurrency[cur] || 0) + parseFloat(f.amount || 0); }
+    return { count: matching.length, byCurrency };
+  }
+  function mergeFormatByCurrency(byCurrency) {
+    return Object.entries(byCurrency).map(([cur, amt]) => formatFinAmount(amt, cur)).join(' + ') || formatFinAmount(0, 'USD');
+  }
+  window.openMergePayersModal = () => {
+    mergeSelectedNames = new Set();
+    document.getElementById('merge-payers-alert').classList.add('hidden');
+    document.getElementById('merge-canonical-section').classList.add('hidden');
+    document.getElementById('merge-canonical-name').value = '';
+    const names = [...new Set(allFinancials.map(f => f.paidByOwner).filter(Boolean))].sort();
+
+    const suggestions = mergeGroupSuggestions(names);
+    mergeSuggestionGroups = suggestions;
+    const suggestionsSection = document.getElementById('merge-suggestions-section');
+    if (suggestions.length) {
+      suggestionsSection.classList.remove('hidden');
+      document.getElementById('merge-suggestions-list').innerHTML = suggestions.map((group, gi) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:8px 10px;background:#FDFBF8;border-radius:3px;border:1px solid var(--border);">
+          <span>${group.map(n => `<strong>${escapeHtml(n)}</strong>`).join(', ')}</span>
+          <button type="button" class="btn btn-sm btn-outline" onclick="applyMergeSuggestion(${gi})">${t('mergePayers.mergeThese')}</button>
+        </div>`).join('');
+    } else {
+      suggestionsSection.classList.add('hidden');
+    }
+
+    document.getElementById('merge-all-names-list').innerHTML = names.map(name => {
+      const stats = mergeNameStats(name);
+      return `
+      <label style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;padding:4px 2px;cursor:pointer;">
+        <span style="display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" class="merge-name-checkbox" data-name="${escapeHtml(name)}" onchange="toggleMergeNameSelection(this.dataset.name, this.checked)">
+          ${escapeHtml(name)}
+        </span>
+        <span style="color:var(--slate);">${t('mergePayers.entryCount').replace('{n}', stats.count)} · ${mergeFormatByCurrency(stats.byCurrency)}</span>
+      </label>`;
+    }).join('');
+    openModal('merge-payers-modal');
+  };
+  window.applyMergeSuggestion = (groupIndex) => {
+    const group = mergeSuggestionGroups[groupIndex]; if (!group) return;
+    mergeSelectedNames = new Set(group);
+    document.querySelectorAll('.merge-name-checkbox').forEach(cb => { cb.checked = mergeSelectedNames.has(cb.dataset.name); });
+    // Default the canonical name to the longest variant - usually the most complete/correct one.
+    document.getElementById('merge-canonical-name').value = [...group].sort((a, b) => b.length - a.length)[0];
+    document.getElementById('merge-canonical-section').classList.remove('hidden');
+    renderMergePreview();
+  };
+  window.toggleMergeNameSelection = (name, checked) => {
+    if (checked) mergeSelectedNames.add(name); else mergeSelectedNames.delete(name);
+    if (mergeSelectedNames.size >= 2) {
+      document.getElementById('merge-canonical-section').classList.remove('hidden');
+      if (!document.getElementById('merge-canonical-name').value.trim()) {
+        document.getElementById('merge-canonical-name').value = [...mergeSelectedNames].sort((a, b) => b.length - a.length)[0];
+      }
+    } else {
+      document.getElementById('merge-canonical-section').classList.add('hidden');
+    }
+    renderMergePreview();
+  };
+  window.renderMergePreview = () => {
+    const preview = document.getElementById('merge-preview');
+    const canonical = document.getElementById('merge-canonical-name').value.trim();
+    if (mergeSelectedNames.size < 2 || !canonical) { preview.textContent = ''; return; }
+    let totalCount = 0; const combinedByCurrency = {};
+    for (const name of mergeSelectedNames) {
+      const stats = mergeNameStats(name);
+      totalCount += stats.count;
+      for (const [cur, amt] of Object.entries(stats.byCurrency)) combinedByCurrency[cur] = (combinedByCurrency[cur] || 0) + amt;
+    }
+    preview.innerHTML = t('mergePayers.previewText')
+      .replace('{n}', totalCount)
+      .replace('{amount}', mergeFormatByCurrency(combinedByCurrency))
+      .replace('{names}', [...mergeSelectedNames].map(n => `"${n}"`).join(', '))
+      .replace('{canonical}', `<strong>${canonical}</strong>`);
+  };
+  window.confirmMergePayers = async () => {
+    const canonical = document.getElementById('merge-canonical-name').value.trim();
+    if (mergeSelectedNames.size < 2) { showAlert('merge-payers-alert', t('mergePayers.selectAtLeastTwo')); return; }
+    if (!canonical) { showAlert('merge-payers-alert', t('mergePayers.canonicalRequired')); return; }
+    const btn = document.getElementById('merge-confirm-btn'); btn.disabled = true; btn.textContent = t('mergePayers.mergingEllipsis');
+    try {
+      const namesToMerge = [...mergeSelectedNames].filter(n => n !== canonical); // no-op if canonical was itself one of the selected names and needs no rewrite
+      const affected = allFinancials.filter(f => namesToMerge.includes(f.paidByOwner));
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < affected.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        affected.slice(i, i + CHUNK_SIZE).forEach(f => { batch.update(doc(db, 'financials', f.id), { paidByOwner: canonical, updatedAt: serverTimestamp() }); });
+        await batch.commit();
+      }
+      logAdminAction('financials_payers_merged', 'financials', null, null, `${[...mergeSelectedNames].join(', ')} → ${canonical} (${affected.length} entries)`);
+      closeModal('merge-payers-modal');
+      await loadFinancials();
+      alert(t('mergePayers.mergedSuccess').replace('{n}', affected.length).replace('{canonical}', canonical));
+    } catch (e) {
+      showAlert('merge-payers-alert', t('common.errorPrefix') + e.message);
+    }
+    btn.disabled = false; btn.textContent = t('mergePayers.confirmMerge');
+  };
+
   window.filterFinancials=()=>{
-    const prop=document.getElementById('fin-filter-prop').value,type=document.getElementById('fin-filter-type').value,year=document.getElementById('fin-filter-year').value;
+    const prop=document.getElementById('fin-filter-prop').value,type=document.getElementById('fin-filter-type').value,year=document.getElementById('fin-filter-year').value,payer=document.getElementById('fin-filter-payer').value;
     let filtered=allFinancials;
     if(prop) filtered=filtered.filter(f=>f.propertyId===prop);
     if(type) filtered=filtered.filter(f=>f.type===type);
     if(year) filtered=filtered.filter(f=>f.date?.startsWith(year));
+    if(payer) filtered=filtered.filter(f=>f.paidByOwner===payer);
     renderFinancials(filtered);
   };
   function formatFinAmount(amount, currency) {
