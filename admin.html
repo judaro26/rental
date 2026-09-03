@@ -284,10 +284,11 @@
           </div>
         </div>
         <div id="country-coverage-banner" class="hidden" style="margin:0 20px 16px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:12px 16px;font-size:12px;color:#92400E;"></div>
+        <p style="font-size:11px;color:var(--slate);margin:0 20px 12px;" data-i18n="properties.reorderHint">Use ▲▼ to set the order properties appear in here and on the public landing page. Clear any search, filter, or column sort first — reordering needs the full, unsorted list to know what "up" and "down" mean.</p>
         <div style="overflow-x:auto;">
           <table class="data-table">
-            <thead><tr><th></th><th data-sort-section="properties" data-sort-col="name" onclick="handleSort('properties','name')" style="cursor:pointer;user-select:none;"><span data-i18n="common.name">Name</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="country" onclick="handleSort('properties','country')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.country">Country</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="address" onclick="handleSort('properties','address')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.address">Address</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="units" onclick="handleSort('properties','units')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.units">Units</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="available" onclick="handleSort('properties','available')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.available">Available</span><span class="sort-arrow"></span></th><th data-i18n="common.actions">Actions</th></tr></thead>
-            <tbody id="properties-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;" data-i18n="common.loading">Loading...</td></tr></tbody>
+            <thead><tr><th data-sort-section="properties" data-sort-col="order" onclick="handleSort('properties','order')" style="cursor:pointer;user-select:none;" data-i18n="properties.order">Order<span class="sort-arrow"></span></th><th></th><th data-sort-section="properties" data-sort-col="name" onclick="handleSort('properties','name')" style="cursor:pointer;user-select:none;"><span data-i18n="common.name">Name</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="country" onclick="handleSort('properties','country')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.country">Country</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="address" onclick="handleSort('properties','address')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.address">Address</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="units" onclick="handleSort('properties','units')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.units">Units</span><span class="sort-arrow"></span></th><th data-sort-section="properties" data-sort-col="available" onclick="handleSort('properties','available')" style="cursor:pointer;user-select:none;"><span data-i18n="properties.available">Available</span><span class="sort-arrow"></span></th><th data-i18n="common.actions">Actions</th></tr></thead>
+            <tbody id="properties-tbody"><tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;" data-i18n="common.loading">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -2661,6 +2662,8 @@
       'properties.closeHint':'You can close this anytime — click "Close" above, click outside this box, or press the Escape key. Nothing is saved until you click "Save Property" below.',
       'properties.title':'Manage Properties', 'properties.add':'+ Add Property', 'properties.country':'Country *',
       'properties.address':'Address *', 'properties.units':'Units', 'properties.available':'Available',
+      'properties.order':'Order', 'properties.reorderDisabledHint':'Clear search, filters, and other column sorts to reorder properties',
+      'properties.reorderHint':'Use ▲▼ to set the order properties appear in here and on the public landing page. Clear any search, filter, or column sort first — reordering needs the full, unsorted list to know what "up" and "down" mean.',
       'properties.imageUrl':'Image URL', 'properties.modalAddTitle':'Add Property', 'properties.modalEditTitle':'Edit Property',
       'properties.boldTitle':'💳 Bold Payment Settings', 'properties.boldApiKey':'API Key', 'properties.boldApiKeyPlaceholder':'Your Bold integration key',
       'properties.boldSecretKey':'Secret Key', 'properties.boldSecretPlaceholder':'Your Bold webhook signing key',
@@ -3186,6 +3189,8 @@
       'properties.closeHint':'Puedes cerrar esto en cualquier momento — haz clic en "Cerrar" arriba, haz clic fuera de este cuadro, o presiona la tecla Escape. Nada se guarda hasta que hagas clic en "Guardar Propiedad" abajo.',
       'properties.title':'Administrar Propiedades', 'properties.add':'+ Agregar Propiedad', 'properties.country':'País *',
       'properties.address':'Dirección *', 'properties.units':'Unidades', 'properties.available':'Disponible',
+      'properties.order':'Orden', 'properties.reorderDisabledHint':'Borra la búsqueda, los filtros y otros ordenamientos de columnas para reorganizar las propiedades',
+      'properties.reorderHint':'Usa ▲▼ para definir el orden en que aparecen las propiedades aquí y en la página pública de inicio. Primero borra cualquier búsqueda, filtro u ordenamiento de columna — reordenar necesita la lista completa y sin ordenar para saber qué significan "arriba" y "abajo".',
       'properties.imageUrl':'URL de Imagen', 'properties.modalAddTitle':'Agregar Propiedad', 'properties.modalEditTitle':'Editar Propiedad',
       'properties.boldTitle':'💳 Configuración de Pagos Bold', 'properties.boldApiKey':'Clave API', 'properties.boldApiKeyPlaceholder':'Tu clave de integración de Bold',
       'properties.boldSecretKey':'Clave Secreta', 'properties.boldSecretPlaceholder':'Tu clave secreta de webhook de Bold',
@@ -3376,6 +3381,20 @@
     const snap = await getDocs(collection(db,'properties'));
     let props = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     if (isRestrictedAdmin()) props = props.filter(p => p.country === CURRENT_ADMIN.allowedCountry);
+    // Default view order follows the admin's manual arrangement (the ▲▼
+    // controls in the table). Properties that have never been touched by
+    // those controls have no displayOrder yet — they fall to the end,
+    // alphabetically among themselves, rather than in Firestore's
+    // arbitrary return order. This same sort is why every dropdown built
+    // from allProperties (tenant edit, announcement filter, etc.) picks up
+    // the admin's arrangement automatically, with no separate change needed.
+    props.sort((a, b) => {
+      const ao = a.displayOrder, bo = b.displayOrder;
+      if (ao != null && bo != null) return ao - bo;
+      if (ao != null) return -1;
+      if (bo != null) return 1;
+      return (a.name || '').localeCompare(b.name || '');
+    });
     allProperties = props;
     renderPropertiesTable();
     populatePropertySelects();
@@ -3412,15 +3431,32 @@
   function renderPropertiesTable(list) {
     const properties = list || allProperties;
     const tbody = document.getElementById('properties-tbody');
-    if (!allProperties.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No properties yet.</td></tr>'; return; }
-    if (!properties.length) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No properties match your search.</td></tr>'; return; }
+    if (!allProperties.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">No properties yet.</td></tr>'; return; }
+    if (!properties.length) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">No properties match your search.</td></tr>'; return; }
+    const reorderable = !hasActivePropertyFilterOrSort();
+    const disabledTitle = t('properties.reorderDisabledHint');
     tbody.innerHTML = properties.map(p => {
+      // Up/down state is based on position in the canonical, unfiltered
+      // allProperties order — not the (possibly filtered) `properties`
+      // list being rendered — since displayOrder always operates on the
+      // full set. Buttons are disabled outright while any search, filter,
+      // or column sort is active, since "up" and "down" would be
+      // ambiguous relative to properties currently out of view.
+      const idx = allProperties.findIndex(x => x.id === p.id);
+      const atTop = idx <= 0, atBottom = idx >= allProperties.length - 1;
+      const upDisabled = !reorderable || atTop;
+      const downDisabled = !reorderable || atBottom;
+      const orderCell = `<td style="white-space:nowrap;">
+          <button onclick="moveProperty('${p.id}',-1)" ${upDisabled?'disabled':''} title="${reorderable?'':disabledTitle}" class="btn btn-sm btn-outline" style="padding:2px 7px;${upDisabled?'opacity:0.35;cursor:not-allowed;':''}">▲</button>
+          <button onclick="moveProperty('${p.id}',1)" ${downDisabled?'disabled':''} title="${reorderable?'':disabledTitle}" class="btn btn-sm btn-outline" style="padding:2px 7px;${downDisabled?'opacity:0.35;cursor:not-allowed;':''}">▼</button>
+        </td>`;
       const thumbUrl = (p.imageUrls && p.imageUrls[0]) || p.imageUrl || '';
       const thumb = `<div style="width:52px;height:52px;position:relative;">
           <img src="${thumbUrl}" alt="${p.name}" style="width:52px;height:52px;object-fit:cover;border-radius:3px;border:1px solid var(--border);display:${thumbUrl ? 'block' : 'none'};" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
           <div style="display:${thumbUrl ? 'none' : 'flex'};width:52px;height:52px;border-radius:3px;background:#F3F4F6;align-items:center;justify-content:center;font-size:18px;position:absolute;top:0;left:0;">🏠</div>
         </div>`;
       return `<tr>
+      ${orderCell}
       <td>${thumb}</td>
       <td><strong>${p.name}</strong><div style="font-size:10px;color:var(--slate);margin-top:2px;">${(p.reminders||[]).filter(r=>r.enabled!==false).length ? t('properties.remindersCount').replace('{count}', (p.reminders||[]).filter(r=>r.enabled!==false).length) : ''}</div></td>
       <td>${countryCell(p)}</td>
@@ -3484,6 +3520,7 @@
   const PROPERTY_SORT_ACCESSORS = {
     name: p => p.name || '', country: p => p.country || '', address: p => p.address || '',
     units: p => Number(p.units) || 0, available: p => p.available ? 1 : 0,
+    order: p => p.displayOrder ?? Number.MAX_SAFE_INTEGER,
   };
   const TENANT_SORT_ACCESSORS = {
     name: t => `${t.firstName||''} ${t.lastName||''}`, email: t => t.email || '',
@@ -3527,6 +3564,46 @@
     else if (boldFilter === 'not-configured') list = list.filter(p => p.boldPaymentsEnabled !== true);
     list = applySort(list, 'properties', PROPERTY_SORT_ACCESSORS);
     renderPropertiesTable(list);
+  };
+
+  // True while any search, dropdown filter, or non-order column sort is
+  // active — the state in which "move up/down" would be ambiguous, since
+  // it would be relative to properties currently out of view. Sorting by
+  // the Order column itself doesn't count, since that already shows the
+  // full manual arrangement the buttons operate on.
+  function hasActivePropertyFilterOrSort() {
+    const q = document.getElementById('property-search').value.trim();
+    const countryFilter = document.getElementById('property-country-filter').value;
+    const availFilter = document.getElementById('property-avail-filter').value;
+    const boldFilter = document.getElementById('property-bold-filter').value;
+    const sortCol = sortState.properties && sortState.properties.column;
+    const nonOrderSortActive = sortCol && sortCol !== 'order';
+    return !!(q || countryFilter || availFilter || boldFilter || nonOrderSortActive);
+  }
+
+  // Swaps a property with its neighbor in the full, unfiltered order and
+  // persists displayOrder for the whole list via a batch — simpler and
+  // more robust than trying to patch just the two swapped values, since it
+  // also lazily fills in displayOrder for any property that never had one
+  // (e.g. everything, the first time this feature is used).
+  window.moveProperty = async (id, direction) => {
+    if (hasActivePropertyFilterOrSort()) return; // UI already disables the buttons in this state; defensive backstop
+    const idx = allProperties.findIndex(p => p.id === id);
+    const swapIdx = idx + direction;
+    if (idx === -1 || swapIdx < 0 || swapIdx >= allProperties.length) return;
+    const reordered = [...allProperties];
+    [reordered[idx], reordered[swapIdx]] = [reordered[swapIdx], reordered[idx]];
+    try {
+      const batch = writeBatch(db);
+      let changedCount = 0;
+      reordered.forEach((p, i) => {
+        if (p.displayOrder !== i) { batch.update(doc(db,'properties',p.id), { displayOrder: i }); changedCount++; }
+      });
+      if (changedCount) await batch.commit();
+      await loadProperties();
+    } catch (e) {
+      alert('Could not reorder properties: ' + e.message);
+    }
   };
 
   // Finds the next occurrence (today or later) of a reminder rule's due day —
