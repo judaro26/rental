@@ -467,6 +467,17 @@
         if (!VISITOR_COUNTRY || !c) return true;
         return c === VISITOR_COUNTRY;
       });
+      // Reflects the admin's manual arrangement (set via the ▲▼ controls in
+      // admin.html); properties never touched by those controls have no
+      // displayOrder yet and fall to the end, alphabetically among
+      // themselves, rather than Firestore's arbitrary return order.
+      visibleDocs.sort((a, b) => {
+        const ao = a.data().displayOrder, bo = b.data().displayOrder;
+        if (ao != null && bo != null) return ao - bo;
+        if (ao != null) return -1;
+        if (bo != null) return 1;
+        return (a.data().name || '').localeCompare(b.data().name || '');
+      });
 
       if (snap.empty || visibleDocs.length === 0) {
         grid.classList.add('hidden'); empty.classList.remove('hidden');
