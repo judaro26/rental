@@ -63,7 +63,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { title, message, propertyId, propertyName, siteName, tenantIds, urgent, sms } = body;
+  const { title, message, propertyId, propertyName, siteName, tenantIds, urgent, sms, whatsapp } = body;
   if (!title || !message) {
     return { statusCode: 400, body: JSON.stringify({ error: 'title and message are required' }) };
   }
@@ -95,7 +95,7 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ sent: 0, reason: 'No matching tenants found' }) };
     }
 
-    let emailSent = 0, emailFailed = 0, smsSent = 0, smsFailed = 0;
+    let emailSent = 0, emailFailed = 0, smsSent = 0, smsFailed = 0, whatsappSent = 0, whatsappFailed = 0;
 
     // Email — independent of SMS; only attempted if SMTP is actually configured.
     if (process.env.SMTP_HOST) {
@@ -149,7 +149,41 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 200, body: JSON.stringify({ success: true, sent: emailSent, failed: emailFailed, smsSent, smsFailed }) };
+    // WhatsApp — independent of email and SMS; only attempted if explicitly
+    // requested AND a provider is actually configured. WhatsApp requires a
+    // pre-approved template (see _lib/send-whatsapp.js), so unlike SMS the
+    // message text can't be built freely here — it's filled into the
+    // template's two placeholders instead: {{1}} for the announcement
+    // title, {{2}} for the body. Reuses the exact same sendWhatsApp() core
+    // the WhatsApp integration's own test action uses.
+    if (whatsapp) {
+      const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
+      const activeWhatsappId = activeSnap.exists ? activeSnap.data().whatsapp : null;
+      const providerSnap = activeWhatsappId ? await db.collection('integrationSecrets').doc(activeWhatsappId).get() : null;
+      const whatsappProvider = providerSnap?.exists ? providerSnap.data() : null;
+
+      if (whatsappProvider) {
+        const { sendWhatsApp } = require('./_lib/send-whatsapp');
+        const whatsappTitle = `${urgent ? '🚨 URGENT' : '📢'} ${title}`;
+        for (const tenant of tenants) {
+          if (!tenant.phone) continue;
+          try {
+            await sendWhatsApp({
+              accountSid: whatsappProvider.accountSid, authToken: whatsappProvider.authToken,
+              fromNumber: whatsappProvider.fromNumber, contentSid: whatsappProvider.contentSid,
+              contentVariables: { '1': whatsappTitle, '2': message },
+              to: tenant.phone,
+            });
+            whatsappSent++;
+          } catch (e) {
+            console.warn(`Failed to WhatsApp ${tenant.phone}:`, e.message);
+            whatsappFailed++;
+          }
+        }
+      }
+    }
+
+    return { statusCode: 200, body: JSON.stringify({ success: true, sent: emailSent, failed: emailFailed, smsSent, smsFailed, whatsappSent, whatsappFailed }) };
   } catch (err) {
     console.error('announce-notify error:', err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
