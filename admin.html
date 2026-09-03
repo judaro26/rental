@@ -8,6 +8,7 @@
   <link rel="icon" href="/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
   <meta name="theme-color" content="#1A1A2E">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="RentBay Admin">
@@ -2533,6 +2534,9 @@
       'properties.enterValidPercentage':'Enter a valid percentage (0-100) for "{name}".',
       'properties.percentagesMustAddUp':'Ownership percentages must add up to 100% (currently {total}%).',
       'properties.ownersSaved':'Owners saved.',
+      'properties.ownerEmailPlaceholder':'Owner email (for portal invite)', 'properties.inviteToPortal':'Invite to Portal',
+      'properties.ownerNameRequiredForInvite':'Enter this owner\'s name first.', 'properties.ownerEmailRequiredForInvite':'Enter an email address to send the invite to.',
+      'properties.inviteSent':'✓ Invitation sent to {email}.',
       'properties.testReminder':'Send Test', 'properties.testSentTo':'Test sent to {email}. Check your inbox.',
       'properties.reminderLanguage':'Language this reminder is sent in',
       'settings.reminderTemplateTitle':'📧 Reminder Email Template',
@@ -3021,6 +3025,9 @@
       'properties.enterValidPercentage':'Ingresa un porcentaje válido (0-100) para "{name}".',
       'properties.percentagesMustAddUp':'Los porcentajes de propiedad deben sumar 100% (actualmente {total}%).',
       'properties.ownersSaved':'Propietarios guardados.',
+      'properties.ownerEmailPlaceholder':'Correo del propietario (para invitación al portal)', 'properties.inviteToPortal':'Invitar al Portal',
+      'properties.ownerNameRequiredForInvite':'Ingresa primero el nombre de este propietario.', 'properties.ownerEmailRequiredForInvite':'Ingresa un correo electrónico para enviar la invitación.',
+      'properties.inviteSent':'✓ Invitación enviada a {email}.',
       'properties.testReminder':'Enviar Prueba', 'properties.testSentTo':'Prueba enviada a {email}. Revisa tu correo.',
       'properties.reminderLanguage':'Idioma en que se envía este recordatorio',
       'settings.reminderTemplateTitle':'📧 Plantilla de Correo de Recordatorios',
@@ -8236,10 +8243,17 @@
       list.innerHTML = `<p style="font-size:12px;color:var(--slate);">${t('properties.noOwnersYet')}</p>`;
     } else {
       list.innerHTML = currentOwners.map((o, idx) => `
-        <div style="display:flex;gap:6px;align-items:center;">
-          <input type="text" value="${(o.name||'').replace(/"/g,'&quot;')}" placeholder="${t('properties.ownerNamePlaceholder')}" class="form-input" style="flex:2;" oninput="updateOwnerField(${idx},'name',this.value)">
-          <input type="number" value="${o.percentage!=null?o.percentage:''}" placeholder="%" min="0" max="100" step="0.01" class="form-input" style="width:80px;" oninput="updateOwnerField(${idx},'percentage',parseFloat(this.value)||0)">
-          <button type="button" onclick="removeOwnerRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="${t('properties.remove')}">×</button>
+        <div style="border-bottom:1px solid #F3F4F6;padding-bottom:8px;margin-bottom:4px;">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <input type="text" value="${(o.name||'').replace(/"/g,'&quot;')}" placeholder="${t('properties.ownerNamePlaceholder')}" class="form-input" style="flex:2;" oninput="updateOwnerField(${idx},'name',this.value)">
+            <input type="number" value="${o.percentage!=null?o.percentage:''}" placeholder="%" min="0" max="100" step="0.01" class="form-input" style="width:80px;" oninput="updateOwnerField(${idx},'percentage',parseFloat(this.value)||0)">
+            <button type="button" onclick="removeOwnerRow(${idx})" style="background:none;border:none;cursor:pointer;color:#9CA3AF;font-size:16px;padding:0 4px;" title="${t('properties.remove')}">×</button>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;">
+            <input type="email" value="${(o.email||'').replace(/"/g,'&quot;')}" placeholder="${t('properties.ownerEmailPlaceholder')}" class="form-input" style="flex:1;font-size:12px;" oninput="updateOwnerField(${idx},'email',this.value)">
+            <button type="button" onclick="inviteOwnerToPortal(${idx})" class="btn btn-sm btn-outline" style="white-space:nowrap;font-size:11px;" id="owner-invite-btn-${idx}">${t('properties.inviteToPortal')}</button>
+          </div>
+          <div id="owner-invite-status-${idx}" style="font-size:11px;margin-top:4px;"></div>
         </div>
       `).join('');
     }
@@ -8264,6 +8278,41 @@
   window.removeOwnerRow = (idx) => {
     currentOwners.splice(idx, 1);
     renderOwnerRows(currentOwners);
+  };
+  window.inviteOwnerToPortal = async (idx) => {
+    const owner = currentOwners[idx]; if (!owner) return;
+    const statusEl = document.getElementById(`owner-invite-status-${idx}`);
+    if (!owner.name || !owner.name.trim()) { statusEl.style.color = '#DC2626'; statusEl.textContent = t('properties.ownerNameRequiredForInvite'); return; }
+    if (!owner.email || !owner.email.trim()) { statusEl.style.color = '#DC2626'; statusEl.textContent = t('properties.ownerEmailRequiredForInvite'); return; }
+    const propertyId = document.getElementById('prop-id').value;
+    if (!propertyId) return;
+    const btn = document.getElementById(`owner-invite-btn-${idx}`);
+    btn.disabled = true; const original = btn.textContent; btn.textContent = t('common.sending');
+    statusEl.textContent = '';
+    try {
+      // Persist the current owners list (with this email) first, so the
+      // invite always matches what's actually saved — bypasses the
+      // percentage-must-sum-to-100 rule since that's a concern for the
+      // separate "Save Owners" action, not for sending an invite.
+      const cleanedOwners = currentOwners.filter(o => o.name && o.name.trim());
+      await updateDoc(doc(db, 'properties', propertyId), { owners: cleanedOwners, updatedAt: serverTimestamp() });
+      const propIdx = allProperties.findIndex(p => p.id === propertyId);
+      if (propIdx !== -1) allProperties[propIdx].owners = cleanedOwners;
+
+      let siteName = ''; try { const s = await getDoc(doc(db, 'settings', 'site')); siteName = s.data()?.siteName || ''; } catch {}
+      const res = await authedFetch('/api/invite-owner', {
+        email: owner.email.trim(), name: owner.name.trim(),
+        propertyId, propertyName: allProperties.find(p => p.id === propertyId)?.name || '',
+        ownerName: owner.name.trim(), siteName,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      logAdminAction('owner_invited', 'property', propertyId, allProperties.find(p => p.id === propertyId)?.name, `Invited ${owner.email} as ${owner.name}`);
+      statusEl.style.color = '#16A34A'; statusEl.textContent = t('properties.inviteSent').replace('{email}', owner.email);
+    } catch (e) {
+      statusEl.style.color = '#DC2626'; statusEl.textContent = t('common.errorPrefix') + e.message;
+    }
+    btn.disabled = false; btn.textContent = original;
   };
   window.savePropertyOwners = async () => {
     const propertyId = document.getElementById('prop-id').value;
