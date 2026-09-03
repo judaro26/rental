@@ -141,19 +141,19 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
       <span data-i18n="nav.invoices">Invoices</span>
     </button>
-    <button class="nav-item" data-role="super_admin" onclick="switchSection('audit',this)">
+    <button class="nav-item" onclick="switchSection('audit',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
       <span data-i18n="nav.audit">Audit Log</span>
     </button>
-    <button class="nav-item" data-role="super_admin" onclick="switchSection('support',this)">
+    <button class="nav-item" onclick="switchSection('support',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span data-i18n="nav.support">Support</span>
     </button>
-    <button class="nav-item" data-role="super_admin" onclick="switchSection('consents',this)">
+    <button class="nav-item" onclick="switchSection('consents',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       <span data-i18n="nav.consents">Consents</span>
     </button>
-    <button class="nav-item" data-role="super_admin" onclick="switchSection('features',this)">
+    <button class="nav-item" onclick="switchSection('features',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <span data-i18n="nav.features">Feature Requests</span>
     </button>
@@ -161,7 +161,7 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       <span data-i18n="nav.financials">Financials</span>
     </button>
-    <button class="nav-item" data-role="super_admin" onclick="switchSection('vendors',this)">
+    <button class="nav-item" onclick="switchSection('vendors',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       <span data-i18n="nav.vendors">Vendors</span>
     </button>
@@ -660,7 +660,7 @@
         </div>
       </div>
 
-      <div class="card" style="margin-top:16px;">
+      <div class="card" data-role="super_admin" style="margin-top:16px;">
         <div class="card-header">
           <h3 style="font-size:1.2rem;font-weight:500;" data-i18n="audit.adminLogTitle">Admin Activity Audit Log</h3>
           <button onclick="loadAdminAuditLog()" class="btn btn-sm" style="background:#F3F4F6;color:#374151;border:none;white-space:nowrap;" data-i18n="applications.refresh">↺ Refresh</button>
@@ -2075,6 +2075,20 @@
     if (scope === null) return list;
     return list.filter(item => item.propertyId ? scope.has(item.propertyId) : allowGlobal);
   }
+  // For collections that only store tenantId, not propertyId directly
+  // (supportMessages, featureRequests) - looks up each tenant's property
+  // via allTenants to determine scope. A record whose tenant can't be
+  // resolved is excluded rather than shown, since its scope can't be
+  // verified either way.
+  function scopeByCountryViaTenant(list) {
+    const scope = getScopedPropertyIds();
+    if (scope === null) return list;
+    return list.filter(item => {
+      if (!item.tenantId) return false;
+      const tenant = allTenants.find(t => t.id === item.tenantId);
+      return tenant?.propertyId ? scope.has(tenant.propertyId) : false;
+    });
+  }
 
   function applyAdminRoleUI() {
     const restricted = isRestrictedAdmin();
@@ -3185,7 +3199,13 @@
     // in allProperties, so loading them in parallel with properties would
     // race and (for a restricted admin) briefly scope against an empty set.
     await loadProperties();
-    await Promise.all([loadTenants(), loadApplications(), loadPayments(), loadDocuments(), loadMaintenance(),
+    // Tenants load next, also awaited on its own: loadSupport and
+    // loadFeatures scope by looking up each record's tenant to find its
+    // property (those collections don't store propertyId directly), so
+    // running them in parallel with loadTenants would risk the same
+    // empty-set race for a restricted admin.
+    await loadTenants();
+    await Promise.all([loadApplications(), loadPayments(), loadDocuments(), loadMaintenance(),
       loadAnnouncements(), loadSettings(), loadInvites(), loadSupport(), loadInvoices(),
       loadFinancials(), loadVendors(), loadConsents(), loadFeatures(), loadInvoiceReminders(), loadDisclosures()]);
     if (!isRestrictedAdmin()) await loadAdmins();
@@ -5712,7 +5732,7 @@
     try {
       let q = query(collection(db,'auditLogs'),orderBy('timestamp','desc'),...(window._auditLastDoc?[startAfter(window._auditLastDoc)]:[]),limit(AUDIT_PAGE));
       const snap = await getDocs(q);
-      const docs = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      const docs = scopeByCountry(snap.docs.map(d=>({ id:d.id, ...d.data() })));
       allAuditLogs = reset ? docs : [...allAuditLogs,...docs];
       window._auditLastDoc = snap.docs[snap.docs.length-1]||null;
       document.getElementById('audit-load-more').style.display = snap.docs.length===AUDIT_PAGE?'':'none';
@@ -5815,7 +5835,7 @@
   async function loadSupport() {
     try {
       const snap = await getDocs(query(collection(db,'supportMessages'), orderBy('createdAt','desc')));
-      allSupport = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      allSupport = scopeByCountryViaTenant(snap.docs.map(d=>({ id:d.id, ...d.data() })));
       renderSupportTable();
     } catch(e) { console.error('loadSupport:',e); }
   }
@@ -5849,7 +5869,7 @@
   async function loadConsents() {
     try {
       const snap = await getDocs(query(collection(db,'paymentConsents'), orderBy('createdAt','desc')));
-      allConsents = snap.docs.map(d=>({id:d.id,...d.data()}));
+      allConsents = scopeByCountry(snap.docs.map(d=>({id:d.id,...d.data()})));
       renderConsents(allConsents);
     } catch(e) { console.error('loadConsents:',e); }
   }
@@ -5909,7 +5929,7 @@
   async function loadFeatures() {
     try {
       const snap=await getDocs(query(collection(db,'featureRequests'),orderBy('createdAt','desc')));
-      allFeatures=snap.docs.map(d=>({id:d.id,...d.data()}));
+      allFeatures=scopeByCountryViaTenant(snap.docs.map(d=>({id:d.id,...d.data()})));
       renderFeatures(allFeatures);
     } catch(e){console.error('loadFeatures:',e);}
   }
@@ -6772,10 +6792,10 @@
   async function loadVendors() {
     try {
       const snap=await getDocs(query(collection(db,'vendors'),orderBy('name','asc')));
-      allVendors=snap.docs.map(d=>({id:d.id,...d.data()}));
+      allVendors=scopeByCountry(snap.docs.map(d=>({id:d.id,...d.data()})), { allowGlobal: true });
       renderVendors(allVendors);
       const vprop=document.getElementById('vendor-filter-prop');
-      if(vprop) vprop.innerHTML='<option value="">All Properties</option>'+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+      if(vprop) vprop.innerHTML=`<option value="">${t('common.allProperties')}</option>`+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
     } catch(e){console.error('loadVendors:',e);}
   }
   window.filterVendors=()=>{
