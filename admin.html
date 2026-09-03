@@ -89,6 +89,12 @@
     @keyframes spin { to { transform:rotate(360deg); } }
     #mobile-toggle { display:none; }
     @media (max-width:768px) { #sidebar { transform:translateX(-100%); transition:transform 0.3s; } #sidebar.open { transform:translateX(0); } #main { margin-left:0; } .content { padding:20px 16px; } #mobile-toggle { display:block; } }
+    @media print {
+      body * { visibility:hidden; }
+      #settlement-report-modal, #settlement-report-modal * { visibility:visible; }
+      #settlement-report-modal { position:absolute; top:0; left:0; width:100%; max-height:none; overflow:visible; box-shadow:none; }
+      .no-print { display:none !important; }
+    }
   </style>
 </head>
 <body>
@@ -552,6 +558,7 @@
               <option value="" data-i18n="invoices.all">All</option><option value="invoice" data-i18n="invoices.invoices">Invoices</option><option value="receipt" data-i18n="invoices.receipts">Receipts</option>
               <option value="draft" data-i18n="invoices.drafts">Drafts</option><option value="sent" data-i18n="invoices.filterPending">Pending</option><option value="paid" data-i18n="payments.paid">Paid</option><option value="overdue" data-i18n="invoices.overdue">Overdue</option>
             </select>
+            <button onclick="remindAllOverdue()" id="remind-all-btn" class="btn btn-outline" data-i18n="invoices.remindAllOverdue">🔔 Remind All Overdue</button>
             <button onclick="openInvoiceModal()" class="btn btn-primary" data-i18n="invoices.newInvoice">+ New Invoice</button>
           </div>
         </div>
@@ -742,6 +749,7 @@
             <button onclick="openImportCsvModal()" class="btn btn-outline" data-i18n="financials.importCsv">Import CSV</button>
             <button onclick="syncIncomeFromPayments()" class="btn btn-outline" id="fin-sync-income-btn" data-i18n="financials.syncIncome">Sync Income from Payments</button>
             <button onclick="openMergePayersModal()" class="btn btn-outline" data-i18n="financials.mergePayerNames">🔀 Merge Payer Names</button>
+            <button onclick="openSettlementReportModal()" class="btn btn-outline" data-i18n="financials.settlementReport">📄 Settlement Report</button>
             <button onclick="openFinancialModal()" class="btn btn-primary" data-i18n="financials.addEntry">+ Add Entry</button>
           </div>
         </div>
@@ -1457,6 +1465,24 @@
         <button onclick="closeModal('merge-payers-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- SETTLEMENT REPORT MODAL -->
+<div id="settlement-report-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('settlement-report-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:720px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('settlement-report-modal')" class="no-print" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:6px;" data-i18n="settlement.title">Ownership Settlement Report</h3>
+    <p style="font-size:13px;color:var(--slate);margin-bottom:18px;" data-i18n="settlement.subtitle">A per-owner financial breakdown for a property and period, to use as the basis for an actual distribution between owners.</p>
+
+    <div class="no-print" style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+      <select id="settlement-prop" class="form-input" style="flex:1;min-width:180px;" onchange="renderSettlementReport()"></select>
+      <select id="settlement-year" class="form-input" style="width:130px;" onchange="renderSettlementReport()"></select>
+      <button onclick="window.print()" class="btn btn-outline" data-i18n="settlement.print">🖨️ Print / Save PDF</button>
+    </div>
+
+    <div id="settlement-report-body"></div>
   </div>
 </div>
 
@@ -2334,6 +2360,11 @@
       'invoices.reminderSentUpcoming':'✓ Reminder sent to {email} (invoice is due in {n} day(s)).',
       'invoices.reminderSentOverdue':'✓ Overdue notice sent to {email} (invoice is {n} day(s) overdue).',
       'invoices.reminderFailed':'Could not send reminder: ',
+      'invoices.remindAllOverdue':'🔔 Remind All Overdue', 'invoices.noOverdueToRemind':'No overdue invoices need a reminder right now — everything overdue was already reminded today, or nothing is overdue.',
+      'invoices.confirmRemindAll':'This will send an overdue notice to {n} tenant(s), right now. Continue?',
+      'invoices.remindingProgress':'Sending {i}/{n}...',
+      'invoices.remindAllResultSuccess':'✓ Sent {sent} overdue notice(s).',
+      'invoices.remindAllResultMixed':'Sent {sent} overdue notice(s); {failed} failed to send. Check individual invoices for details.',
       'invoiceModal.newTitle':'New Invoice', 'invoiceModal.emailHint':'An email will be sent to the tenant with a link to view.',
       'invoiceModal.dueDate':'Due Date', 'invoiceModal.taxRate':'Tax Rate %', 'invoiceModal.notesPlaceholder':'e.g. Payment due by end of month',
       'invoiceModal.lineItems':'Line Items *', 'invoiceModal.addItem':'+ Add Item', 'invoiceModal.qty':'Qty', 'invoiceModal.unitPrice':'Unit $',
@@ -2383,6 +2414,16 @@
       'financials.exportCsv':'Export CSV', 'financials.importCsv':'Import CSV', 'financials.syncIncome':'Sync Income from Payments',
       'financials.addEntry':'+ Add Entry', 'financials.receipt':'Receipt',
       'financials.mergePayerNames':'🔀 Merge Payer Names', 'financials.allPayers':'All Payers',
+      'financials.settlementReport':'📄 Settlement Report',
+      'settlement.title':'Ownership Settlement Report', 'settlement.subtitle':'A per-owner financial breakdown for a property and period, to use as the basis for an actual distribution between owners.',
+      'settlement.print':'🖨️ Print / Save PDF', 'settlement.noEligibleProperties':'No properties with 2+ owners set up yet',
+      'settlement.allTime':'All Time', 'settlement.totalIncome':'Total Income', 'settlement.totalExpenses':'Total Expenses', 'settlement.netOperating':'Net Operating',
+      'settlement.colOwner':'Owner', 'settlement.colOwnership':'Ownership', 'settlement.colFairShareNet':'Fair Share of Net',
+      'settlement.colFronted':'Expenses Fronted', 'settlement.colFairShareExpenses':'Fair Share of Expenses', 'settlement.colExpenseSettlement':'Expense Settlement',
+      'settlement.unspecifiedWarning':'{amount} in expenses for this period have no payer set, so they aren\'t included in any owner\'s "Expenses Fronted" column. Assign a payer to each for a complete picture.',
+      'settlement.explainFairShareNet':'What this owner is entitled to from the property\'s overall performance this period (ownership % × income minus expenses), assuming income and expenses flow through a shared account.',
+      'settlement.explainExpenseSettlement':'Whether this owner personally fronted more or less than their ownership share of total expenses — independent of Fair Share of Net, and the number to use if expenses were paid out-of-pocket rather than from a shared account.',
+      'settlement.notLegalAdvice':'This report is a calculation aid based on the data entered, not a legal or accounting document. Verify figures before using them for an actual distribution.',
       'financials.noPayerSet':'⚠️ No Payer Set ({n})', 'financials.clickToFindThese':'Click to see just these transactions',
       'mergePayers.title':'Merge Payer Names',
       'mergePayers.subtitle':'Combines different spellings of the same person (e.g. "Juan David" and "Juan David Rodriguez") into one name across every expense. This applies everywhere, not just the current property or year filter.',
@@ -2863,6 +2904,11 @@
       'invoices.reminderSentUpcoming':'✓ Recordatorio enviado a {email} (la factura vence en {n} día(s)).',
       'invoices.reminderSentOverdue':'✓ Aviso de vencimiento enviado a {email} (la factura está vencida hace {n} día(s)).',
       'invoices.reminderFailed':'No se pudo enviar el recordatorio: ',
+      'invoices.remindAllOverdue':'🔔 Recordar Todos los Vencidos', 'invoices.noOverdueToRemind':'Ningún pago vencido necesita un recordatorio ahora mismo — todos los vencidos ya recibieron uno hoy, o no hay ninguno vencido.',
+      'invoices.confirmRemindAll':'Esto enviará un aviso de vencimiento a {n} inquilino(s), ahora mismo. ¿Continuar?',
+      'invoices.remindingProgress':'Enviando {i}/{n}...',
+      'invoices.remindAllResultSuccess':'✓ Se enviaron {sent} aviso(s) de vencimiento.',
+      'invoices.remindAllResultMixed':'Se enviaron {sent} aviso(s) de vencimiento; {failed} no se pudieron enviar. Revisa las facturas individuales para más detalles.',
       'invoiceModal.newTitle':'Nueva Factura', 'invoiceModal.emailHint':'Se enviará un correo al inquilino con un enlace para verla.',
       'invoiceModal.dueDate':'Fecha de Vencimiento', 'invoiceModal.taxRate':'Tasa de Impuesto %', 'invoiceModal.notesPlaceholder':'ej. Pago vence a fin de mes',
       'invoiceModal.lineItems':'Conceptos *', 'invoiceModal.addItem':'+ Agregar Concepto', 'invoiceModal.qty':'Cant', 'invoiceModal.unitPrice':'Precio Unit.',
@@ -2912,6 +2958,16 @@
       'financials.exportCsv':'Exportar CSV', 'financials.importCsv':'Importar CSV', 'financials.syncIncome':'Sincronizar Ingresos de Pagos',
       'financials.addEntry':'+ Agregar Entrada', 'financials.receipt':'Recibo',
       'financials.mergePayerNames':'🔀 Combinar Nombres de Pagadores', 'financials.allPayers':'Todos los Pagadores',
+      'financials.settlementReport':'📄 Informe de Liquidación',
+      'settlement.title':'Informe de Liquidación entre Propietarios', 'settlement.subtitle':'Un desglose financiero por propietario para una propiedad y período, para usar como base de una distribución real entre propietarios.',
+      'settlement.print':'🖨️ Imprimir / Guardar PDF', 'settlement.noEligibleProperties':'Aún no hay propiedades con 2+ propietarios configurados',
+      'settlement.allTime':'Todo el Tiempo', 'settlement.totalIncome':'Ingreso Total', 'settlement.totalExpenses':'Gasto Total', 'settlement.netOperating':'Neto Operativo',
+      'settlement.colOwner':'Propietario', 'settlement.colOwnership':'Propiedad', 'settlement.colFairShareNet':'Parte Justa del Neto',
+      'settlement.colFronted':'Gastos Adelantados', 'settlement.colFairShareExpenses':'Parte Justa de Gastos', 'settlement.colExpenseSettlement':'Liquidación de Gastos',
+      'settlement.unspecifiedWarning':'{amount} en gastos de este período no tienen pagador asignado, por lo que no se incluyen en la columna "Gastos Adelantados" de ningún propietario. Asigna un pagador a cada uno para un panorama completo.',
+      'settlement.explainFairShareNet':'Lo que le corresponde a este propietario según el desempeño general de la propiedad en este período (% de propiedad × ingresos menos gastos), asumiendo que los ingresos y gastos pasan por una cuenta compartida.',
+      'settlement.explainExpenseSettlement':'Si este propietario adelantó más o menos que su parte proporcional del total de gastos — independiente de la Parte Justa del Neto, y el número a usar si los gastos se pagaron de su bolsillo en lugar de una cuenta compartida.',
+      'settlement.notLegalAdvice':'Este informe es una ayuda de cálculo basada en los datos ingresados, no un documento legal o contable. Verifica las cifras antes de usarlas para una distribución real.',
       'financials.noPayerSet':'⚠️ Sin Pagador Asignado ({n})', 'financials.clickToFindThese':'Haz clic para ver solo estas transacciones',
       'mergePayers.title':'Combinar Nombres de Pagadores',
       'mergePayers.subtitle':'Combina diferentes formas de escribir el nombre de la misma persona (ej. "Juan David" y "Juan David Rodríguez") en un solo nombre en todos los gastos. Esto aplica en todas partes, no solo en el filtro actual de propiedad o año.',
@@ -5992,6 +6048,46 @@
       btnEl.disabled = false; btnEl.textContent = original;
     }
   };
+  // Same eligibility as the per-row 🔔 button (unpaid, non-draft, real
+  // invoice, has an email and due date), narrowed to genuinely overdue —
+  // "remind all overdue" shouldn't also nag tenants whose invoice isn't
+  // due yet. Additionally skips anything already reminded today (manual
+  // or scheduled), so re-running this later the same day — or running it
+  // after already clicking a few individual 🔔 buttons — doesn't double
+  // up. Sends sequentially through the same per-invoice endpoint the row
+  // button uses, rather than a separate bulk endpoint, so there's exactly
+  // one send path to keep correct as reminder logic evolves.
+  function getOverdueUnremindedToday() {
+    const todayStr = new Date().toDateString();
+    const today = new Date(todayStr);
+    return allInvoices.filter(inv => {
+      if (inv.type !== 'invoice' || inv.status === 'paid' || inv.status === 'draft') return false;
+      if (!inv.tenantEmail || !inv.dueDate) return false;
+      const due = new Date(inv.dueDate + 'T00:00:00');
+      if (due >= today) return false; // not overdue yet
+      const remindedToday = (inv.remindersSent || []).some(r => r.sentAt && new Date(r.sentAt).toDateString() === todayStr);
+      return !remindedToday;
+    });
+  }
+  window.remindAllOverdue = async () => {
+    const targets = getOverdueUnremindedToday();
+    if (!targets.length) { alert(t('invoices.noOverdueToRemind')); return; }
+    if (!confirm(t('invoices.confirmRemindAll').replace('{n}', targets.length))) return;
+    const btn = document.getElementById('remind-all-btn');
+    btn.disabled = true;
+    let sent = 0, failed = 0;
+    for (const [i, inv] of targets.entries()) {
+      btn.textContent = t('invoices.remindingProgress').replace('{i}', i + 1).replace('{n}', targets.length);
+      try {
+        const res = await authedFetch('/api/send-invoice-reminder-now', { invoiceId: inv.id });
+        if (!res.ok) throw new Error();
+        sent++;
+      } catch { failed++; }
+    }
+    btn.disabled = false; btn.textContent = t('invoices.remindAllOverdue');
+    alert(failed ? t('invoices.remindAllResultMixed').replace('{sent}', sent).replace('{failed}', failed) : t('invoices.remindAllResultSuccess').replace('{sent}', sent));
+    loadInvoices();
+  };
   window.deleteInvoice = async (invoiceId) => {
     if (!confirm(t('invoiceModal.confirmDelete'))) return;
     try { await deleteDoc(doc(db,'invoices',invoiceId)); loadInvoices(); } catch(e) { alert(t('common.errorPrefix')+e.message); }
@@ -6693,6 +6789,106 @@
     document.getElementById('fin-filter-payer').value = '__unspecified__';
     filterFinancials();
     document.getElementById('financials-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  window.openSettlementReportModal = () => {
+    const propSel = document.getElementById('settlement-prop');
+    // Only properties with 2+ owners actually have anything to settle —
+    // matches the same gate the inline owner breakdown and catch-up
+    // tracker already use elsewhere in this section.
+    const eligible = allProperties.filter(p => Array.isArray(p.owners) && p.owners.length >= 2);
+    propSel.innerHTML = eligible.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    if (!eligible.length) { propSel.innerHTML = `<option value="">${t('settlement.noEligibleProperties')}</option>`; }
+    // Default to whatever's already selected in the main Financials property
+    // filter, if it's one of the eligible ones — saves a redundant re-pick
+    // for the common case of "I was just looking at this property's financials."
+    const currentFinProp = document.getElementById('fin-filter-prop').value;
+    if (eligible.some(p => p.id === currentFinProp)) propSel.value = currentFinProp;
+    openModal('settlement-report-modal');
+    renderSettlementReport();
+  };
+
+  function computeSettlementReport(propertyId, year) {
+    const prop = allProperties.find(p => p.id === propertyId);
+    const owners = Array.isArray(prop?.owners) ? prop.owners : [];
+    let items = allFinancials.filter(f => f.propertyId === propertyId);
+    if (year) items = items.filter(f => (f.date || '').startsWith(year));
+
+    const currencies = [...new Set(items.map(i => i.currency || 'USD'))];
+    const income = items.filter(i => i.type === 'income');
+    const expenses = items.filter(i => i.type === 'expense');
+    const totalIncome = income.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+    const totalExpenses = expenses.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+    const netOperating = totalIncome - totalExpenses;
+
+    const spentByOwner = {};
+    for (const e of expenses) {
+      const key = e.paidByOwner || '__unspecified__';
+      spentByOwner[key] = (spentByOwner[key] || 0) + parseFloat(e.amount || 0);
+    }
+    const unspecifiedExpenses = spentByOwner['__unspecified__'] || 0;
+
+    const ownerRows = owners.map(o => {
+      const fronted = spentByOwner[o.name] || 0;
+      const fairShareOfExpenses = totalExpenses * o.percentage / 100;
+      const fairShareOfNet = netOperating * o.percentage / 100;
+      return { name: o.name, percentage: o.percentage, fronted, fairShareOfExpenses, expenseSettlement: fronted - fairShareOfExpenses, fairShareOfNet };
+    });
+
+    return {
+      propertyName: prop?.name || '', hasMultipleCurrencies: currencies.length > 1, currency: currencies[0] || 'USD',
+      totalIncome, totalExpenses, netOperating, ownerRows, unspecifiedExpenses,
+    };
+  }
+
+  window.renderSettlementReport = () => {
+    const propId = document.getElementById('settlement-prop').value;
+    const body = document.getElementById('settlement-report-body');
+    if (!propId) { body.innerHTML = ''; return; }
+
+    const yearSel = document.getElementById('settlement-year');
+    const propYears = [...new Set(allFinancials.filter(f => f.propertyId === propId).map(f => (f.date || '').substring(0, 4)).filter(Boolean))].sort().reverse();
+    const prevYear = yearSel.value;
+    yearSel.innerHTML = `<option value="">${t('financials.allYears')}</option>` + propYears.map(y => `<option value="${y}">${y}</option>`).join('');
+    if (propYears.includes(prevYear)) yearSel.value = prevYear;
+
+    const r = computeSettlementReport(propId, yearSel.value);
+    if (r.hasMultipleCurrencies) {
+      body.innerHTML = `<p style="font-size:12px;color:var(--slate);">${t('financials.mixedCurrencyExplanation')}</p>`;
+      return;
+    }
+    const periodLabel = yearSel.value || t('settlement.allTime');
+    const fmt = v => formatFinAmount(v, r.currency);
+    body.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:3px;padding:16px;margin-bottom:16px;">
+        <h4 style="font-size:1.1rem;font-weight:500;margin:0 0 4px;">${r.propertyName} — ${periodLabel}</h4>
+        <div style="display:flex;gap:24px;margin-top:12px;font-size:13px;">
+          <div><span style="color:var(--slate);">${t('settlement.totalIncome')}</span><br><strong>${fmt(r.totalIncome)}</strong></div>
+          <div><span style="color:var(--slate);">${t('settlement.totalExpenses')}</span><br><strong>${fmt(r.totalExpenses)}</strong></div>
+          <div><span style="color:var(--slate);">${t('settlement.netOperating')}</span><br><strong style="color:${r.netOperating>=0?'#16A34A':'#DC2626'};">${fmt(r.netOperating)}</strong></div>
+        </div>
+      </div>
+      <table class="data-table" style="margin-bottom:14px;">
+        <thead><tr>
+          <th>${t('settlement.colOwner')}</th><th>${t('settlement.colOwnership')}</th>
+          <th>${t('settlement.colFairShareNet')}</th><th>${t('settlement.colFronted')}</th>
+          <th>${t('settlement.colFairShareExpenses')}</th><th>${t('settlement.colExpenseSettlement')}</th>
+        </tr></thead>
+        <tbody>
+          ${r.ownerRows.map(o => `<tr>
+            <td>${o.name}</td><td>${o.percentage}%</td>
+            <td>${fmt(o.fairShareOfNet)}</td><td>${fmt(o.fronted)}</td>
+            <td>${fmt(o.fairShareOfExpenses)}</td>
+            <td style="font-weight:500;color:${o.expenseSettlement>=0?'#16A34A':'#DC2626'};">${o.expenseSettlement>=0?t('financials.owedBack'):t('financials.owes')} ${fmt(Math.abs(o.expenseSettlement))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      ${r.unspecifiedExpenses ? `<p style="font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:8px 12px;margin-bottom:14px;">⚠️ ${t('settlement.unspecifiedWarning').replace('{amount}', fmt(r.unspecifiedExpenses))}</p>` : ''}
+      <p style="font-size:11px;color:var(--slate);line-height:1.6;">
+        <strong>${t('settlement.colFairShareNet')}:</strong> ${t('settlement.explainFairShareNet')}<br>
+        <strong>${t('settlement.colExpenseSettlement')}:</strong> ${t('settlement.explainExpenseSettlement')}
+      </p>
+      <p style="font-size:10px;color:var(--slate);margin-top:10px;">${t('settlement.notLegalAdvice')}</p>`;
   };
 
   // Purchase catch-up tracker: independent of whatever year/type filter is
