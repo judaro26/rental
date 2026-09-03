@@ -2373,7 +2373,7 @@
       'audit.adminActionReactivated':'Admin reactivated', 'audit.noAdminActivity':'No admin activity recorded yet.',
       'audit.totalEvents':'Total Events', 'audit.uniqueTenants':'Unique Tenants', 'audit.sessions':'Sessions',
       'audit.logins':'Logins', 'audit.paymentEvents':'Payment Events',
-      'support.colSubject':'Subject', 'consents.title':'Auto-Pay Consents', 'consents.active':'Active',
+      'support.colSubject':'Subject', 'support.title':'Tenant Support Messages', 'consents.title':'Auto-Pay Consents', 'consents.active':'Active',
       'consents.cancelled':'Cancelled', 'consents.colMethod':'Method', 'consents.colDay':'Day', 'consents.colAuthorized':'Authorized',
       'features.title':'Feature Requests', 'features.new':'New', 'features.underReview':'Under Review',
       'features.planned':'Planned', 'features.completed':'Completed',
@@ -2634,6 +2634,8 @@
       'applications.printBlankHint':'Generate a printable, fill-by-hand application to hand out. Pick a property to include its address and state-specific disclosures, or leave it generic.',
       'applications.genericOption':'— Generic (no specific property) —', 'applications.printForm':'Print Form',
       'maintenance.updateRequestTitle':'Update Request', 'maintenance.adminNotes':'Admin Notes', 'maintenance.visibleToTenant':'(visible to tenant)',
+      'maintenance.title':'Maintenance Requests', 'maintenance.searchPlaceholder':'Search tenant, category...', 'maintenance.colUnit':'Unit',
+      'maintenance.open':'Open', 'maintenance.inProgress':'In Progress', 'maintenance.resolved':'Resolved',
       'maintenance.updateMessagePlaceholder':'Update message for tenant...',
       'payments.recordManualTitle':'Record Manual Payment', 'payments.amountRequired':'Amount ($) *',
       'payments.recordPaymentButton':'Record Payment',
@@ -2900,7 +2902,7 @@
       'audit.adminActionReactivated':'Administrador reactivado', 'audit.noAdminActivity':'Aún no hay actividad de administrador registrada.',
       'audit.totalEvents':'Eventos Totales', 'audit.uniqueTenants':'Inquilinos Únicos', 'audit.sessions':'Sesiones',
       'audit.logins':'Inicios de Sesión', 'audit.paymentEvents':'Eventos de Pago',
-      'support.colSubject':'Asunto', 'consents.title':'Consentimientos de Auto-Pago', 'consents.active':'Activo',
+      'support.colSubject':'Asunto', 'support.title':'Mensajes de Soporte de Inquilinos', 'consents.title':'Consentimientos de Auto-Pago', 'consents.active':'Activo',
       'consents.cancelled':'Cancelado', 'consents.colMethod':'Método', 'consents.colDay':'Día', 'consents.colAuthorized':'Autorizado',
       'features.title':'Solicitudes de Funciones', 'features.new':'Nueva', 'features.underReview':'En Revisión',
       'features.planned':'Planeada', 'features.completed':'Completada',
@@ -3161,6 +3163,8 @@
       'applications.printBlankHint':'Genera una solicitud imprimible, para llenar a mano, para entregar. Elige una propiedad para incluir su dirección y divulgaciones específicas del estado, o déjala genérica.',
       'applications.genericOption':'— Genérica (sin propiedad específica) —', 'applications.printForm':'Imprimir Formulario',
       'maintenance.updateRequestTitle':'Actualizar Solicitud', 'maintenance.adminNotes':'Notas del Administrador', 'maintenance.visibleToTenant':'(visible para el inquilino)',
+      'maintenance.title':'Solicitudes de Mantenimiento', 'maintenance.searchPlaceholder':'Buscar inquilino, categoría...', 'maintenance.colUnit':'Unidad',
+      'maintenance.open':'Abierto', 'maintenance.inProgress':'En Progreso', 'maintenance.resolved':'Resuelto',
       'maintenance.updateMessagePlaceholder':'Mensaje de actualización para el inquilino...',
       'payments.recordManualTitle':'Registrar Pago Manual', 'payments.amountRequired':'Monto ($) *',
       'payments.recordPaymentButton':'Registrar Pago',
@@ -5820,7 +5824,7 @@
   window.openInvoiceModal = () => {
     document.getElementById('invoice-modal-title').textContent=t('invoiceModal.newTitle');
     document.getElementById('inv-submit-btn').textContent=t('invoiceModal.sendInvoice');
-    document.getElementById('inv-alert')?.classList.add('hidden');
+    document.getElementById('invoice-alert')?.classList.add('hidden');
     const sel = document.getElementById('inv-tenant');
     sel.innerHTML='<option value="">Select tenant...</option>'+allTenants.filter(t=>t.status==='active').map(t=>`<option value="${t.id}">${t.firstName} ${t.lastName} — ${t.propertyName||''}${t.unit?' Unit '+t.unit:''}</option>`).join('');
     sel.value='';
