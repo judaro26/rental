@@ -5923,6 +5923,7 @@
     tenant_email_sent: 'audit.adminActionTenantEmailSent',
   };
   window.loadAdminAuditLog = async () => {
+    if (isRestrictedAdmin()) return; // this specific card stays super_admin-only; rules would reject the query anyway
     const tbody = document.getElementById('admin-audit-tbody');
     try {
       const snap = await getDocs(query(collection(db,'adminAuditLogs'), orderBy('timestamp','desc'), limit(100)));
@@ -8771,7 +8772,7 @@
   };
 
   // ===== SECTION SWITCHING =====
-  const SUPER_ADMIN_ONLY_SECTIONS = new Set(['audit','support','consents','features','vendors','settings','adminusers','pagebuilder']);
+  const SUPER_ADMIN_ONLY_SECTIONS = new Set(['settings','adminusers','pagebuilder']);
   window.switchSection=(id,btn)=>{
     if (isRestrictedAdmin() && SUPER_ADMIN_ONLY_SECTIONS.has(id)) { id = 'dashboard'; btn = document.getElementById('nav-dashboard'); }
     document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
