@@ -1615,6 +1615,10 @@
         <select id="prop-state" class="form-input"><option value="">— Select state —</option></select>
       </div>
       <div class="col-span-2">
+        <label class="label"><span data-i18n="properties.description">Description</span> <span style="font-size:10px;font-weight:400;color:var(--slate);" data-i18n="properties.descriptionHint">(shown to prospective tenants on the public listing)</span></label>
+        <textarea id="prop-description" class="form-input" rows="4" data-i18n-placeholder="properties.descriptionPlaceholder" placeholder="Tell prospective tenants about this property — nearby amenities, what makes it a great place to live, parking, laundry, pet policy, etc."></textarea>
+      </div>
+      <div class="col-span-2">
         <label class="label" data-i18n="properties.images">Property Images</label>
         <div id="prop-images-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px;"></div>
         <div id="prop-upload-status" style="display:none;font-size:12px;color:var(--slate);margin-bottom:6px;"></div>
@@ -2663,6 +2667,8 @@
       'properties.availableHint':'Show this property on the tenant listings page when available.',
       'properties.type':'Type', 'properties.city':'City', 'properties.zip':'ZIP',
       'properties.stateHint':'(drives which compliance disclosures print on applications)',
+      'properties.description':'Description', 'properties.descriptionHint':'(shown to prospective tenants on the public listing)',
+      'properties.descriptionPlaceholder':'Tell prospective tenants about this property — nearby amenities, what makes it a great place to live, parking, laundry, pet policy, etc.',
       'properties.images':'Property Images',
       'properties.save':'Save Property', 'properties.needsCountry':'⚠️ Needs country',
       'admins.title':'Admin Users', 'admins.invite':'+ Invite Admin',
@@ -3173,6 +3179,8 @@
       'properties.availableHint':'Mostrar esta propiedad en la página de listados cuando esté disponible.',
       'properties.type':'Tipo', 'properties.city':'Ciudad', 'properties.zip':'Código Postal',
       'properties.stateHint':'(determina qué divulgaciones de cumplimiento se imprimen en las solicitudes)',
+      'properties.description':'Descripción', 'properties.descriptionHint':'(se muestra a los posibles inquilinos en el anuncio público)',
+      'properties.descriptionPlaceholder':'Cuéntales a los posibles inquilinos sobre esta propiedad — comodidades cercanas, qué la hace un gran lugar para vivir, estacionamiento, lavandería, política de mascotas, etc.',
       'properties.images':'Imágenes de la Propiedad',
       'properties.save':'Guardar Propiedad', 'properties.needsCountry':'⚠️ Necesita país',
       'admins.title':'Usuarios Admin', 'admins.invite':'+ Invitar Admin',
@@ -3556,7 +3564,7 @@
     document.getElementById('prop-state').value = '';
   };
   window.openPropertyModal = () => {
-    ['prop-id','prop-name','prop-address','prop-units','prop-city','prop-zip'].forEach(id => document.getElementById(id).value = '');
+    ['prop-id','prop-name','prop-address','prop-units','prop-city','prop-zip','prop-description'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('prop-country').value = '';
     populateStateOptions('US');
     document.getElementById('prop-available').checked = false;
@@ -3585,6 +3593,7 @@
     populateStateOptions(p.country||'US');
     document.getElementById('prop-state').value = p.state||'';
     document.getElementById('prop-zip').value = p.zip||'';
+    document.getElementById('prop-description').value = p.description||'';
     document.getElementById('prop-modal-title').textContent = t('properties.modalEditTitle');
     document.getElementById('prop-alert').classList.add('hidden');
     applyCountryLockToModal();
@@ -3621,7 +3630,7 @@
     if (!name || !addr) { showAlert('prop-alert','Name and address are required.'); return; }
     if (!country) { showAlert('prop-alert','Country is required.'); return; }
     const imageUrls = Array.from(document.querySelectorAll('.prop-img-input')).map(i => i.value.trim()).filter(Boolean);
-    const data = { name, address: addr, available, country, units: parseInt(document.getElementById('prop-units').value)||0, type: document.getElementById('prop-type').value, city: document.getElementById('prop-city').value.trim(), state: document.getElementById('prop-state').value, zip: document.getElementById('prop-zip').value.trim(), imageUrls, updatedAt: serverTimestamp() };
+    const data = { name, address: addr, available, country, units: parseInt(document.getElementById('prop-units').value)||0, type: document.getElementById('prop-type').value, city: document.getElementById('prop-city').value.trim(), state: document.getElementById('prop-state').value, zip: document.getElementById('prop-zip').value.trim(), description: document.getElementById('prop-description').value.trim(), imageUrls, updatedAt: serverTimestamp() };
     const btn = document.getElementById('prop-save-btn'); btn.disabled=true; btn.textContent=t('common.saving');
     try {
       if (id) { await updateDoc(doc(db,'properties',id), data); logAdminAction('property_updated', 'property', id, name); }
