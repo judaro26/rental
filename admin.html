@@ -2132,6 +2132,16 @@
       return tenant?.propertyId ? scope.has(tenant.propertyId) : false;
     });
   }
+  // A Firestore permission-denied error (a security-rules rejection, not a
+  // bug in this page) is common for a restricted admin viewing a section
+  // whose rules haven't been updated to allow their role. The raw
+  // Firebase message ("Missing or insufficient permissions") gives a
+  // non-technical admin nothing to act on, so this gives them something
+  // concrete to tell whoever manages the account instead.
+  function formatLoadError(e) {
+    if (e?.code === 'permission-denied') return t('common.permissionDeniedHint');
+    return t('common.errorPrefix') + e.message;
+  }
 
   function applyAdminRoleUI() {
     const restricted = isRestrictedAdmin();
@@ -2281,6 +2291,7 @@
       'invoiceModal.setDueDateFirst':'Set a due date first to use the quick-set buttons.',
       'invoiceModal.confirmGenerateReceipt':'Generate a paid receipt for {name} — ${amount}?',
       'invoiceModal.receiptEmailed':'Receipt generated and emailed to {email}', 'common.errorPrefix':'Error: ',
+      'common.permissionDeniedHint':'You don\'t currently have permission to view this. Ask whoever manages this account to update the Firestore security rules for this section.',
       'invoiceModal.confirmMarkPaid':'Mark this invoice as paid?', 'invoiceModal.confirmSendNow':'Email invoice {num} to {email} now?',
       'invoiceModal.theTenant':'the tenant', 'invoiceModal.errorSending':'Error sending invoice: ',
       'invoiceModal.confirmDelete':'Delete this invoice/receipt permanently?',
@@ -2790,6 +2801,7 @@
       'invoiceModal.setDueDateFirst':'Establece primero una fecha de vencimiento para usar los botones de ajuste rápido.',
       'invoiceModal.confirmGenerateReceipt':'¿Generar un recibo de pago para {name} — ${amount}?',
       'invoiceModal.receiptEmailed':'Recibo generado y enviado por correo a {email}', 'common.errorPrefix':'Error: ',
+      'common.permissionDeniedHint':'Actualmente no tienes permiso para ver esto. Pide a quien administra esta cuenta que actualice las reglas de seguridad de Firestore para esta sección.',
       'invoiceModal.confirmMarkPaid':'¿Marcar esta factura como pagada?', 'invoiceModal.confirmSendNow':'¿Enviar la factura {num} a {email} ahora?',
       'invoiceModal.theTenant':'el inquilino', 'invoiceModal.errorSending':'Error al enviar la factura: ',
       'invoiceModal.confirmDelete':'¿Eliminar esta factura/recibo permanentemente?',
@@ -5897,7 +5909,7 @@
       renderAuditLog(allAuditLogs); renderAuditSummary(allAuditLogs);
     } catch(e) {
       console.error('loadAuditLog:',e);
-      tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${t('common.errorPrefix')}${e.message}</td></tr>`;
+      tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${formatLoadError(e)}</td></tr>`;
     }
   }
   window.loadMoreAudit = () => loadAuditLog(false);
@@ -5929,7 +5941,7 @@
       }).join('');
     } catch (e) {
       console.error('loadAdminAuditLog:', e);
-      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#DC2626;padding:24px;">${t('common.errorPrefix')}${e.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#DC2626;padding:24px;">${formatLoadError(e)}</td></tr>`;
     }
   };
   window.filterAuditLog = () => {
@@ -5989,7 +6001,7 @@
     } catch(e) {
       console.error('loadSupport:',e);
       const tbody = document.getElementById('support-tbody');
-      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${t('common.errorPrefix')}${e.message}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${formatLoadError(e)}</td></tr>`;
     }
   }
   function renderSupportTable() {
@@ -6027,7 +6039,7 @@
     } catch(e) {
       console.error('loadConsents:',e);
       const tbody = document.getElementById('consents-tbody');
-      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${t('common.errorPrefix')}${e.message}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${formatLoadError(e)}</td></tr>`;
     }
   }
   window.filterConsents = () => {
@@ -6091,7 +6103,7 @@
     } catch(e){
       console.error('loadFeatures:',e);
       const el = document.getElementById('features-list');
-      if (el) el.innerHTML = `<p style="padding:20px;text-align:center;color:#DC2626;font-size:13px;">${t('common.errorPrefix')}${e.message}</p>`;
+      if (el) el.innerHTML = `<p style="padding:20px;text-align:center;color:#DC2626;font-size:13px;">${formatLoadError(e)}</p>`;
     }
   }
   window.filterFeatures=()=>{
@@ -6960,7 +6972,7 @@
     } catch(e){
       console.error('loadVendors:',e);
       const grid = document.getElementById('vendors-grid');
-      if (grid) grid.innerHTML = `<p style="font-size:13px;color:#DC2626;grid-column:1/-1;">${t('common.errorPrefix')}${e.message}</p>`;
+      if (grid) grid.innerHTML = `<p style="font-size:13px;color:#DC2626;grid-column:1/-1;">${formatLoadError(e)}</p>`;
     }
   }
   window.filterVendors=()=>{
