@@ -35,7 +35,7 @@ async function sendWhatsApp({ accountSid, authToken, fromNumber, contentSid, con
     body: params.toString(),
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || `Twilio rejected this WhatsApp message (HTTP ${res.status}).`);
+  if (!res.ok) throw new Error(data.message ? `${data.message}${data.code ? ` (Twilio error ${data.code})` : ''}` : `Twilio rejected this WhatsApp message (HTTP ${res.status}).`);
   return { id: data.sid, status: data.status };
 }
 
