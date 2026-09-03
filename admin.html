@@ -34,6 +34,7 @@
     .btn-success { background:#16A34A; color:#fff; }
     .btn-success:hover { background:#15803D; }
     .btn-danger { background:#DC2626; color:#fff; }
+    #tenant-email-body:empty:before { content: attr(data-placeholder); color: #9CA3AF; pointer-events: none; }
     .btn-danger:hover { background:#B91C1C; }
     .btn-amber { background:var(--amber); color:#fff; }
     .btn-amber:hover { background:#A8751E; }
@@ -1853,6 +1854,48 @@
   </div>
 </div>
 
+<!-- TENANT EMAIL COMPOSE MODAL -->
+<div id="tenant-email-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('tenant-email-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('tenant-email-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;" data-i18n="tenants.emailModalTitle">Send Email</h3>
+    <p id="tenant-email-to" style="font-size:13px;color:var(--slate);margin-bottom:18px;"></p>
+    <div id="tenant-email-alert" class="hidden alert" style="margin-bottom:14px;"></div>
+
+    <label class="label" data-i18n="support.colSubject">Subject</label>
+    <input type="text" id="tenant-email-subject" class="form-input" style="margin-bottom:14px;" data-i18n-placeholder="tenants.emailSubjectPlaceholder" placeholder="e.g. A quick update about your unit">
+
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <button type="button" onclick="switchEmailTab('edit')" id="email-tab-edit-btn" class="btn btn-sm btn-primary" style="flex:1;" data-i18n="tenants.emailTabEdit">✏️ Edit</button>
+      <button type="button" onclick="switchEmailTab('preview')" id="email-tab-preview-btn" class="btn btn-sm btn-outline" style="flex:1;" data-i18n="tenants.emailTabPreview">👁 Preview</button>
+    </div>
+
+    <div id="email-edit-pane">
+      <div style="display:flex;gap:4px;flex-wrap:wrap;background:#F9FAFB;border:1px solid var(--border);border-bottom:none;border-radius:3px 3px 0 0;padding:6px;">
+        <button type="button" onclick="emailFormat('bold')" class="btn btn-sm btn-outline" style="font-weight:700;padding:4px 10px;" title="Bold">B</button>
+        <button type="button" onclick="emailFormat('italic')" class="btn btn-sm btn-outline" style="font-style:italic;padding:4px 10px;" title="Italic">I</button>
+        <button type="button" onclick="emailFormat('underline')" class="btn btn-sm btn-outline" style="text-decoration:underline;padding:4px 10px;" title="Underline">U</button>
+        <button type="button" onclick="emailFormat('insertUnorderedList')" class="btn btn-sm btn-outline" style="padding:4px 10px;" title="Bulleted list">• ≡</button>
+        <button type="button" onclick="emailFormat('insertOrderedList')" class="btn btn-sm btn-outline" style="padding:4px 10px;" title="Numbered list">1. ≡</button>
+        <button type="button" onclick="emailAddLink()" class="btn btn-sm btn-outline" style="padding:4px 10px;" title="Insert link">🔗</button>
+        <button type="button" onclick="emailFormat('removeFormat')" class="btn btn-sm btn-outline" style="padding:4px 10px;" data-i18n="tenants.clearFormatting" title="Clear formatting">Clear</button>
+      </div>
+      <div id="tenant-email-body" contenteditable="true" style="border:1px solid var(--border);border-radius:0 0 3px 3px;padding:14px;min-height:220px;font-size:14px;line-height:1.6;color:#374151;"></div>
+      <p style="font-size:10px;color:var(--slate);margin-top:6px;" data-i18n="tenants.emailFormattingHint">Select text to bold, italicize, or link it. Check the Preview tab to see exactly what your tenant will receive.</p>
+    </div>
+
+    <div id="email-preview-pane" class="hidden">
+      <iframe id="tenant-email-preview-frame" style="width:100%;height:400px;border:1px solid var(--border);border-radius:3px;background:#F7F4EF;"></iframe>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:18px;">
+      <button onclick="sendTenantEmail()" class="btn btn-primary" style="flex:1;" id="tenant-email-send-btn" data-i18n="tenants.sendEmailButton">Send Email</button>
+      <button onclick="closeModal('tenant-email-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- APPLICATION PREVIEW MODAL -->
 <div id="application-preview-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('application-preview-modal')"></div>
@@ -2437,6 +2480,16 @@
       'financials.catchupVsOwner':'vs. {owner}\'s {year} contribution', 'financials.catchupMatched':'✓ Matched',
       'financials.catchupRemaining':'{amount} to go',
       'applications.generateSendSignature':'Generate &amp; Send for Signature', 'tenants.saveChanges':'Save Changes',
+      'tenants.sendEmail':'Send Email', 'tenants.emailModalTitle':'Send Email', 'tenants.emailSubjectPlaceholder':'e.g. A quick update about your unit',
+      'tenants.emailTabEdit':'✏️ Edit', 'tenants.emailTabPreview':'👁 Preview', 'tenants.clearFormatting':'Clear',
+      'tenants.emailFormattingHint':'Select text to bold, italicize, or link it. Check the Preview tab to see exactly what your tenant will receive.',
+      'tenants.sendEmailButton':'Send Email', 'tenants.emailToLine':'To: {name} ({email})',
+      'tenants.emailBodyPlaceholder':'Write your message here...', 'tenants.emailLinkPrompt':'Enter the URL to link to:',
+      'tenants.emailNoSubjectPreview':'(no subject yet)', 'tenants.emailPreviewSubjectLabel':'Subject',
+      'tenants.emailPreviewFooter':'This message was sent to you by your property manager via the tenant portal.',
+      'tenants.emailSubjectRequired':'Enter a subject line.', 'tenants.emailBodyRequired':'Write a message before sending.',
+      'tenants.emailSent':'✓ Email sent to {email}.',
+      'audit.adminActionTenantEmailSent':'Sent custom email to tenant',
       'invitations.firstNameEmailRequired':'First name and email are required.', 'invitations.sentTo':'✓ Invitation sent to {email}',
       'invitations.sendInvitation':'Send Invitation', 'invitations.sendLink':'Send Link',
       'invitations.hoursLabel':'{n} hour(s)', 'invitations.daysLabel':'{n} day(s)',
@@ -2936,6 +2989,16 @@
       'financials.catchupVsOwner':'vs. el aporte de {owner} en {year}', 'financials.catchupMatched':'✓ Igualado',
       'financials.catchupRemaining':'faltan {amount}',
       'applications.generateSendSignature':'Generar y Enviar para Firma', 'tenants.saveChanges':'Guardar Cambios',
+      'tenants.sendEmail':'Enviar Correo', 'tenants.emailModalTitle':'Enviar Correo', 'tenants.emailSubjectPlaceholder':'ej. Una actualización rápida sobre tu unidad',
+      'tenants.emailTabEdit':'✏️ Editar', 'tenants.emailTabPreview':'👁 Vista Previa', 'tenants.clearFormatting':'Limpiar',
+      'tenants.emailFormattingHint':'Selecciona texto para ponerlo en negrita, cursiva, o enlazarlo. Revisa la pestaña de Vista Previa para ver exactamente lo que recibirá tu inquilino.',
+      'tenants.sendEmailButton':'Enviar Correo', 'tenants.emailToLine':'Para: {name} ({email})',
+      'tenants.emailBodyPlaceholder':'Escribe tu mensaje aquí...', 'tenants.emailLinkPrompt':'Ingresa la URL a enlazar:',
+      'tenants.emailNoSubjectPreview':'(sin asunto aún)', 'tenants.emailPreviewSubjectLabel':'Asunto',
+      'tenants.emailPreviewFooter':'Este mensaje te fue enviado por tu administrador de propiedad a través del portal de inquilinos.',
+      'tenants.emailSubjectRequired':'Ingresa una línea de asunto.', 'tenants.emailBodyRequired':'Escribe un mensaje antes de enviar.',
+      'tenants.emailSent':'✓ Correo enviado a {email}.',
+      'audit.adminActionTenantEmailSent':'Envió correo personalizado al inquilino',
       'invitations.firstNameEmailRequired':'El nombre y el correo son obligatorios.', 'invitations.sentTo':'✓ Invitación enviada a {email}',
       'invitations.sendInvitation':'Enviar Invitación', 'invitations.sendLink':'Enviar Enlace',
       'invitations.hoursLabel':'{n} hora(s)', 'invitations.daysLabel':'{n} día(s)',
@@ -3592,6 +3655,7 @@
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
             ${status !== 'active' ? `<button onclick="approveTenant('${tn.id}')" class="btn btn-sm btn-success">${t('tenants.approve')}</button>` : ''}
             <button onclick="openEditTenant('${tn.id}')" class="btn btn-sm btn-outline">${t('common.edit')}</button>
+            ${tn.email ? `<button onclick="openTenantEmailModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('tenants.sendEmail')}">✉️</button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -4424,6 +4488,90 @@
     document.getElementById('auto-invoice-test-result').textContent = '';
     document.getElementById('tenant-edit-alert').classList.add('hidden');
     openModal('tenant-modal');
+  };
+
+  // ===== TENANT EMAIL COMPOSER =====
+  // Lets an admin write a rich-formatted, on-brand email to a specific
+  // tenant, preview exactly what it will look like, then send it.
+  // Uses the browser's native contenteditable + execCommand for
+  // formatting rather than an external rich-text library, consistent
+  // with this app's existing no-build-step, minimal-dependency style.
+  let _emailTargetTenant = null;
+  let _emailSiteName = '';
+  window.openTenantEmailModal = async (tenantId) => {
+    const tn = allTenants.find(x => x.id === tenantId); if (!tn) return;
+    _emailTargetTenant = tn;
+    try { const s = await getDoc(doc(db, 'settings', 'site')); _emailSiteName = s.data()?.siteName || ''; } catch { _emailSiteName = ''; }
+    const name = `${tn.firstName || ''} ${tn.lastName || ''}`.trim() || t('common.unknown');
+    document.getElementById('tenant-email-to').textContent = t('tenants.emailToLine').replace('{name}', name).replace('{email}', tn.email);
+    document.getElementById('tenant-email-subject').value = '';
+    const bodyEl = document.getElementById('tenant-email-body');
+    bodyEl.innerHTML = '';
+    bodyEl.setAttribute('data-placeholder', t('tenants.emailBodyPlaceholder'));
+    document.getElementById('tenant-email-alert').classList.add('hidden');
+    switchEmailTab('edit');
+    openModal('tenant-email-modal');
+  };
+  window.emailFormat = (command) => {
+    document.getElementById('tenant-email-body').focus();
+    document.execCommand(command, false, null);
+  };
+  window.emailAddLink = () => {
+    const url = prompt(t('tenants.emailLinkPrompt'));
+    if (!url) return;
+    document.getElementById('tenant-email-body').focus();
+    document.execCommand('createLink', false, url);
+  };
+  window.switchEmailTab = (tab) => {
+    const editBtn = document.getElementById('email-tab-edit-btn'), previewBtn = document.getElementById('email-tab-preview-btn');
+    document.getElementById('email-edit-pane').classList.toggle('hidden', tab !== 'edit');
+    document.getElementById('email-preview-pane').classList.toggle('hidden', tab !== 'preview');
+    editBtn.className = tab === 'edit' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+    previewBtn.className = tab === 'preview' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+    editBtn.style.flex = previewBtn.style.flex = '1';
+    if (tab === 'preview') renderTenantEmailPreview();
+  };
+  // Mirrors the shell buildEmail() constructs server-side in
+  // send-tenant-email.js — kept in sync manually since this is purely
+  // presentational templating, not logic worth sharing over the network
+  // for an instant, client-side preview.
+  function buildTenantEmailPreviewHtml() {
+    const subject = document.getElementById('tenant-email-subject').value.trim() || t('tenants.emailNoSubjectPreview');
+    const bodyHtml = document.getElementById('tenant-email-body').innerHTML;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="margin:0;padding:24px;background:#F7F4EF;font-family:'Helvetica Neue',Arial,sans-serif;">
+      <div style="max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 2px 16px rgba(26,26,46,0.08);">
+        <div style="background:#1A1A2E;padding:24px 32px;"><span style="font-size:18px;font-weight:300;color:#E8D5B0;letter-spacing:0.06em;">${(_emailSiteName || 'Tenant Portal').replace(/</g,'&lt;')}</span></div>
+        <div style="padding:28px 32px;">
+          <p style="font-size:11px;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 6px;">${t('tenants.emailPreviewSubjectLabel')}</p>
+          <p style="font-size:16px;font-weight:500;color:#1A1A2E;margin:0 0 20px;">${subject.replace(/</g,'&lt;')}</p>
+          <div style="font-size:14px;color:#374151;line-height:1.7;">${bodyHtml}</div>
+        </div>
+        <div style="background:#F7F4EF;padding:16px 32px;text-align:center;"><p style="margin:0;font-size:11px;color:#9CA3AF;">${t('tenants.emailPreviewFooter')}</p></div>
+      </div>
+    </body></html>`;
+  }
+  function renderTenantEmailPreview() {
+    document.getElementById('tenant-email-preview-frame').srcdoc = buildTenantEmailPreviewHtml();
+  }
+  window.sendTenantEmail = async () => {
+    if (!_emailTargetTenant) return;
+    const subject = document.getElementById('tenant-email-subject').value.trim();
+    const bodyHtml = document.getElementById('tenant-email-body').innerHTML.trim();
+    if (!subject) { showAlert('tenant-email-alert', t('tenants.emailSubjectRequired')); return; }
+    if (!bodyHtml || bodyHtml === '<br>') { showAlert('tenant-email-alert', t('tenants.emailBodyRequired')); return; }
+    const btn = document.getElementById('tenant-email-send-btn'); btn.disabled = true; btn.textContent = t('common.sending');
+    try {
+      const res = await authedFetch('/api/send-tenant-email', {
+        tenantId: _emailTargetTenant.id, subject, bodyHtml, siteName: _emailSiteName,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      showAlert('tenant-email-alert', t('tenants.emailSent').replace('{email}', data.sentTo), 'success');
+      setTimeout(() => closeModal('tenant-email-modal'), 1400);
+    } catch (e) {
+      showAlert('tenant-email-alert', t('common.errorPrefix') + e.message);
+    }
+    btn.disabled = false; btn.textContent = t('tenants.sendEmailButton');
   };
   window.saveTenant = async () => {
     const id = document.getElementById('edit-tenant-id').value;
@@ -5760,6 +5908,7 @@
     property_country_set: 'audit.adminActionPropertyCountrySet', application_status_changed: 'audit.adminActionAppStatusChanged',
     tenant_approved: 'audit.adminActionTenantApproved', admin_invited: 'audit.adminActionAdminInvited', admin_role_updated: 'audit.adminActionRoleUpdated',
     admin_invite_resent: 'audit.adminActionInviteResent', admin_revoked: 'audit.adminActionRevoked', admin_reactivated: 'audit.adminActionReactivated',
+    tenant_email_sent: 'audit.adminActionTenantEmailSent',
   };
   window.loadAdminAuditLog = async () => {
     const tbody = document.getElementById('admin-audit-tbody');
