@@ -225,6 +225,40 @@
   </div>
 </div>
 
+<!-- ===== PROPERTY DETAILS MODAL ===== -->
+<div id="property-details-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('property-details-modal')"></div>
+  <div style="display:flex;align-items:flex-start;justify-content:center;min-height:100vh;padding:40px 16px;">
+    <div style="background:#fff;width:100%;max-width:640px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.22);position:relative;z-index:1;margin:auto;overflow:hidden;">
+      <button onclick="closeModal('property-details-modal')" style="position:absolute;top:14px;right:16px;background:rgba(0,0,0,0.4);color:#fff;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:20px;z-index:3;">×</button>
+
+      <div id="pd-gallery-wrap" style="position:relative;overflow:hidden;height:380px;background:#1A1A2E;">
+        <div id="pd-gallery-track" style="display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);height:100%;"></div>
+        <div id="pd-gallery-dots" style="position:absolute;bottom:14px;left:0;right:0;display:flex;justify-content:center;gap:6px;z-index:2;"></div>
+        <div id="pd-gallery-arrows"></div>
+      </div>
+
+      <div style="padding:32px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:10px;flex-wrap:wrap;">
+          <div>
+            <h2 id="pd-name" style="font-size:1.9rem;font-weight:500;margin-bottom:6px;"></h2>
+            <span id="pd-availability" class="badge-status"></span>
+          </div>
+          <div id="pd-facts" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
+        <p id="pd-address" style="font-size:13px;color:var(--slate);margin-bottom:18px;"></p>
+        <p id="pd-description" style="font-size:14px;color:var(--charcoal);line-height:1.7;margin-bottom:22px;white-space:pre-line;"></p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <a id="pd-apply-link" href="#" class="btn-outline py-3 text-xs tracking-widest uppercase rounded-sm" style="flex:1;min-width:160px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;">
+            <span data-i18n="landing.applyNow">Apply Now</span>
+          </a>
+          <button id="pd-login-btn" class="btn-primary py-3 text-xs tracking-widest uppercase rounded-sm" style="flex:1;min-width:160px;" data-i18n="landing.tenantLogin">Tenant Login</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== FIREBASE SDK + LOGIC ===== -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
@@ -415,6 +449,7 @@
   });
 
   // Load properties
+  window._propertiesById = {};
   async function loadProperties() {
     const grid  = document.getElementById('properties-grid');
     const empty = document.getElementById('properties-empty');
@@ -506,7 +541,7 @@
           <div style="padding:22px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:10px;flex-wrap:wrap;">
               <div>
-                <h3 style="font-size:1.4rem;font-weight:500;margin-bottom:6px;">${p.name}</h3>
+                <h3 onclick="window._openPropertyDetails('${cid}')" style="font-size:1.4rem;font-weight:500;margin-bottom:6px;cursor:pointer;" onmouseenter="this.style.color='var(--amber)'" onmouseleave="this.style.color=''">${p.name}</h3>
                 <span class="badge-status ${isAvailable ? 'available' : 'unavailable'}">${availableLabel}</span>
               </div>
               ${p.units ? `<span style="font-size:11px;background:rgba(201,144,58,0.12);color:var(--amber);padding:3px 8px;border-radius:2px;">${p.units} ${PublicI18N.t('landing.units')}</span>` : ''}
@@ -520,6 +555,11 @@
           </div>`;
 
         grid.appendChild(card);
+
+        // Cache full property data (including the resolved image list and
+        // availability) so the details modal can look it up instantly on
+        // click, rather than re-fetching from Firestore every time.
+        window._propertiesById[cid] = { ...p, _imgs: imgs, _isAvailable: isAvailable, _availableLabel: availableLabel };
 
         // Auto-advance carousel if multiple images
         if (imgs.length > 1) {
@@ -557,6 +597,96 @@
     }
   }
   loadProperties();
+
+  // ===== PROPERTY DETAILS MODAL =====
+  // A separate, independent gallery system from the per-card carousels
+  // above (which are keyed by property id) - only one details modal can
+  // ever be open at a time, so a single current-index variable is simpler
+  // and avoids any id collision between a card's carousel and the modal's
+  // own gallery for the same property while both exist in the DOM at once.
+  let _pdImages = [], _pdCurrent = 0;
+
+  window._openPropertyDetails = (cid) => {
+    const p = window._propertiesById[cid];
+    if (!p) return;
+
+    _pdImages = p._imgs;
+    _pdCurrent = 0;
+    _renderPdGallery();
+
+    document.getElementById('pd-name').textContent = p.name || '';
+    const badge = document.getElementById('pd-availability');
+    badge.textContent = p._availableLabel;
+    badge.className = `badge-status ${p._isAvailable ? 'available' : 'unavailable'}`;
+
+    const fullAddress = [p.address, p.city, [p.state, p.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    document.getElementById('pd-address').textContent = fullAddress ? `📍 ${fullAddress}` : '';
+
+    const descEl = document.getElementById('pd-description');
+    descEl.textContent = p.description || '';
+    descEl.style.display = p.description ? '' : 'none';
+
+    const facts = [];
+    if (p.type) facts.push(p.type);
+    if (p.units) facts.push(`${p.units} ${PublicI18N.t('landing.units')}`);
+    document.getElementById('pd-facts').innerHTML = facts.map(f =>
+      `<span style="font-size:11px;background:rgba(201,144,58,0.12);color:var(--amber);padding:3px 8px;border-radius:2px;">${f}</span>`
+    ).join('');
+
+    const applyLink = document.getElementById('pd-apply-link');
+    if (p._isAvailable) {
+      applyLink.href = `/apply.html?propertyId=${encodeURIComponent(cid)}&propertyName=${encodeURIComponent(p.name)}`;
+      applyLink.style.display = '';
+    } else {
+      applyLink.style.display = 'none';
+    }
+    document.getElementById('pd-login-btn').onclick = () => {
+      closeModal('property-details-modal');
+      window._openTenantLogin(cid, p.name);
+    };
+
+    openModal('property-details-modal');
+  };
+
+  function _renderPdGallery() {
+    const track = document.getElementById('pd-gallery-track');
+    track.innerHTML = _pdImages.map(src =>
+      `<div style="min-width:100%;height:100%;flex-shrink:0;">
+        <img src="${src}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=700&q=80'">
+      </div>`
+    ).join('');
+    track.style.transform = 'translateX(0%)';
+
+    document.getElementById('pd-gallery-dots').innerHTML = _pdImages.length > 1
+      ? _pdImages.map((_, idx) => `<span onclick="window._pdGalleryGoTo(${idx})"
+          style="width:8px;height:8px;border-radius:50%;background:${idx===0?'#fff':'rgba(255,255,255,0.45)'};cursor:pointer;display:inline-block;"></span>`).join('')
+      : '';
+
+    document.getElementById('pd-gallery-arrows').innerHTML = _pdImages.length > 1
+      ? `<button onclick="window._pdGalleryPrev()" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;z-index:2;">‹</button>
+         <button onclick="window._pdGalleryNext()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:rgba(0,0,0,0.4);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;z-index:2;">›</button>`
+      : '';
+  }
+  window._pdGalleryGoTo = (idx) => {
+    const total = _pdImages.length;
+    if (total === 0) return;
+    _pdCurrent = ((idx % total) + total) % total;
+    document.getElementById('pd-gallery-track').style.transform = `translateX(-${_pdCurrent * 100}%)`;
+    document.querySelectorAll('#pd-gallery-dots span').forEach((d, i) =>
+      d.style.background = i === _pdCurrent ? '#fff' : 'rgba(255,255,255,0.45)');
+  };
+  window._pdGalleryNext = () => window._pdGalleryGoTo(_pdCurrent + 1);
+  window._pdGalleryPrev = () => window._pdGalleryGoTo(_pdCurrent - 1);
+
+  // Keyboard navigation while the details modal is open — left/right to
+  // browse images, Escape to close, matching the familiar lightbox pattern.
+  document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('property-details-modal');
+    if (modal.classList.contains('hidden')) return;
+    if (e.key === 'ArrowRight') window._pdGalleryNext();
+    else if (e.key === 'ArrowLeft') window._pdGalleryPrev();
+    else if (e.key === 'Escape') closeModal('property-details-modal');
+  });
 
   // ===== WINDOW-EXPOSED HELPERS =====
   let _selectedPropId = '', _selectedPropName = '', _loginContext = null; // 'tenant' | 'admin'
