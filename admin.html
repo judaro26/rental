@@ -1067,6 +1067,15 @@
             <button onclick="saveEnvelopeProvider()" class="btn btn-primary" style="flex:1;" id="envelope-int-save-btn" data-i18n="common.save">Save</button>
             <button onclick="testEnvelopeIntegration()" class="btn btn-outline" id="envelope-int-test-btn" data-i18n="settings.testConnection">Test Connection</button>
           </div>
+          <hr style="border:none;border-top:1px solid var(--border);margin:20px 0 16px;">
+          <h4 style="font-size:13px;font-weight:500;margin-bottom:4px;" data-i18n="settings.sendTestLeaseTitle">📝 Send Test Lease</h4>
+          <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="settings.sendTestLeaseHelp">Generates a real lease document from your configured Documenso template — with sample terms and an obviously-fake tenant name — and sends it to an email you choose, so you can check the template's fields fill in correctly before using this with a real applicant.</p>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <input type="email" id="test-lease-email" class="form-input" data-i18n-placeholder="settings.testLeaseEmailPlaceholder" placeholder="Email to send the test lease to">
+            <select id="test-lease-property" class="form-input"><option value="" data-i18n="settings.testLeaseNoProperty">No property (use default template)</option></select>
+            <button onclick="sendTestLease()" class="btn btn-outline" id="test-lease-btn" data-i18n="settings.sendTestLease">Send Test Lease</button>
+          </div>
+          <div id="test-lease-result" style="font-size:12px;margin-top:10px;"></div>
         </div>
       </div>
 
@@ -2335,6 +2344,14 @@
       'settings.templateIdHint':'(numeric, not the "envelope_..." string)', 'settings.apiUrl':'API URL', 'settings.appUrl':'App URL',
       'settings.webhookSecret':'Webhook Secret', 'settings.webhookSecretPlaceholder':'Optional — matches the secret set in Documenso\'s webhook config',
       'settings.testConnection':'Test Connection', 'settings.addSmsProviderTitle':'Add SMS Provider',
+      'settings.editEnvelopeProviderTitle':'Edit Envelope Provider', 'settings.leaveBlankToKeepCurrent':'(leave blank to keep current: {masked})',
+      'settings.testFailedPrefix':'Test failed: ',
+      'settings.sendTestLeaseTitle':'📝 Send Test Lease',
+      'settings.sendTestLeaseHelp':'Generates a real lease document from your configured Documenso template — with sample terms and an obviously-fake tenant name — and sends it to an email you choose, so you can check the template\'s fields fill in correctly before using this with a real applicant.',
+      'settings.testLeaseEmailPlaceholder':'Email to send the test lease to', 'settings.testLeaseNoProperty':'No property (use default template)',
+      'settings.sendTestLease':'Send Test Lease', 'settings.testLeaseEmailRequired':'Enter an email address first.',
+      'settings.testLeaseSent':'✓ Test lease sent to {email}. {matched} of {requested} template fields matched.',
+      'settings.testLeasePartialMatch':'Some fields didn\'t match — check your Documenso template\'s field labels against the ones listed in generate-lease.js.',
       'settings.providerLockHint':'The provider can\'t be changed after saving — add a new one instead to switch.',
       'settings.fromNumberHint':'(+E.164 format, e.g. +15551234567 — must be purchased and messaging-enabled in your provider\'s dashboard)',
       'settings.messagingProfileId':'Messaging Profile ID', 'settings.optionalForReference':'(optional, for your reference)',
@@ -2826,6 +2843,14 @@
       'settings.templateIdHint':'(numérico, no la cadena "envelope_...")', 'settings.apiUrl':'URL de API', 'settings.appUrl':'URL de App',
       'settings.webhookSecret':'Secreto de Webhook', 'settings.webhookSecretPlaceholder':'Opcional — coincide con el secreto configurado en el webhook de Documenso',
       'settings.testConnection':'Probar Conexión', 'settings.addSmsProviderTitle':'Agregar Proveedor de SMS',
+      'settings.editEnvelopeProviderTitle':'Editar Proveedor de Sobre', 'settings.leaveBlankToKeepCurrent':'(deja en blanco para mantener el actual: {masked})',
+      'settings.testFailedPrefix':'La prueba falló: ',
+      'settings.sendTestLeaseTitle':'📝 Enviar Contrato de Prueba',
+      'settings.sendTestLeaseHelp':'Genera un documento de contrato real desde tu plantilla de Documenso configurada — con términos de muestra y un nombre de inquilino obviamente falso — y lo envía a un correo que elijas, para que puedas verificar que los campos de la plantilla se llenan correctamente antes de usar esto con un solicitante real.',
+      'settings.testLeaseEmailPlaceholder':'Correo al que enviar el contrato de prueba', 'settings.testLeaseNoProperty':'Sin propiedad (usar plantilla predeterminada)',
+      'settings.sendTestLease':'Enviar Contrato de Prueba', 'settings.testLeaseEmailRequired':'Ingresa primero un correo electrónico.',
+      'settings.testLeaseSent':'✓ Contrato de prueba enviado a {email}. {matched} de {requested} campos de la plantilla coincidieron.',
+      'settings.testLeasePartialMatch':'Algunos campos no coincidieron — verifica las etiquetas de campo de tu plantilla de Documenso contra las que aparecen en generate-lease.js.',
       'settings.providerLockHint':'El proveedor no se puede cambiar después de guardar — agrega uno nuevo para cambiar.',
       'settings.fromNumberHint':'(formato +E.164, ej. +15551234567 — debe estar comprado y habilitado para mensajería en el panel de tu proveedor)',
       'settings.messagingProfileId':'ID de Perfil de Mensajería', 'settings.optionalForReference':'(opcional, para tu referencia)',
@@ -7262,9 +7287,13 @@
     document.getElementById('int-envelope-apiurl').value = p?.apiUrl || 'https://app.documenso.com/api/v2';
     document.getElementById('int-envelope-appurl').value = p?.appUrl || 'https://app.documenso.com';
     document.getElementById('int-envelope-secret').value = '';
-    document.getElementById('envelope-secret-hint').textContent = p ? `(leave blank to keep current: ${p.webhookSecretMasked || '••••'})` : 'Optional — matches the secret set in Documenso\'s webhook config';
-    document.getElementById('envelope-provider-modal-title').textContent = p ? 'Edit Envelope Provider' : 'Add Envelope Provider';
+    document.getElementById('envelope-secret-hint').textContent = p ? t('settings.leaveBlankToKeepCurrent').replace('{masked}', p.webhookSecretMasked || '••••') : t('settings.webhookSecretPlaceholder');
+    document.getElementById('envelope-provider-modal-title').textContent = p ? t('settings.editEnvelopeProviderTitle') : t('settings.addEnvelopeProviderTitle');
     document.getElementById('envelope-provider-modal-alert').classList.add('hidden');
+    document.getElementById('test-lease-email').value = '';
+    document.getElementById('test-lease-result').innerHTML = '';
+    const propSel = document.getElementById('test-lease-property');
+    propSel.innerHTML = `<option value="">${t('settings.testLeaseNoProperty')}</option>` + allProperties.map(pr => `<option value="${pr.id}">${pr.name}</option>`).join('');
     openModal('envelope-provider-modal');
   };
   window.saveEnvelopeProvider = async () => {
@@ -7297,8 +7326,33 @@
         apiUrl: document.getElementById('int-envelope-apiurl').value.trim(),
       });
       showAlert('envelope-provider-modal-alert', '✓ ' + result.message, 'success');
-    } catch (e) { showAlert('envelope-provider-modal-alert', 'Test failed: ' + e.message); }
+    } catch (e) { showAlert('envelope-provider-modal-alert', t('settings.testFailedPrefix') + e.message); }
     btn.disabled = false; btn.textContent = t('settings.testConnection');
+  };
+
+  window.sendTestLease = async () => {
+    const email = document.getElementById('test-lease-email').value.trim();
+    const resultEl = document.getElementById('test-lease-result');
+    if (!email) { resultEl.style.color = '#DC2626'; resultEl.textContent = t('settings.testLeaseEmailRequired'); return; }
+    const propertyId = document.getElementById('test-lease-property').value;
+    const btn = document.getElementById('test-lease-btn'); btn.disabled = true; btn.textContent = t('common.sending');
+    resultEl.textContent = '';
+    try {
+      let siteName = ''; try { const s = await getDoc(doc(db, 'settings', 'site')); siteName = s.data()?.siteName || ''; } catch {}
+      const res = await authedFetch('/api/test-lease', { testEmail: email, propertyId: propertyId || undefined, siteName });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      resultEl.style.color = '#16A34A';
+      resultEl.innerHTML = t('settings.testLeaseSent')
+        .replace('{email}', data.sentTo)
+        .replace('{matched}', data.fieldsMatched)
+        .replace('{requested}', data.fieldsRequested)
+        + (data.fieldsMatched < data.fieldsRequested ? `<br><span style="color:#D97706;">${t('settings.testLeasePartialMatch')}</span>` : '');
+    } catch (err) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = t('common.errorPrefix') + err.message;
+    }
+    btn.disabled = false; btn.textContent = t('settings.sendTestLease');
   };
 
   // ── Screening provider modal (SingleKey) ────────────────────────────────
