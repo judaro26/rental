@@ -5986,7 +5986,11 @@
       const snap = await getDocs(query(collection(db,'supportMessages'), orderBy('createdAt','desc')));
       allSupport = scopeByCountryViaTenant(snap.docs.map(d=>({ id:d.id, ...d.data() })));
       renderSupportTable();
-    } catch(e) { console.error('loadSupport:',e); }
+    } catch(e) {
+      console.error('loadSupport:',e);
+      const tbody = document.getElementById('support-tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${t('common.errorPrefix')}${e.message}</td></tr>`;
+    }
   }
   function renderSupportTable() {
     const tbody=document.getElementById('support-tbody'); if(!tbody) return;
@@ -6020,7 +6024,11 @@
       const snap = await getDocs(query(collection(db,'paymentConsents'), orderBy('createdAt','desc')));
       allConsents = scopeByCountry(snap.docs.map(d=>({id:d.id,...d.data()})));
       renderConsents(allConsents);
-    } catch(e) { console.error('loadConsents:',e); }
+    } catch(e) {
+      console.error('loadConsents:',e);
+      const tbody = document.getElementById('consents-tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${t('common.errorPrefix')}${e.message}</td></tr>`;
+    }
   }
   window.filterConsents = () => {
     const f=document.getElementById('consent-filter').value;
@@ -6080,7 +6088,11 @@
       const snap=await getDocs(query(collection(db,'featureRequests'),orderBy('createdAt','desc')));
       allFeatures=scopeByCountryViaTenant(snap.docs.map(d=>({id:d.id,...d.data()})));
       renderFeatures(allFeatures);
-    } catch(e){console.error('loadFeatures:',e);}
+    } catch(e){
+      console.error('loadFeatures:',e);
+      const el = document.getElementById('features-list');
+      if (el) el.innerHTML = `<p style="padding:20px;text-align:center;color:#DC2626;font-size:13px;">${t('common.errorPrefix')}${e.message}</p>`;
+    }
   }
   window.filterFeatures=()=>{
     const f=document.getElementById('feat-filter').value;
@@ -6945,7 +6957,11 @@
       renderVendors(allVendors);
       const vprop=document.getElementById('vendor-filter-prop');
       if(vprop) vprop.innerHTML=`<option value="">${t('common.allProperties')}</option>`+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
-    } catch(e){console.error('loadVendors:',e);}
+    } catch(e){
+      console.error('loadVendors:',e);
+      const grid = document.getElementById('vendors-grid');
+      if (grid) grid.innerHTML = `<p style="font-size:13px;color:#DC2626;grid-column:1/-1;">${t('common.errorPrefix')}${e.message}</p>`;
+    }
   }
   window.filterVendors=()=>{
     const prop=document.getElementById('vendor-filter-prop').value,q=document.getElementById('vendor-search').value.toLowerCase();
