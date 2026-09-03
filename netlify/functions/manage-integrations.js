@@ -91,6 +91,9 @@ function maskProvider(id, d, activeId) {
     }
     return { ...base, provider: 'telnyx', apiKeyMasked: mask(d.apiKey), fromNumber: d.fromNumber, messagingProfileId: d.messagingProfileId };
   }
+  if (d.type === 'whatsapp') {
+    return { ...base, provider: 'twilio', accountSid: d.accountSid, authTokenMasked: mask(d.authToken), fromNumber: d.fromNumber, contentSid: d.contentSid };
+  }
   return base;
 }
 
@@ -127,7 +130,7 @@ exports.handler = async (event) => {
     // ── ADD a new provider ───────────────────────────────────────────────────
     if (action === 'add_provider') {
       const { type, label } = body;
-      if (!['email', 'storage', 'envelope', 'screening', 'sms'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", "envelope", "screening", or "sms".' }) };
+      if (!['email', 'storage', 'envelope', 'screening', 'sms', 'whatsapp'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", "envelope", "screening", "sms", or "whatsapp".' }) };
 
       let fields;
       if (type === 'email') {
@@ -165,7 +168,7 @@ exports.handler = async (event) => {
           tenantPays: tenantPays === true,
           minScore: minScore ? parseInt(minScore) : null,
         };
-      } else {
+      } else if (type === 'sms') {
         const { provider, apiKey, messagingProfileId, accountSid, authToken, fromNumber, username } = body;
         if (provider === 'twilio') {
           if (!fromNumber) return { statusCode: 400, body: JSON.stringify({ error: 'fromNumber is required for a new Twilio SMS provider (the phone number to send from, in +E.164 format).' }) };
@@ -179,9 +182,18 @@ exports.handler = async (event) => {
           if (!apiKey) return { statusCode: 400, body: JSON.stringify({ error: 'apiKey is required for a new Telnyx SMS provider.' }) };
           fields = { provider: 'telnyx', apiKey, fromNumber, messagingProfileId: messagingProfileId || null };
         }
+      } else {
+        // whatsapp — Twilio only. contentSid identifies the WhatsApp
+        // template approved for the "new announcement" use case; see
+        // _lib/send-whatsapp.js for why a template is required at all.
+        const { accountSid, authToken, fromNumber, contentSid } = body;
+        if (!accountSid || !authToken) return { statusCode: 400, body: JSON.stringify({ error: 'accountSid and authToken are required for a new WhatsApp provider.' }) };
+        if (!fromNumber) return { statusCode: 400, body: JSON.stringify({ error: 'fromNumber is required for a new WhatsApp provider (your Twilio WhatsApp Sender number, in +E.164 format).' }) };
+        if (!contentSid) return { statusCode: 400, body: JSON.stringify({ error: 'contentSid is required — the approved Content Template SID (starts with "HX") from your Twilio Console.' }) };
+        fields = { provider: 'twilio', accountSid, authToken, fromNumber, contentSid };
       }
 
-      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider', screening: 'Screening Provider', sms: 'SMS Provider' }[type];
+      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider', screening: 'Screening Provider', sms: 'SMS Provider', whatsapp: 'WhatsApp Provider' }[type];
       const ref = await coll.add({
         type, label: label || defaultLabel,
         ...fields,
@@ -255,6 +267,11 @@ exports.handler = async (event) => {
           if (body.messagingProfileId !== undefined) update.messagingProfileId = body.messagingProfileId;
           if (body.apiKey) update.apiKey = body.apiKey; // blank = keep existing
         }
+      } else if (d.type === 'whatsapp') {
+        if (body.accountSid !== undefined) update.accountSid = body.accountSid;
+        if (body.fromNumber !== undefined) update.fromNumber = body.fromNumber;
+        if (body.contentSid !== undefined) update.contentSid = body.contentSid;
+        if (body.authToken) update.authToken = body.authToken; // blank = keep existing
       }
 
       await ref.update(update);
@@ -541,6 +558,37 @@ exports.handler = async (event) => {
         return { statusCode: 200, body: JSON.stringify({ success: true, message: `Test SMS sent to ${toNumber} (status: ${result.status}).${cost} This was a real message, not a free validation check.` }) };
       } catch (err) {
         return { statusCode: 400, body: JSON.stringify({ error: err.message || 'Could not send test SMS.' }) };
+      }
+    }
+
+    if (action === 'test_whatsapp') {
+      const { id, accountSid, authToken, fromNumber, contentSid, toNumber } = body;
+      if (!toNumber) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a WhatsApp number (in +E.164 format) to send the test to.' }) };
+
+      let creds = null;
+      if (accountSid && authToken && fromNumber && contentSid) {
+        creds = { accountSid, authToken, fromNumber, contentSid };
+      } else if (id) {
+        const snap = await coll.doc(id).get();
+        if (!snap.exists || snap.data().type !== 'whatsapp') return { statusCode: 404, body: JSON.stringify({ error: 'WhatsApp provider not found.' }) };
+        creds = snap.data();
+      } else {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No WhatsApp configuration given to test.' }) };
+      }
+
+      try {
+        const { sendWhatsApp } = require('./_lib/send-whatsapp');
+        // Matches the {{1}}, {{2}} placeholders the announcement template
+        // is documented to expect — see settings.whatsappTemplateHint in
+        // admin.html for the exact wording shown to the admin.
+        const result = await sendWhatsApp({
+          accountSid: creds.accountSid, authToken: creds.authToken, fromNumber: creds.fromNumber, contentSid: creds.contentSid,
+          contentVariables: { '1': 'Test', '2': 'This is a test message from your property management portal. If you received this, your WhatsApp integration is working.' },
+          to: toNumber,
+        });
+        return { statusCode: 200, body: JSON.stringify({ success: true, message: `Test WhatsApp message sent to ${toNumber} (status: ${result.status}). This was a real message, not a free validation check.` }) };
+      } catch (err) {
+        return { statusCode: 400, body: JSON.stringify({ error: err.message || 'Could not send test WhatsApp message.' }) };
       }
     }
 
