@@ -503,6 +503,12 @@
               </label>
               <p style="font-size:11px;color:var(--slate);margin-top:2px;margin-left:24px;" data-i18n="announcements.smsHint">Requires an SMS provider configured above, and a phone number on file for each tenant. Real messages with a real (small) cost per tenant — not free like email.</p>
             </div>
+            <div class="col-span-2">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="ann-whatsapp"> <span data-i18n="announcements.alsoWhatsapp">💚 Also send via WhatsApp</span>
+              </label>
+              <p style="font-size:11px;color:var(--slate);margin-top:2px;margin-left:24px;" data-i18n="announcements.whatsappHint">Requires a WhatsApp provider configured above, and a phone number on file for each tenant. Real messages with a real (small) cost per tenant — not free like email.</p>
+            </div>
           </div>
           <button onclick="postAnnouncement()" class="btn btn-primary" data-i18n="announcements.postButton">Post Announcement</button>
         </div>
@@ -1043,6 +1049,20 @@
               <tbody id="sms-providers-tbody"><tr><td colspan="5" style="text-align:center;color:var(--slate);padding:16px;" data-i18n="common.loading">Loading...</td></tr></tbody>
             </table>
           </div>
+
+          <hr style="border:none;border-top:1px solid var(--border);margin:20px 0 16px;">
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h4 style="font-size:1rem;font-weight:500;margin:0;" data-i18n="settings.whatsappProvider">💚 WhatsApp Provider</h4>
+            <button onclick="openWhatsappProviderModal()" class="btn btn-outline btn-sm" data-i18n="settings.addWhatsappProvider">+ Add WhatsApp Provider</button>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="settings.whatsappProviderHelp">Twilio only — WhatsApp business messaging requires Meta business verification and a pre-approved message template, set up directly in your Twilio Console (not something this app can configure for you). Powers WhatsApp delivery for announcements, in addition to email and SMS. Testing this sends a real WhatsApp message with a real, small cost.</p>
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead><tr><th data-i18n="settings.colLabel">Label</th><th data-i18n="settings.colFromNumber">From Number</th><th data-i18n="settings.colContentSid">Content SID</th><th data-i18n="common.status">Status</th><th data-i18n="common.actions">Actions</th></tr></thead>
+              <tbody id="whatsapp-providers-tbody"><tr><td colspan="5" style="text-align:center;color:var(--slate);padding:16px;" data-i18n="common.loading">Loading...</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1121,6 +1141,36 @@
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
               <button onclick="saveSmsProvider()" class="btn btn-primary" style="flex:1;" id="sms-int-save-btn" data-i18n="common.save">Save</button>
               <button onclick="testSmsIntegration()" class="btn btn-outline" id="sms-int-test-btn" data-i18n="settings.sendTestSms">Send Test SMS</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WHATSAPP PROVIDER MODAL -->
+      <div id="whatsapp-provider-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop absolute inset-0" onclick="closeModal('whatsapp-provider-modal')"></div>
+        <div style="background:#fff;width:100%;max-width:480px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+          <button onclick="closeModal('whatsapp-provider-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+          <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" id="whatsapp-provider-modal-title" data-i18n="settings.addWhatsappProviderTitle">Add WhatsApp Provider</h3>
+          <input type="hidden" id="int-whatsapp-id">
+          <div id="whatsapp-provider-modal-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div><label class="label" data-i18n="settings.colLabel">Label</label><input type="text" id="int-whatsapp-label" class="form-input" placeholder="My Twilio WhatsApp Sender"></div>
+            <div><label class="label"><span data-i18n="settings.colFromNumber">From Number</span> <span style="font-size:10px;font-weight:400;color:var(--slate);" data-i18n="settings.whatsappFromNumberHint">(+E.164 format — your Twilio WhatsApp Sender number, enabled via Meta business verification)</span></label><input type="text" id="int-whatsapp-fromnumber" class="form-input" placeholder="+15551234567"></div>
+            <div><label class="label" data-i18n="settings.accountSid">Account SID</label><input type="text" id="int-whatsapp-accountsid" class="form-input" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
+            <div><label class="label"><span data-i18n="settings.authToken">Auth Token</span> <span id="whatsapp-token-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-whatsapp-authtoken" class="form-input" placeholder="Twilio Console → Account Info"></div>
+            <div>
+              <label class="label"><span data-i18n="settings.colContentSid">Content SID</span></label>
+              <input type="text" id="int-whatsapp-contentsid" class="form-input" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+              <p style="font-size:10px;color:var(--slate);margin-top:4px;" data-i18n="settings.whatsappTemplateHint">The approved Content Template SID from Twilio Console → Content Editor. This template must have exactly two variables: {{1}} for the announcement title, {{2}} for its message body — e.g. "📢 {{1}}: {{2}}".</p>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-top:14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:10px 12px;" data-i18n="settings.whatsappTestWarning">⚠️ Testing sends a real WhatsApp message with a real (small) cost — there's no free credential-only check available for WhatsApp.</p>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px;">
+            <input type="text" id="int-whatsapp-test-to" class="form-input" data-i18n-placeholder="settings.testWhatsappPlaceholder" placeholder="WhatsApp number to send the test to, +E.164 format">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <button onclick="saveWhatsappProvider()" class="btn btn-primary" style="flex:1;" id="whatsapp-int-save-btn" data-i18n="common.save">Save</button>
+              <button onclick="testWhatsappIntegration()" class="btn btn-outline" id="whatsapp-int-test-btn" data-i18n="settings.sendTestWhatsapp">Send Test WhatsApp</button>
             </div>
           </div>
         </div>
@@ -2250,6 +2300,10 @@
       'announcements.smsConfirm':'This will send a real SMS (with a real, small cost per tenant) to everyone targeted who has a phone number on file. Continue?',
       'announcements.posting':'Posting...', 'announcements.emailedCount':'emailed {n} tenant(s)',
       'announcements.textedCount':'texted {n} tenant(s)', 'announcements.postedAnd':'✓ Announcement posted and {parts}.',
+      'announcements.alsoWhatsapp':'💚 Also send via WhatsApp',
+      'announcements.whatsappHint':'Requires a WhatsApp provider configured above, and a phone number on file for each tenant. Real messages with a real (small) cost per tenant — not free like email.',
+      'announcements.whatsappConfirm':'This will send a real WhatsApp message (with a real, small cost per tenant) to everyone targeted who has a phone number on file. Continue?',
+      'announcements.whatsappedCount':'WhatsApped {n} tenant(s)',
       'announcements.postedOnly':'✓ Announcement posted.',
       'invitations.title':'Tenant Invitations', 'invitations.newInvitation':'+ New Invitation',
       'invitations.colSent':'Sent', 'invitations.colActivated':'Activated',
@@ -2431,6 +2485,14 @@
       'settings.clicksendHint':'ClickSend doesn\'t need a "from" number here — it uses whatever sender is configured as your account default (or a specific Sender ID) directly in your ClickSend dashboard.',
       'settings.username':'Username', 'settings.smsTestWarning':'⚠️ Testing sends a real SMS with a real (small) cost — there\'s no free credential-only check available for SMS.',
       'settings.testPhonePlaceholder':'Phone number to send the test to, +E.164 format', 'settings.sendTestSms':'Send Test SMS',
+      'settings.enterPhoneForTest':'Enter a phone number to send the test to.',
+      'settings.whatsappProvider':'💚 WhatsApp Provider', 'settings.addWhatsappProvider':'+ Add WhatsApp Provider',
+      'settings.whatsappProviderHelp':'Twilio only — WhatsApp business messaging requires Meta business verification and a pre-approved message template, set up directly in your Twilio Console (not something this app can configure for you). Powers WhatsApp delivery for announcements, in addition to email and SMS. Testing this sends a real WhatsApp message with a real, small cost.',
+      'settings.colContentSid':'Content SID', 'settings.addWhatsappProviderTitle':'Add WhatsApp Provider', 'settings.editWhatsappProviderTitle':'Edit WhatsApp Provider',
+      'settings.whatsappFromNumberHint':'(+E.164 format — your Twilio WhatsApp Sender number, enabled via Meta business verification)',
+      'settings.whatsappTemplateHint':'The approved Content Template SID from Twilio Console → Content Editor. This template must have exactly two variables: {{1}} for the announcement title, {{2}} for its message body — e.g. "📢 {{1}}: {{2}}".',
+      'settings.whatsappTestWarning':'⚠️ Testing sends a real WhatsApp message with a real (small) cost — there\'s no free credential-only check available for WhatsApp.',
+      'settings.testWhatsappPlaceholder':'WhatsApp number to send the test to, +E.164 format', 'settings.sendTestWhatsapp':'Send Test WhatsApp',
       'settings.addScreeningProviderTitle':'Add Screening Provider', 'settings.activeEnvironment':'Active Environment',
       'settings.sandboxOption':'Sandbox (testing — no real charges or checks)', 'settings.productionOption':'Production (live — real charges and checks)',
       'settings.sandboxToken':'Sandbox Token', 'settings.fromSingleKeyManager':'From your SingleKey account manager',
@@ -2762,6 +2824,10 @@
       'announcements.smsConfirm':'Esto enviará un SMS real (con un costo real y pequeño por inquilino) a todos los destinatarios que tengan un número de teléfono registrado. ¿Continuar?',
       'announcements.posting':'Publicando...', 'announcements.emailedCount':'correo enviado a {n} inquilino(s)',
       'announcements.textedCount':'SMS enviado a {n} inquilino(s)', 'announcements.postedAnd':'✓ Anuncio publicado y {parts}.',
+      'announcements.alsoWhatsapp':'💚 También enviar por WhatsApp',
+      'announcements.whatsappHint':'Requiere un proveedor de WhatsApp configurado arriba, y un número de teléfono registrado para cada inquilino. Mensajes reales con un costo real (pequeño) por inquilino — no es gratis como el correo.',
+      'announcements.whatsappConfirm':'Esto enviará un mensaje de WhatsApp real (con un costo real y pequeño por inquilino) a todos los destinatarios que tengan un número de teléfono registrado. ¿Continuar?',
+      'announcements.whatsappedCount':'WhatsApp enviado a {n} inquilino(s)',
       'announcements.postedOnly':'✓ Anuncio publicado.',
       'invitations.title':'Invitaciones de Inquilinos', 'invitations.newInvitation':'+ Nueva Invitación',
       'invitations.colSent':'Enviada', 'invitations.colActivated':'Activada',
@@ -2943,6 +3009,14 @@
       'settings.clicksendHint':'ClickSend no necesita un número "de origen" aquí — usa el remitente configurado como predeterminado de tu cuenta (o un ID de Remitente específico) directamente en tu panel de ClickSend.',
       'settings.username':'Usuario', 'settings.smsTestWarning':'⚠️ Probar esto envía un SMS real con un costo real (pequeño) — no hay una verificación gratuita de solo credenciales disponible para SMS.',
       'settings.testPhonePlaceholder':'Número de teléfono al que enviar la prueba, formato +E.164', 'settings.sendTestSms':'Enviar SMS de Prueba',
+      'settings.enterPhoneForTest':'Ingresa un número de teléfono al que enviar la prueba.',
+      'settings.whatsappProvider':'💚 Proveedor de WhatsApp', 'settings.addWhatsappProvider':'+ Agregar Proveedor de WhatsApp',
+      'settings.whatsappProviderHelp':'Solo Twilio — la mensajería empresarial de WhatsApp requiere verificación empresarial de Meta y una plantilla de mensaje pre-aprobada, configurada directamente en tu Consola de Twilio (no es algo que esta aplicación pueda configurar por ti). Habilita el envío de anuncios por WhatsApp, además de correo y SMS. Probar esto envía un mensaje de WhatsApp real con un costo real y pequeño.',
+      'settings.colContentSid':'SID de Contenido', 'settings.addWhatsappProviderTitle':'Agregar Proveedor de WhatsApp', 'settings.editWhatsappProviderTitle':'Editar Proveedor de WhatsApp',
+      'settings.whatsappFromNumberHint':'(formato +E.164 — tu número de Remitente de WhatsApp en Twilio, habilitado mediante verificación empresarial de Meta)',
+      'settings.whatsappTemplateHint':'El SID de la Plantilla de Contenido aprobada desde Twilio Console → Content Editor. Esta plantilla debe tener exactamente dos variables: {{1}} para el título del anuncio, {{2}} para el cuerpo del mensaje — ej. "📢 {{1}}: {{2}}".',
+      'settings.whatsappTestWarning':'⚠️ Probar esto envía un mensaje de WhatsApp real con un costo real (pequeño) — no hay una verificación gratuita de solo credenciales disponible para WhatsApp.',
+      'settings.testWhatsappPlaceholder':'Número de WhatsApp al que enviar la prueba, formato +E.164', 'settings.sendTestWhatsapp':'Enviar WhatsApp de Prueba',
       'settings.addScreeningProviderTitle':'Agregar Proveedor de Verificación', 'settings.activeEnvironment':'Entorno Activo',
       'settings.sandboxOption':'Sandbox (pruebas — sin cargos ni verificaciones reales)', 'settings.productionOption':'Producción (en vivo — cargos y verificaciones reales)',
       'settings.sandboxToken':'Token de Sandbox', 'settings.fromSingleKeyManager':'De tu gestor de cuenta de SingleKey',
@@ -5220,25 +5294,29 @@
     const propId = useSpecific ? '' : document.getElementById('ann-property').value;
     const urgent = document.getElementById('ann-urgent').checked;
     const sms = document.getElementById('ann-sms').checked;
+    const whatsapp = document.getElementById('ann-whatsapp').checked;
     if (!title||!message) { showAlert('ann-alert', t('announcements.titleMessageRequired')); return; }
     if (useSpecific && !tenantIds.length) { showAlert('ann-alert', t('announcements.selectAtLeastOneTenant')); return; }
     if (sms && !confirm(t('announcements.smsConfirm'))) return;
+    if (whatsapp && !confirm(t('announcements.whatsappConfirm'))) return;
     const btn = document.querySelector('#section-announcements button[onclick="postAnnouncement()"]');
     if (btn) { btn.disabled=true; btn.textContent=t('announcements.posting'); }
     await addDoc(collection(db,'announcements'),{title,message,propertyId:propId||null,tenantIds:tenantIds.length?tenantIds:null,urgent,createdAt:serverTimestamp()});
     let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
     const propName = propId?(allProperties.find(p=>p.id===propId)?.name||''):'';
-    fetch('/api/announce-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,sms,siteName})})
+    fetch('/api/announce-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,sms,whatsapp,siteName})})
       .then(r=>r.json()).then(d=>{
         const parts = [];
         if (d.sent>0) parts.push(t('announcements.emailedCount').replace('{n}', d.sent));
         if (d.smsSent>0) parts.push(t('announcements.textedCount').replace('{n}', d.smsSent));
+        if (d.whatsappSent>0) parts.push(t('announcements.whatsappedCount').replace('{n}', d.whatsappSent));
         showAlert('ann-alert', parts.length ? t('announcements.postedAnd').replace('{parts}', parts.join(', ')) : t('announcements.postedOnly'), 'success');
       })
       .catch(()=>showAlert('ann-alert', t('announcements.postedOnly'),'success'));
     document.getElementById('ann-title').value=''; document.getElementById('ann-message').value='';
     document.getElementById('ann-urgent').checked = false;
     document.getElementById('ann-sms').checked = false;
+    document.getElementById('ann-whatsapp').checked = false;
     selectedAnnouncementTenantIds.clear();
     document.getElementById('ann-use-specific-tenants').checked = false;
     toggleAnnSpecificTenants();
@@ -7257,6 +7335,7 @@
       renderProvidersTable('envelope', 'envelope-providers-tbody');
       renderProvidersTable('screening', 'screening-providers-tbody');
       renderProvidersTable('sms', 'sms-providers-tbody');
+      renderProvidersTable('whatsapp', 'whatsapp-providers-tbody');
     } catch (e) {
       console.error('loadIntegrationsStatus:', e);
     }
@@ -7266,22 +7345,23 @@
     const tbody = document.getElementById(tbodyId);
     const rows = allIntegrationProviders.filter(p => p.type === type);
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="${type === 'email' || type === 'sms' ? 5 : 4}" style="text-align:center;color:var(--slate);padding:16px;">No ${type} providers saved yet — using the environment default.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${type === 'email' || type === 'sms' || type === 'whatsapp' ? 5 : 4}" style="text-align:center;color:var(--slate);padding:16px;">No ${type} providers saved yet — using the environment default.</td></tr>`;
       return;
     }
-    const openFns = { email: 'openEmailProviderModal', storage: 'openStorageProviderModal', envelope: 'openEnvelopeProviderModal', screening: 'openScreeningProviderModal', sms: 'openSmsProviderModal' };
+    const openFns = { email: 'openEmailProviderModal', storage: 'openStorageProviderModal', envelope: 'openEnvelopeProviderModal', screening: 'openScreeningProviderModal', sms: 'openSmsProviderModal', whatsapp: 'openWhatsappProviderModal' };
     tbody.innerHTML = rows.map(p => {
       const statusBadge = p.isActive ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-pending">Inactive</span>';
       const openFn = openFns[type];
       const middleCell = type === 'email' ? `<td style="font-size:12px;">${p.host || '—'}</td>`
         : type === 'storage' ? `<td style="font-size:12px;">${p.backend === 'r2' ? `R2: ${p.bucketName || '—'}` : `Cloudinary: ${p.cloudName || '—'}`}</td>`
         : type === 'screening' ? `<td style="font-size:12px;text-transform:capitalize;">${p.environment || 'sandbox'}</td>`
-        : type === 'sms' ? `<td style="font-size:12px;">${p.fromNumber || '—'}</td>`
+        : (type === 'sms' || type === 'whatsapp') ? `<td style="font-size:12px;">${p.fromNumber || '—'}</td>`
         : `<td style="font-size:12px;">${p.templateId || '—'}</td>`;
       return `<tr>
         <td><strong>${p.label}</strong></td>
         ${type === 'email' || type === 'sms' ? `<td style="font-size:12px;text-transform:capitalize;">${p.provider}</td>` : ''}
         ${middleCell}
+        ${type === 'whatsapp' ? `<td style="font-size:11px;font-family:monospace;">${p.contentSid || '—'}</td>` : ''}
         <td>${statusBadge}</td>
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -7298,11 +7378,16 @@
 
   window.testSavedProvider = async (id, type, btnEl) => {
     const resultEl = btnEl.closest('td').querySelector('.provider-test-result');
-    // SMS needs a destination number, unlike every other provider's
-    // no-input test — prompt for it rather than silently guessing one.
+    // SMS and WhatsApp need a destination number, unlike every other
+    // provider's no-input test — prompt for it rather than silently
+    // guessing one.
     let extraParams = {};
     if (type === 'sms') {
       const toNumber = prompt('Send a real test SMS to which number? (+E.164 format, e.g. +15551234567)\n\nThis will incur a small real cost.');
+      if (!toNumber) return; // cancelled
+      extraParams = { toNumber };
+    } else if (type === 'whatsapp') {
+      const toNumber = prompt('Send a real test WhatsApp message to which number? (+E.164 format, e.g. +15551234567)\n\nThis will incur a small real cost.');
       if (!toNumber) return; // cancelled
       extraParams = { toNumber };
     }
@@ -7310,7 +7395,7 @@
     const original = btnEl.textContent; btnEl.textContent=t('common.testing');
     resultEl.textContent = '';
     try {
-      const action = { email: 'test_email', storage: 'test_storage', envelope: 'test_envelope', screening: 'test_screening', sms: 'test_sms' }[type];
+      const action = { email: 'test_email', storage: 'test_storage', envelope: 'test_envelope', screening: 'test_screening', sms: 'test_sms', whatsapp: 'test_whatsapp' }[type];
       const result = await callManageIntegrations(action, { id, ...extraParams });
       resultEl.style.color = '#16A34A';
       resultEl.textContent = '✓ ' + (result.message || `Test email sent to ${result.sentTo}.`);
@@ -7705,6 +7790,57 @@
       showAlert('sms-provider-modal-alert', '✓ ' + result.message, 'success');
     } catch (e) { showAlert('sms-provider-modal-alert', 'Test failed: ' + e.message); }
     btn.disabled = false; btn.textContent = t('settings.sendTestSms');
+  };
+
+  window.openWhatsappProviderModal = (id) => {
+    const p = id ? allIntegrationProviders.find(x => x.id === id) : null;
+    document.getElementById('int-whatsapp-id').value = id || '';
+    document.getElementById('int-whatsapp-label').value = p?.label || '';
+    document.getElementById('int-whatsapp-fromnumber').value = p?.fromNumber || '';
+    document.getElementById('int-whatsapp-accountsid').value = p?.accountSid || '';
+    document.getElementById('int-whatsapp-authtoken').value = '';
+    document.getElementById('whatsapp-token-hint').textContent = p ? `(leave blank to keep current: ${p.authTokenMasked || '••••'})` : '';
+    document.getElementById('int-whatsapp-contentsid').value = p?.contentSid || '';
+    document.getElementById('int-whatsapp-test-to').value = '';
+    document.getElementById('whatsapp-provider-modal-title').textContent = p ? t('settings.editWhatsappProviderTitle') : t('settings.addWhatsappProviderTitle');
+    document.getElementById('whatsapp-provider-modal-alert').classList.add('hidden');
+    openModal('whatsapp-provider-modal');
+  };
+  window.saveWhatsappProvider = async () => {
+    const id = document.getElementById('int-whatsapp-id').value;
+    const btn = document.getElementById('whatsapp-int-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
+    const payload = {
+      label: document.getElementById('int-whatsapp-label').value.trim(),
+      fromNumber: document.getElementById('int-whatsapp-fromnumber').value.trim(),
+      accountSid: document.getElementById('int-whatsapp-accountsid').value.trim(),
+      authToken: document.getElementById('int-whatsapp-authtoken').value, // blank on edit = keep existing
+      contentSid: document.getElementById('int-whatsapp-contentsid').value.trim(),
+    };
+    try {
+      if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('whatsapp_provider_updated', 'settings', id, payload.label); }
+      else { await callManageIntegrations('add_provider', { type: 'whatsapp', ...payload }); logAdminAction('whatsapp_provider_added', 'settings', null, payload.label); }
+      closeModal('whatsapp-provider-modal');
+      await loadIntegrationsStatus();
+    } catch (e) { showAlert('whatsapp-provider-modal-alert', e.message); }
+    btn.disabled = false; btn.textContent = t('common.save');
+  };
+  window.testWhatsappIntegration = async () => {
+    const id = document.getElementById('int-whatsapp-id').value;
+    const toNumber = document.getElementById('int-whatsapp-test-to').value.trim();
+    if (!toNumber) { showAlert('whatsapp-provider-modal-alert', t('settings.enterPhoneForTest')); return; }
+    const btn = document.getElementById('whatsapp-int-test-btn'); btn.disabled = true; btn.textContent = t('common.sending');
+    try {
+      const payload = {
+        id: id || undefined, toNumber,
+        fromNumber: document.getElementById('int-whatsapp-fromnumber').value.trim(),
+        accountSid: document.getElementById('int-whatsapp-accountsid').value.trim(),
+        authToken: document.getElementById('int-whatsapp-authtoken').value,
+        contentSid: document.getElementById('int-whatsapp-contentsid').value.trim(),
+      };
+      const result = await callManageIntegrations('test_whatsapp', payload);
+      showAlert('whatsapp-provider-modal-alert', '✓ ' + result.message, 'success');
+    } catch (e) { showAlert('whatsapp-provider-modal-alert', t('settings.testFailedPrefix') + e.message); }
+    btn.disabled = false; btn.textContent = t('settings.sendTestWhatsapp');
   };
 
   // ===== PAGE BUILDER (Super Admin only — landing page layout) =====
