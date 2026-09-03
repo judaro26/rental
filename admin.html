@@ -2482,6 +2482,7 @@
       'settings.fromNumberHint':'(+E.164 format, e.g. +15551234567 — must be purchased and messaging-enabled in your provider\'s dashboard)',
       'settings.messagingProfileId':'Messaging Profile ID', 'settings.optionalForReference':'(optional, for your reference)',
       'settings.accountSid':'Account SID', 'settings.authToken':'Auth Token',
+      'settings.accountSidFormatHint':'That doesn\'t look like an Account SID — it should start with "AC" and come from the Twilio Console home/dashboard, not from API Keys & Tokens (those start with "SK" and won\'t work here).',
       'settings.clicksendHint':'ClickSend doesn\'t need a "from" number here — it uses whatever sender is configured as your account default (or a specific Sender ID) directly in your ClickSend dashboard.',
       'settings.username':'Username', 'settings.smsTestWarning':'⚠️ Testing sends a real SMS with a real (small) cost — there\'s no free credential-only check available for SMS.',
       'settings.testPhonePlaceholder':'Phone number to send the test to, +E.164 format', 'settings.sendTestSms':'Send Test SMS',
@@ -3006,6 +3007,7 @@
       'settings.fromNumberHint':'(formato +E.164, ej. +15551234567 — debe estar comprado y habilitado para mensajería en el panel de tu proveedor)',
       'settings.messagingProfileId':'ID de Perfil de Mensajería', 'settings.optionalForReference':'(opcional, para tu referencia)',
       'settings.accountSid':'SID de Cuenta', 'settings.authToken':'Token de Autenticación',
+      'settings.accountSidFormatHint':'Eso no parece un SID de Cuenta — debe comenzar con "AC" y provenir de la página principal de la Consola de Twilio, no de API Keys & Tokens (esos comienzan con "SK" y no funcionarán aquí).',
       'settings.clicksendHint':'ClickSend no necesita un número "de origen" aquí — usa el remitente configurado como predeterminado de tu cuenta (o un ID de Remitente específico) directamente en tu panel de ClickSend.',
       'settings.username':'Usuario', 'settings.smsTestWarning':'⚠️ Probar esto envía un SMS real con un costo real (pequeño) — no hay una verificación gratuita de solo credenciales disponible para SMS.',
       'settings.testPhonePlaceholder':'Número de teléfono al que enviar la prueba, formato +E.164', 'settings.sendTestSms':'Enviar SMS de Prueba',
@@ -7808,12 +7810,14 @@
   };
   window.saveWhatsappProvider = async () => {
     const id = document.getElementById('int-whatsapp-id').value;
+    const accountSidVal = document.getElementById('int-whatsapp-accountsid').value.trim();
+    if (accountSidVal && !accountSidVal.startsWith('AC')) { showAlert('whatsapp-provider-modal-alert', t('settings.accountSidFormatHint')); return; }
     const btn = document.getElementById('whatsapp-int-save-btn'); btn.disabled = true; btn.textContent = t('common.saving');
     const payload = {
       label: document.getElementById('int-whatsapp-label').value.trim(),
       fromNumber: document.getElementById('int-whatsapp-fromnumber').value.trim(),
       accountSid: document.getElementById('int-whatsapp-accountsid').value.trim(),
-      authToken: document.getElementById('int-whatsapp-authtoken').value, // blank on edit = keep existing
+      authToken: document.getElementById('int-whatsapp-authtoken').value.trim(), // blank on edit = keep existing
       contentSid: document.getElementById('int-whatsapp-contentsid').value.trim(),
     };
     try {
@@ -7828,13 +7832,15 @@
     const id = document.getElementById('int-whatsapp-id').value;
     const toNumber = document.getElementById('int-whatsapp-test-to').value.trim();
     if (!toNumber) { showAlert('whatsapp-provider-modal-alert', t('settings.enterPhoneForTest')); return; }
+    const accountSidVal = document.getElementById('int-whatsapp-accountsid').value.trim();
+    if (accountSidVal && !accountSidVal.startsWith('AC')) { showAlert('whatsapp-provider-modal-alert', t('settings.accountSidFormatHint')); return; }
     const btn = document.getElementById('whatsapp-int-test-btn'); btn.disabled = true; btn.textContent = t('common.sending');
     try {
       const payload = {
         id: id || undefined, toNumber,
         fromNumber: document.getElementById('int-whatsapp-fromnumber').value.trim(),
         accountSid: document.getElementById('int-whatsapp-accountsid').value.trim(),
-        authToken: document.getElementById('int-whatsapp-authtoken').value,
+        authToken: document.getElementById('int-whatsapp-authtoken').value.trim(),
         contentSid: document.getElementById('int-whatsapp-contentsid').value.trim(),
       };
       const result = await callManageIntegrations('test_whatsapp', payload);
