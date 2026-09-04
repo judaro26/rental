@@ -95,7 +95,7 @@ exports.handler = async (event) => {
     await store.set(blobKey, fileBuffer, { metadata: { contentType: mimeType, fileName } });
 
     const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
-    const viewUrl = `${siteUrl}/api/view-doc?key=${encodeURIComponent(blobKey)}`;
+    const viewUrl = `${siteUrl}/api/view-doc?key=${encodeURIComponent(blobKey)}&app=${encodeURIComponent(appId)}&token=${encodeURIComponent(token)}`;
     const type = ext === 'pdf' ? 'pdf' : ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(ext) ? 'image' : 'file';
     const label = (fields.label || 'Document').toString().slice(0, 120);
 
