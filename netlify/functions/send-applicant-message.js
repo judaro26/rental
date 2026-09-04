@@ -64,6 +64,14 @@ exports.handler = async (event) => {
   const a  = getAdmin();
   const db = a.firestore();
 
+  // Admin-only: same issue as request-documents.js — no auth check, and
+  // when includeForm is set, the response leaks a valid responseToken via
+  // formUrl to whoever called this, not just to the real applicant via
+  // email.
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
+
   try {
     const ref  = db.collection('applications').doc(applicationId);
     const snap = await ref.get();
