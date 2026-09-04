@@ -34,10 +34,35 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'tenantId and tenantEmail required' }) };
   }
 
-  try {
-    const fb = getAdmin();
-    const db = fb.firestore();
+  const fb = getAdmin();
+  const db = fb.firestore();
 
+  // Authentication: previously this function had no auth check, and the
+  // impact here is more than impersonation — it creates/links a real
+  // Stripe Customer to the given tenantId's Firestore record and returns
+  // a SetupIntent client secret, which is what actually authorizes
+  // attaching a payment method. An unauthenticated caller could use this
+  // to link a Stripe Customer of their choosing to a real tenant's
+  // account (before the tenant sets one up), or obtain a fresh client
+  // secret for a tenant's *existing* Stripe Customer and use it to attach
+  // a payment method the tenant never approved.
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+  const bearerMatch = authHeader.match(/^Bearer (.+)$/i);
+  if (!bearerMatch) return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) };
+
+  let decoded;
+  try { decoded = await fb.auth().verifyIdToken(bearerMatch[1]); }
+  catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
+
+  const isOwnSetup = decoded.uid === tenantId;
+  if (!isOwnSetup) {
+    const adminSnap = await db.collection('admins').doc(decoded.uid).get();
+    if (!adminSnap.exists || adminSnap.data().status === 'revoked') {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Not authorized to set up auto-pay for this tenant.' }) };
+    }
+  }
+
+  try {
     // Get or create Stripe Customer
     const tenantDoc  = await db.collection('tenants').doc(tenantId).get();
     const tenantData = tenantDoc.data() || {};
