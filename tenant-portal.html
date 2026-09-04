@@ -841,15 +841,36 @@
           <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${d.name}</div>
           <div style="font-size:11px;color:var(--slate);">${d.category||''} · ${date}</div>
         </div>
-        <a href="${d.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
-          style="font-size:11px;color:#9CA3AF;text-decoration:none;flex-shrink:0;" title="Download" download>↓</a>
+        <a href="#" onclick="event.stopPropagation();event.preventDefault();downloadTenantDoc('${safeUrl}','${safeName}',this)"
+          style="font-size:11px;color:#9CA3AF;text-decoration:none;flex-shrink:0;" title="Download">↓</a>
       </div>`;
     }).join('');
   }
 
-  window.openDocViewer = (encodedUrl, name, type, docId, storagePath) => {
-    // URL already points to /api/view-doc?key=... (set at upload time)
-    const src = decodeURIComponent(encodedUrl);
+  window.downloadTenantDoc = async (encodedUrl, name, linkEl) => {
+    const original = linkEl.textContent;
+    linkEl.textContent = '…';
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(decodeURIComponent(encodedUrl), { headers: { 'Authorization': `Bearer ${idToken}` } });
+      if (!res.ok) throw new Error(`Could not download document (${res.status})`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = name; document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      alert('Could not download document: ' + e.message);
+    }
+    linkEl.textContent = original;
+  };
+
+  window.openDocViewer = async (encodedUrl, name, type, docId, storagePath) => {
+    // URL already points to /api/view-doc?key=... (set at upload time) —
+    // now requires auth, so this fetches with the tenant's token and
+    // renders the result as a Blob URL rather than linking to it directly.
+    const rawUrl = decodeURIComponent(encodedUrl);
     logAction('document_viewed', `Opened document: ${name} (${type})`);
     const body = document.getElementById('doc-viewer-body');
 
@@ -863,6 +884,21 @@
 
     document.getElementById('doc-viewer-title').textContent = name;
     const dlBtn = document.getElementById('doc-viewer-download');
+    dlBtn.style.display = 'none';
+    body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9CA3AF;font-size:13px;">Loading…</div>`;
+
+    let src;
+    try {
+      const idToken = await currentUser.getIdToken();
+      const res = await fetch(rawUrl, { headers: { 'Authorization': `Bearer ${idToken}` } });
+      if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+      const blob = await res.blob();
+      src = URL.createObjectURL(blob);
+    } catch (e) {
+      body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:#DC2626;"><span style="font-size:32px;">⚠️</span><p style="font-size:13px;margin:0;text-align:center;max-width:320px;">${e.message}</p></div>`;
+      return;
+    }
+
     dlBtn.href = src; dlBtn.style.display = '';
 
     if (type === 'pdf') {
