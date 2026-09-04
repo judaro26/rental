@@ -181,6 +181,14 @@
     <!-- ===== ANNOUNCEMENTS ===== -->
     <div id="announcements-section" style="margin-bottom:24px;display:none;"></div>
 
+    <!-- ===== MOVE-OUT STATUS (only shown if a move-out record exists) ===== -->
+    <div id="moveout-status-card" style="display:none;margin-bottom:24px;">
+      <div class="card" style="border:2px solid #C9903A;">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="tenant.moveout.title">🚪 Move-Out &amp; Deposit Return</h3></div>
+        <div class="card-body" id="moveout-status-body"></div>
+      </div>
+    </div>
+
     <!-- ===== DASHBOARD ===== -->
     <section id="section-dashboard" class="section active">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
@@ -523,6 +531,24 @@
     </section>
 
     <section id="section-settings" class="section">
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="tenant.settings.contactInfo">Contact Information</h3></div>
+        <div class="card-body">
+          <div id="contact-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+            <div>
+              <label class="label" data-i18n="tenant.settings.phone">Phone Number</label>
+              <input type="tel" id="settings-phone-input" class="form-input" placeholder="(555) 123-4567">
+            </div>
+            <div>
+              <label class="label" data-i18n="common.email">Email</label>
+              <input type="email" id="settings-email-display" class="form-input" readonly style="background:#F3F0EB;">
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin:4px 0 16px;" data-i18n="tenant.settings.emailReadonlyHint">Your email is your login and is not editable here — contact your property manager if you need to update it.</p>
+          <button onclick="saveContactInfo()" id="settings-contact-save-btn" class="btn btn-primary" data-i18n="common.save">Save</button>
+        </div>
+      </div>
       <div class="card">
         <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="tenant.settings.notifications">Notification Preferences</h3></div>
         <div class="card-body">
@@ -715,6 +741,13 @@
         } catch { window._boldPaymentsEnabled = false; }
       }
 
+      // Lease info card only ever rendered on a dashboard *re-visit* via
+      // switchSection before this — since dashboard is already the
+      // default-active section in the HTML, that handler never fired on
+      // the very first load, so this card was stuck on "Loading..." until
+      // the tenant navigated away and back. Calling it directly here too.
+      renderLeaseInfo();
+
       // Load all data sections
       await Promise.all([
         loadPayments(),
@@ -724,7 +757,8 @@
         loadFeatureHistory(),
         loadZelleSettings(),
         loadInvoicesTenant(),
-        loadAnnouncements()
+        loadAnnouncements(),
+        loadMoveOutStatus()
       ]);
 
       // Returning from Bold's hosted checkout — the actual "paid" status
@@ -758,8 +792,52 @@
         <div><span class="label">Lease End</span>${td.leaseEnd ? new Date(td.leaseEnd+'T00:00:00').toLocaleDateString() : '—'}</div>
         <div><span class="label">Monthly Rent</span>${td.monthlyRent ? '$'+Number(td.monthlyRent).toLocaleString() : '—'}</div>
         <div><span class="label">Status</span><span class="badge ${td.status==='active'?'badge-paid':'badge-pending'}">${td.status||'Pending'}</span></div>
-      </div>`;
+      </div>
+      ${renderRenewalPrompt(td)}`;
   }
+
+  // Matches the admin dashboard's own "leases expiring" widget, which uses
+  // the same 60-day window — keeps both sides of the app in agreement
+  // about when a lease counts as "approaching renewal."
+  function renderRenewalPrompt(td) {
+    if (!td.leaseEnd) return '';
+    const daysLeft = Math.round((new Date(td.leaseEnd+'T00:00:00') - new Date()) / 86400000);
+    if (daysLeft > 60) return '';
+
+    if (td.renewalRequest?.requested) {
+      const requestedDate = td.renewalRequest.requestedAt?.toDate
+        ? td.renewalRequest.requestedAt.toDate().toLocaleDateString()
+        : '';
+      return `<div style="margin-top:16px;padding-top:16px;border-top:1px solid #F3F4F6;font-size:13px;color:#16A34A;">
+        ✓ ${PublicI18N.t('tenant.renewal.requestSent')}${requestedDate ? ' ('+requestedDate+')' : ''} — ${PublicI18N.t('tenant.renewal.willBeInTouch')}
+      </div>`;
+    }
+
+    const urgency = daysLeft < 0
+      ? PublicI18N.t('tenant.renewal.alreadyEnded')
+      : `${PublicI18N.t('tenant.renewal.endsIn')} ${daysLeft} ${PublicI18N.t(daysLeft===1?'tenant.renewal.day':'tenant.renewal.days')}`;
+    return `<div style="margin-top:16px;padding-top:16px;border-top:1px solid #F3F4F6;">
+      <p style="font-size:13px;color:#92400E;margin:0 0 10px;">⏰ ${urgency}. ${PublicI18N.t('tenant.renewal.prompt')}</p>
+      <button onclick="requestRenewal()" id="renewal-request-btn" class="btn btn-primary btn-sm">${PublicI18N.t('tenant.renewal.requestButton')}</button>
+    </div>`;
+  }
+
+  window.requestRenewal = async () => {
+    const btn = document.getElementById('renewal-request-btn');
+    if (btn) { btn.disabled = true; btn.textContent = PublicI18N.t('common.loading'); }
+    try {
+      await updateDoc(doc(db,'tenants',currentUser.uid), {
+        renewalRequest: { requested: true, requestedAt: serverTimestamp() },
+        updatedAt: serverTimestamp(),
+      });
+      if (tenantData) tenantData.renewalRequest = { requested: true, requestedAt: Timestamp.now() };
+      logAction('renewal_requested', 'Tenant requested lease renewal');
+      renderLeaseInfo();
+    } catch (e) {
+      alert('Could not send your renewal request: ' + e.message);
+      if (btn) { btn.disabled = false; btn.textContent = PublicI18N.t('tenant.renewal.requestButton'); }
+    }
+  };
 
   // ===== PAYMENTS =====
   let payments = [];
@@ -1066,6 +1144,50 @@
   });
 
   // ===== ANNOUNCEMENTS =====
+  // ===== MOVE-OUT STATUS =====
+  // Queries the tenant's own moveOuts record directly — already readable
+  // per firestore.rules (isAdmin() || resource.data.tenantId ==
+  // request.auth.uid), so no backend endpoint is needed. A where-only
+  // query (no orderBy) avoids requiring a composite index; a tenant
+  // realistically has at most one move-out record anyway, so the client-
+  // side sort below is just a safety net, not something expected to
+  // matter in practice.
+  async function loadMoveOutStatus() {
+    try {
+      const q = query(collection(db,'moveOuts'), where('tenantId','==',currentUser.uid));
+      const snap = await getDocs(q);
+      if (snap.empty) return;
+      const records = snap.docs.map(d => d.data())
+        .sort((a,b) => (b.generatedAt?.toMillis?.()||0) - (a.generatedAt?.toMillis?.()||0));
+      const mo = records[0];
+
+      const card = document.getElementById('moveout-status-card');
+      const body = document.getElementById('moveout-status-body');
+      const dateStr = mo.moveOutDate ? new Date(mo.moveOutDate+'T00:00:00').toLocaleDateString() : '—';
+
+      if (mo.country === 'CO') {
+        body.innerHTML = `
+          <p style="font-size:13px;color:var(--slate);margin:0 0 12px;">${PublicI18N.t('tenant.moveout.movedOutOn')} ${dateStr}.</p>
+          ${mo.conditionNotes ? `<p style="font-size:13px;color:#374151;white-space:pre-wrap;margin:0 0 12px;">${mo.conditionNotes}</p>` : ''}
+          ${mo.statementUrl ? `<a href="${mo.statementUrl}" target="_blank" rel="noreferrer noopener" class="btn btn-primary">${PublicI18N.t('tenant.moveout.viewStatement')}</a>` : ''}
+        `;
+      } else {
+        const isRefund = (mo.netAmount||0) >= 0;
+        const deductionCount = (mo.deductions||[]).length;
+        body.innerHTML = `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;font-size:13px;margin-bottom:16px;">
+            <div><span class="label">${PublicI18N.t('tenant.moveout.date')}</span>${dateStr}</div>
+            <div><span class="label">${PublicI18N.t('tenant.moveout.deposit')}</span>$${(mo.depositAmount||0).toFixed(2)}</div>
+            <div><span class="label">${PublicI18N.t('tenant.moveout.deductions')}</span>${deductionCount} ${PublicI18N.t(deductionCount===1?'tenant.moveout.item':'tenant.moveout.items')}</div>
+            <div><span class="label">${isRefund?PublicI18N.t('tenant.moveout.refundDue'):PublicI18N.t('tenant.moveout.youOwe')}</span><strong style="color:${isRefund?'#16A34A':'#DC2626'};">$${Math.abs(mo.netAmount||0).toFixed(2)}</strong></div>
+          </div>
+          ${mo.statementUrl ? `<a href="${mo.statementUrl}" target="_blank" rel="noreferrer noopener" class="btn btn-primary">${PublicI18N.t('tenant.moveout.viewStatement')}</a>` : ''}
+        `;
+      }
+      card.style.display = '';
+    } catch(e) { console.warn('loadMoveOutStatus:', e); }
+  }
+
   async function loadAnnouncements() {
     try {
       const q = query(collection(db,'announcements'), orderBy('createdAt','desc'));
@@ -2033,7 +2155,7 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
     if (btn) btn.classList.add('active');
     document.getElementById('page-title').textContent = PublicI18N.t('tenant.nav.' + id) || id;
     if (id === 'dashboard') renderLeaseInfo();
-    if (id === 'settings') renderNotificationPrefs();
+    if (id === 'settings') { renderNotificationPrefs(); renderContactInfo(); }
     logAction('section_viewed', `Navigated to ${id}`);
     document.getElementById('sidebar').classList.remove('open');
   };
@@ -2074,6 +2196,42 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
       const toggle = document.getElementById(`settings-${channel}-toggle`);
       if (toggle) toggle.checked = !enabled;
     }
+  };
+
+  function renderContactInfo() {
+    document.getElementById('settings-phone-input').value = tenantData?.phone || '';
+    document.getElementById('settings-email-display').value = tenantData?.email || currentUser?.email || '';
+  }
+
+  window.saveContactInfo = async () => {
+    const alertEl = document.getElementById('contact-alert');
+    alertEl.classList.add('hidden');
+    const phoneRaw = document.getElementById('settings-phone-input').value.trim();
+    // Lenient on format (accepts "(555) 123-4567", "555-123-4567", etc.) —
+    // just requires enough digits to plausibly be a real US phone number.
+    if (phoneRaw && phoneRaw.replace(/\D/g, '').length < 10) {
+      alertEl.className = 'alert alert-error';
+      alertEl.textContent = 'Please enter a valid phone number.';
+      alertEl.classList.remove('hidden');
+      return;
+    }
+    const btn = document.getElementById('settings-contact-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      await updateDoc(doc(db,'tenants',currentUser.uid), {
+        phone: phoneRaw, updatedAt: serverTimestamp(),
+      });
+      if (tenantData) tenantData.phone = phoneRaw;
+      logAction('contact_info_updated', 'Phone number updated');
+      alertEl.className = 'alert alert-success';
+      alertEl.textContent = 'Contact information saved.';
+      alertEl.classList.remove('hidden');
+    } catch (e) {
+      alertEl.className = 'alert alert-error';
+      alertEl.textContent = 'Could not save: ' + e.message;
+      alertEl.classList.remove('hidden');
+    }
+    btn.disabled = false; btn.textContent = 'Save';
   };
 </script>
 <!-- AUTO-PAY CONSENT MODAL -->
