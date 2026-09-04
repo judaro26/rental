@@ -2427,6 +2427,7 @@
       'announcements.smsConfirm':'This will send a real SMS (with a real, small cost per tenant) to everyone targeted who has a phone number on file. Continue?',
       'announcements.posting':'Posting...', 'announcements.emailedCount':'emailed {n} tenant(s)',
       'announcements.textedCount':'texted {n} tenant(s)', 'announcements.postedAnd':'✓ Announcement posted and {parts}.',
+      'announcements.skippedOptOut':'skipped {n} tenant(s) who opted out',
       'announcements.alsoWhatsapp':'💚 Also send via WhatsApp',
       'announcements.whatsappHint':'Requires a WhatsApp provider configured above, and a phone number on file for each tenant. Real messages with a real (small) cost per tenant — not free like email.',
       'announcements.whatsappConfirm':'This will send a real WhatsApp message (with a real, small cost per tenant) to everyone targeted who has a phone number on file. Continue?',
@@ -3001,6 +3002,7 @@
       'announcements.smsConfirm':'Esto enviará un SMS real (con un costo real y pequeño por inquilino) a todos los destinatarios que tengan un número de teléfono registrado. ¿Continuar?',
       'announcements.posting':'Publicando...', 'announcements.emailedCount':'correo enviado a {n} inquilino(s)',
       'announcements.textedCount':'SMS enviado a {n} inquilino(s)', 'announcements.postedAnd':'✓ Anuncio publicado y {parts}.',
+      'announcements.skippedOptOut':'se omitió a {n} inquilino(s) que optaron por no recibir',
       'announcements.alsoWhatsapp':'💚 También enviar por WhatsApp',
       'announcements.whatsappHint':'Requiere un proveedor de WhatsApp configurado arriba, y un número de teléfono registrado para cada inquilino. Mensajes reales con un costo real (pequeño) por inquilino — no es gratis como el correo.',
       'announcements.whatsappConfirm':'Esto enviará un mensaje de WhatsApp real (con un costo real y pequeño por inquilino) a todos los destinatarios que tengan un número de teléfono registrado. ¿Continuar?',
@@ -5964,6 +5966,8 @@
         if (d.sent>0) parts.push(t('announcements.emailedCount').replace('{n}', d.sent));
         if (d.smsSent>0) parts.push(t('announcements.textedCount').replace('{n}', d.smsSent));
         if (d.whatsappSent>0) parts.push(t('announcements.whatsappedCount').replace('{n}', d.whatsappSent));
+        const skipped = (d.smsSkipped||0) + (d.whatsappSkipped||0);
+        if (skipped>0) parts.push(t('announcements.skippedOptOut').replace('{n}', skipped));
         showAlert('ann-alert', parts.length ? t('announcements.postedAnd').replace('{parts}', parts.join(', ')) : t('announcements.postedOnly'), 'success');
       })
       .catch(()=>showAlert('ann-alert', t('announcements.postedOnly'),'success'));
