@@ -1978,8 +1978,9 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
       btn.textContent = 'Authorizing...';
 
       // Record consent + save PaymentMethod to Firestore
+      const idToken = await currentUser.getIdToken();
       const res  = await fetch('/api/record-consent', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({
           tenantId:    currentUser.uid,
           tenantName:  `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
