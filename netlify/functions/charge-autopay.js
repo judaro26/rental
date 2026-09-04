@@ -33,6 +33,19 @@ exports.handler = async (event) => {
 
   const fb = getAdmin();
   const db = fb.firestore();
+
+  // Admin-only: this charges a real payment method for real money, and
+  // despite the intent stated in the header comment, nothing here
+  // actually verified that. Anyone who obtained a consentId — a Firestore
+  // document ID, not a secret — could have called this directly and
+  // charged that tenant's saved card, repeatedly, with no admin
+  // involvement at all. Relying on document IDs being hard to guess isn't
+  // real access control, so this needed an explicit check regardless of
+  // how discoverable a given ID actually is in practice.
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, fb);
+  if (authResult.error) return authResult.error;
+
   const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
 
   try {
