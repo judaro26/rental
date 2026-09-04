@@ -107,7 +107,7 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ sent: 0, reason: 'No matching tenants found' }) };
     }
 
-    let emailSent = 0, emailFailed = 0, smsSent = 0, smsFailed = 0, whatsappSent = 0, whatsappFailed = 0;
+    let emailSent = 0, emailFailed = 0, smsSent = 0, smsFailed = 0, smsSkipped = 0, whatsappSent = 0, whatsappFailed = 0, whatsappSkipped = 0;
 
     // Email — independent of SMS; only attempted if SMTP is actually configured.
     if (process.env.SMTP_HOST) {
@@ -146,6 +146,10 @@ exports.handler = async (event) => {
         const smsText = `[${siteName || 'Property'}]${urgent ? ' URGENT' : ''}: ${title} - ${message}`.slice(0, 1600);
         for (const tenant of tenants) {
           if (!tenant.phone) continue;
+          // Default to enabled when unset — this is an opt-out, not an
+          // opt-in, so a tenant who's never touched the setting keeps
+          // receiving texts exactly as before this feature existed.
+          if (tenant.notificationPrefs?.sms === false) { smsSkipped++; continue; }
           try {
             await sendSms({
               provider: smsProvider.provider, apiKey: smsProvider.apiKey, fromNumber: smsProvider.fromNumber,
@@ -179,6 +183,7 @@ exports.handler = async (event) => {
         const whatsappTitle = `${urgent ? '🚨 URGENT' : '📢'} ${title}`;
         for (const tenant of tenants) {
           if (!tenant.phone) continue;
+          if (tenant.notificationPrefs?.whatsapp === false) { whatsappSkipped++; continue; }
           try {
             await sendWhatsApp({
               accountSid: whatsappProvider.accountSid, authToken: whatsappProvider.authToken,
@@ -195,7 +200,7 @@ exports.handler = async (event) => {
       }
     }
 
-    return { statusCode: 200, body: JSON.stringify({ success: true, sent: emailSent, failed: emailFailed, smsSent, smsFailed, whatsappSent, whatsappFailed }) };
+    return { statusCode: 200, body: JSON.stringify({ success: true, sent: emailSent, failed: emailFailed, smsSent, smsFailed, smsSkipped, whatsappSent, whatsappFailed, whatsappSkipped }) };
   } catch (err) {
     console.error('announce-notify error:', err);
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
