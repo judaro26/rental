@@ -5,6 +5,19 @@
 
 const Busboy = require('busboy');
 
+let admin;
+function getAdmin() {
+  if (!admin) {
+    admin = require('firebase-admin');
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+      });
+    }
+  }
+  return admin;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
@@ -15,6 +28,18 @@ exports.handler = async (event) => {
   if (!siteID || !token) {
     return { statusCode: 500, body: JSON.stringify({ error: 'NETLIFY_SITE_ID and NETLIFY_API_TOKEN required.' }) };
   }
+
+  // Admin-only: this had no auth check, and unlike view-qr.js (which just
+  // serves an intentionally-public image), this is the write side.
+  // Anyone who could call this could replace a real payment QR code with
+  // one pointing to their own Zelle/Cash App account — redirecting future
+  // tenant rent payments to themselves, a direct financial-fraud vector,
+  // not just an unauthorized-write concern.
+  const a  = getAdmin();
+  const db = a.firestore();
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
 
   try {
     const bb = Busboy({ headers: { 'content-type': event.headers['content-type'] || event.headers['Content-Type'] || '' } });
