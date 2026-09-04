@@ -39,6 +39,33 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'tenantId, signatureName, and monthlyAmount are required' }) };
   }
 
+  // Authentication: this creates a legally-worded payment authorization
+  // (see consentText below — it explicitly certifies the tenant reviewed
+  // and agreed to these exact terms) and flips on real auto-pay billing
+  // for whatever tenantId is given. Both of those are exactly the kind of
+  // action that must be verified server-side, not trusted from the
+  // request body — previously this function had no auth check at all, so
+  // any caller could forge a signed authorization and enable billing for
+  // any tenant UID, known or guessed, with no login required.
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+  const bearerMatch = authHeader.match(/^Bearer (.+)$/i);
+  if (!bearerMatch) return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) };
+
+  const a = getAdmin();
+  const db = a.firestore();
+
+  let decoded;
+  try { decoded = await a.auth().verifyIdToken(bearerMatch[1]); }
+  catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
+
+  const isOwnConsent = decoded.uid === tenantId;
+  if (!isOwnConsent) {
+    const adminSnap = await db.collection('admins').doc(decoded.uid).get();
+    if (!adminSnap.exists || adminSnap.data().status === 'revoked') {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Not authorized to record consent for this tenant.' }) };
+    }
+  }
+
   // Capture audit data server-side (cannot be spoofed by client)
   const ipAddress = event.headers?.['x-forwarded-for']?.split(',')[0]?.trim()
     || event.headers?.['x-real-ip']
@@ -70,9 +97,6 @@ Electronic Signature: ${signatureName}
 Date: ${new Date(consentDate).toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric', hour:'2-digit', minute:'2-digit', timeZoneName:'short' })}
 IP Address: ${ipAddress}
 Device: ${userAgent}`;
-
-  const a  = getAdmin();
-  const db = a.firestore();
 
   try {
     // Save consent record
