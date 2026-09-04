@@ -172,7 +172,21 @@ exports.handler = async (event) => {
     consentBackgroundCheck,  // must be true — express opt-in
     consentTerms,            // must be true
     siteName,
+    website,                 // honeypot — see apply.html for the hidden field this comes from
   } = body;
+
+  // Honeypot: a form field named to look legitimate to an automated
+  // filler, but hidden from real applicants via off-screen CSS positioning
+  // (not display:none, which some bots specifically check for and skip)
+  // plus tabindex="-1" and autocomplete="off" so it's never reachable by
+  // keyboard navigation or browser autofill either. A real applicant can
+  // never populate it; a bot that blindly fills every field usually does.
+  // Responding with a normal-looking success, rather than an error, means
+  // a bot's operator sees what looks like a working submission and has no
+  // signal to adapt around — silent rejection is the point.
+  if (website) {
+    return { statusCode: 200, body: JSON.stringify({ success: true }) };
+  }
 
   // ── Validate required fields ─────────────────────────────────────────────
   if (!firstName || !lastName || !email) {
