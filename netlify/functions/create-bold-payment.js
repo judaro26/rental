@@ -4,6 +4,18 @@
 // (each property/client has their own account — money settles directly to
 // them, this app never touches it).
 //
+// Nequi support: Bold's /online/link/v1 accepts an optional payment_methods
+// array (e.g. ["CREDIT_CARD","PSE","NEQUI","BOTON_BANCOLOMBIA"]) to restrict
+// which methods appear on the checkout page — and per Bold's own docs,
+// omitting it entirely (as this code does) shows every method already
+// enabled on the merchant's Bold account, Nequi included. So there is no
+// separate Nequi integration to build here: if a property's Bold account
+// has Nequi turned on, tenants already see it as a checkout option today.
+// The one thing this code can't do is turn Nequi on for an account that
+// doesn't have it — that's a Bold-side merchant setting, checked or
+// requested directly through Bold's own merchant dashboard/support, not
+// something available via this API.
+//
 // POST /api/create-bold-payment
 // Body: { invoiceId }
 // Auth: Bearer <Firebase ID token> — either the tenant who owns the invoice,
