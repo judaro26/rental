@@ -11,6 +11,7 @@
 // input parameters (an HTTP request body vs. a tenant's own stored fields).
 
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 function getStore() {
   const { getStore: _gs } = require('@netlify/blobs');
@@ -222,7 +223,16 @@ async function createInvoice({ a, db, siteUrl,
 
   // Store in Netlify Blobs
   const store    = getStore();
-  const blobKey  = `${isReceipt?'receipt':'invoice'}_${invoiceNumber}_${Date.now()}.html`;
+  // The trailing segment used to be Date.now() — but invoiceNumber is
+  // fully sequential (INV-2026-0001, -0002, ...) and a millisecond
+  // timestamp is a narrow, often-predictable window (e.g. every
+  // auto-invoice from a given day's scheduled run clusters within
+  // seconds of each other). Since view-invoice.js is intentionally
+  // login-free — invoices are meant to open straight from an email link,
+  // no tenant portal account required — this key is the entire access
+  // control for that invoice. It needs to be unguessable on its own,
+  // not just unique.
+  const blobKey  = `${isReceipt?'receipt':'invoice'}_${invoiceNumber}_${crypto.randomBytes(16).toString('hex')}.html`;
   await store.set(blobKey, Buffer.from(html, 'utf8'), { metadata: { contentType: 'text/html', fileName: `${blobKey}` } });
   const invoiceUrl = `${siteUrl}/api/view-invoice?key=${encodeURIComponent(blobKey)}`;
 
