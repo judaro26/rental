@@ -53,6 +53,29 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'tenantId and action required' }) };
   }
 
+  // Authentication: previously this function had no auth check, meaning
+  // an unauthenticated caller could inject arbitrary entries into
+  // auditLogs — attributed to any tenantId they chose, with any action/
+  // details text. An audit trail that's this easy to forge or pollute
+  // defeats its own purpose (it exists to be trustworthy in a dispute or
+  // investigation), so this needed the same fix as the collections above.
+  const fbForAuth = getAdmin();
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+  const bearerMatch = authHeader.match(/^Bearer (.+)$/i);
+  if (!bearerMatch) return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) };
+
+  let decoded;
+  try { decoded = await fbForAuth.auth().verifyIdToken(bearerMatch[1]); }
+  catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
+
+  const isOwnLog = decoded.uid === tenantId;
+  if (!isOwnLog) {
+    const adminSnap = await fbForAuth.firestore().collection('admins').doc(decoded.uid).get();
+    if (!adminSnap.exists || adminSnap.data().status === 'revoked') {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Not authorized to log an action for this tenant.' }) };
+    }
+  }
+
   // Capture audit-critical data server-side
   const ip        = (event.headers?.['x-forwarded-for'] || '').split(',')[0]?.trim()
     || event.headers?.['x-real-ip']
