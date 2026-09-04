@@ -2065,6 +2065,21 @@
   </div>
 </div>
 
+<!-- MOVE-IN PHOTOS MODAL -->
+<div id="movein-photos-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('movein-photos-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('movein-photos-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;" data-i18n="moveOut.moveInPhotosTitle">📸 Move-In Condition Photos</h3>
+    <p id="movein-photos-modal-to" style="font-size:13px;color:var(--slate);margin-bottom:6px;"></p>
+    <p style="font-size:11px;color:var(--slate);margin-bottom:16px;" data-i18n="moveOut.moveInPhotosHint">Required by AB 2801 for tenancies starting on or after July 1, 2025: photograph the unit after cleaning/repairs but before the tenant takes possession, to establish the baseline condition.</p>
+    <div id="movein-photos-list" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;min-height:44px;"></div>
+    <div style="display:flex;gap:10px;margin-top:24px;">
+      <button onclick="closeModal('movein-photos-modal')" class="btn btn-primary" style="flex:1;" data-i18n="common.done">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- MOVE-OUT & DEPOSIT RETURN MODAL -->
 <div id="moveout-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="modal-backdrop absolute inset-0" onclick="closeModal('moveout-modal')"></div>
@@ -2086,6 +2101,12 @@
       <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:10px;">
         <span data-i18n="moveOut.depositOnFile">Deposit on file</span>
         <strong id="moveout-deposit-display">$0.00</strong>
+      </div>
+
+      <div style="margin-bottom:16px;">
+        <div style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin-bottom:6px;" data-i18n="moveOut.conditionPhotosTitle">Unit Condition Photos (as-left, before any repairs)</div>
+        <p style="font-size:11px;color:var(--slate);margin:0 0 8px;" data-i18n="moveOut.conditionPhotosHint">Required by AB 2801: photograph the unit immediately after move-out, before any cleaning or repairs begin.</p>
+        <div id="moveout-condition-photos" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"></div>
       </div>
 
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
@@ -2764,6 +2785,12 @@
       'moveOut.statementSent':'Move-out statement generated and sent.', 'moveOut.viewStatement':'View statement',
       'moveOut.deadlineIs':'Deadline:', 'moveOut.daysLeftLabel':'days left', 'moveOut.deadlinePassed':'21-day deadline passed',
       'moveOut.deadlinePassedWarning':'you may have forfeited the right to withhold any portion of the deposit',
+      'common.done':'Done',
+      'moveOut.conditionPhotosTitle':'Unit Condition Photos (as-left, before any repairs)',
+      'moveOut.conditionPhotosHint':'Required by AB 2801: photograph the unit immediately after move-out, before any cleaning or repairs begin.',
+      'moveOut.photoBefore':'Before', 'moveOut.photoAfter':'After',
+      'moveOut.moveInPhotos':'Move-In Photos', 'moveOut.moveInPhotosTitle':'📸 Move-In Condition Photos',
+      'moveOut.moveInPhotosHint':'Required by AB 2801 for tenancies starting on or after July 1, 2025: photograph the unit after cleaning/repairs but before the tenant takes possession, to establish the baseline condition.',
       'admins.inviteAdminTitle':'Invite Admin', 'admins.emailRequired':'Email *', 'admins.displayName':'Display Name',
       'admins.roleRequired':'Role *', 'admins.restrictedAdminOption':'Restricted Admin (one country only)',
       'admins.superAdminOption':'Super Admin (full access)', 'admins.countryScopeRequired':'Country Scope *',
@@ -3332,6 +3359,12 @@
       'moveOut.statementSent':'Estado de cuenta de salida generado y enviado.', 'moveOut.viewStatement':'Ver estado de cuenta',
       'moveOut.deadlineIs':'Fecha límite:', 'moveOut.daysLeftLabel':'días restantes', 'moveOut.deadlinePassed':'Se venció el plazo de 21 días',
       'moveOut.deadlinePassedWarning':'podrías haber perdido el derecho a retener cualquier parte del depósito',
+      'common.done':'Listo',
+      'moveOut.conditionPhotosTitle':'Fotos del Estado de la Unidad (al dejarla, antes de reparaciones)',
+      'moveOut.conditionPhotosHint':'Requerido por la AB 2801: fotografía la unidad inmediatamente después de la salida, antes de cualquier limpieza o reparación.',
+      'moveOut.photoBefore':'Antes', 'moveOut.photoAfter':'Después',
+      'moveOut.moveInPhotos':'Fotos de Entrada', 'moveOut.moveInPhotosTitle':'📸 Fotos del Estado de Entrada',
+      'moveOut.moveInPhotosHint':'Requerido por la AB 2801 para contratos que inician a partir del 1 de julio de 2025: fotografía la unidad después de la limpieza/reparaciones pero antes de que el inquilino tome posesión, para establecer el estado inicial.',
       'admins.inviteAdminTitle':'Invitar Administrador', 'admins.emailRequired':'Correo *', 'admins.displayName':'Nombre a Mostrar',
       'admins.roleRequired':'Rol *', 'admins.restrictedAdminOption':'Administrador Restringido (un solo país)',
       'admins.superAdminOption':'Super Administrador (acceso total)', 'admins.countryScopeRequired':'Ámbito de País *',
@@ -4017,6 +4050,7 @@
             ${status !== 'active' ? `<button onclick="approveTenant('${tn.id}')" class="btn btn-sm btn-success">${t('tenants.approve')}</button>` : ''}
             <button onclick="openEditTenant('${tn.id}')" class="btn btn-sm btn-outline">${t('common.edit')}</button>
             ${tn.email ? `<button onclick="openTenantEmailModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('tenants.sendEmail')}">✉️</button>` : ''}
+            <button onclick="openMoveInPhotosModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('moveOut.moveInPhotosTitle')}">📸 ${t('moveOut.moveInPhotos')}</button>
             ${status === 'active' ? `<button onclick="openMoveOutModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('moveOut.buttonTitle')}">🚪 ${t('moveOut.button')}</button>` : ''}
           </div>
         </td>
@@ -4815,6 +4849,46 @@
     btn.disabled=false; btn.textContent=t('applications.generateSendSignature');
   };
 
+  // ===== MOVE-IN PHOTOS (AB 2801) =====
+  window.openMoveInPhotosModal = (id) => {
+    const tenant = allTenants.find(t=>t.id===id); if (!tenant) return;
+    document.getElementById('movein-photos-modal').dataset.tenantId = id;
+    const prop = allProperties.find(p=>p.id===tenant.propertyId);
+    document.getElementById('movein-photos-modal-to').textContent =
+      `${t('tenants.tenant')}: ${`${tenant.firstName||''} ${tenant.lastName||''}`.trim()}${tenant.unit?` · ${t('common.unit')} ${tenant.unit}`:''}${prop?.name?` · ${t('common.property')}: ${prop.name}`:''}`;
+    renderMoveInPhotos(id);
+    openModal('movein-photos-modal');
+  };
+  function renderMoveInPhotos(tenantId) {
+    const photos = allDocuments.filter(d => d.tenantId === tenantId && d.category === 'Move-In Condition');
+    document.getElementById('movein-photos-list').innerHTML =
+      photos.map(d => `
+        <div style="position:relative;">
+          <img src="${d.url}" style="width:64px;height:64px;object-fit:cover;border-radius:2px;border:1px solid var(--border);">
+          <button onclick="removeMoveInPhoto('${d.id}','${tenantId}')" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#DC2626;color:#fff;border:none;font-size:11px;line-height:1;cursor:pointer;padding:0;">×</button>
+        </div>`).join('')
+      + `<label style="cursor:pointer;font-size:22px;width:64px;height:64px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:2px;color:var(--slate);flex-shrink:0;">📷<input type="file" accept="image/*" multiple style="display:none;" onchange="uploadMoveInPhotos('${tenantId}',this.files)"></label>`;
+  }
+  window.uploadMoveInPhotos = async (tenantId, fileList) => {
+    if (!fileList?.length) return;
+    try {
+      await uploadConditionPhotos(fileList, { namePrefix: 'Move-in condition', category: 'Move-In Condition', tenantId });
+      await loadDocuments();
+      renderMoveInPhotos(tenantId);
+    } catch (e) { alert('Photo upload failed: ' + e.message); }
+  };
+  window.removeMoveInPhoto = async (docId, tenantId) => {
+    try {
+      const doc = allDocuments.find(d => d.id === docId);
+      const res = await authedFetch('/api/delete-document', { docId, storagePath: doc?.storagePath });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Delete failed');
+      await loadDocuments();
+      renderMoveInPhotos(tenantId);
+    } catch (e) { alert('Error removing photo: ' + e.message); }
+  };
+
+
   // ===== MOVE-OUT & DEPOSIT RETURN =====
   let _moveOutDeductions = [];
 
@@ -4833,6 +4907,7 @@
     document.getElementById('moveout-co-section').classList.toggle('hidden', isUS);
     if (isUS) {
       _moveOutDeductions = [];
+      _moveOutConditionPhotos = [];
       document.getElementById('moveout-deposit-display').textContent = '$' + (parseFloat(tenant.securityDeposit)||0).toFixed(2);
       // AB 414 requires offering an electronic refund when the tenant paid
       // electronically. Default to that when their payment history shows
@@ -4841,31 +4916,103 @@
       document.getElementById('moveout-refund-method').value = paidElectronically ? 'electronic' : 'check';
       document.getElementById('moveout-electronic-hint').classList.toggle('hidden', !paidElectronically);
       renderMoveOutDeductions();
+      renderMoveOutConditionPhotos();
     }
     updateMoveOutCalculations();
     openModal('moveout-modal');
   };
 
+  // AB 2801 (Civil Code §1950.5) photo documentation. Reuses the existing,
+  // already-secured /api/upload-document endpoint (documents collection +
+  // view-doc.js) rather than building a parallel storage system — a photo
+  // here is just a document with a category tag.
+  async function uploadConditionPhotos(files, { namePrefix, category, tenantId }) {
+    const idToken = await auth.currentUser.getIdToken();
+    const uploaded = [];
+    for (const file of Array.from(files)) {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('name', `${namePrefix} — ${file.name}`);
+      fd.append('category', category);
+      fd.append('tenantId', tenantId);
+      const res = await fetch('/api/upload-document', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Photo upload failed');
+      uploaded.push({ docId: data.docId, url: data.url, storagePath: data.storagePath });
+    }
+    return uploaded;
+  }
+
+  function renderMoveOutPhotoThumbs(photos, onRemove) {
+    return (photos||[]).map((p, pi) => `
+      <div style="position:relative;">
+        <img src="${p.url}" style="width:36px;height:36px;object-fit:cover;border-radius:2px;border:1px solid var(--border);">
+        <button onclick="${onRemove}(${pi})" style="position:absolute;top:-5px;right:-5px;width:15px;height:15px;border-radius:50%;background:#DC2626;color:#fff;border:none;font-size:9px;line-height:1;cursor:pointer;padding:0;">×</button>
+      </div>`).join('');
+  }
+  function photoUploadButton(onChange) {
+    return `<label style="cursor:pointer;font-size:15px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--border);border-radius:2px;color:var(--slate);flex-shrink:0;">📷<input type="file" accept="image/*" multiple style="display:none;" onchange="${onChange}"></label>`;
+  }
+
+  let _moveOutConditionPhotos = [];
+  function renderMoveOutConditionPhotos() {
+    document.getElementById('moveout-condition-photos').innerHTML =
+      renderMoveOutPhotoThumbs(_moveOutConditionPhotos, 'removeMoveOutConditionPhoto') + photoUploadButton('uploadMoveOutConditionPhotos(this.files)');
+  }
+  window.uploadMoveOutConditionPhotos = async (fileList) => {
+    if (!fileList?.length) return;
+    const tenantId = document.getElementById('moveout-tenant-id').value;
+    try {
+      const uploaded = await uploadConditionPhotos(fileList, { namePrefix: 'Move-out condition', category: 'Move-Out Condition', tenantId });
+      _moveOutConditionPhotos.push(...uploaded);
+      renderMoveOutConditionPhotos();
+    } catch (e) { alert('Photo upload failed: ' + e.message); }
+  };
+  window.removeMoveOutConditionPhoto = (pi) => {
+    _moveOutConditionPhotos.splice(pi, 1);
+    renderMoveOutConditionPhotos();
+  };
+
+
   function renderMoveOutDeductions() {
     const list = document.getElementById('moveout-deductions-list');
     document.getElementById('moveout-empty-deductions-hint').classList.toggle('hidden', _moveOutDeductions.length > 0);
     list.innerHTML = _moveOutDeductions.map((d, i) => `
-      <div style="display:flex;gap:8px;align-items:flex-start;background:#FDFBF8;padding:10px;border-radius:3px;">
-        <select onchange="updateMoveOutDeductionField(${i},'category',this.value)" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;width:150px;flex-shrink:0;">
-          <option value="unpaid_rent" ${d.category==='unpaid_rent'?'selected':''}>${t('moveOut.catUnpaidRent')}</option>
-          <option value="damage" ${d.category==='damage'?'selected':''}>${t('moveOut.catDamage')}</option>
-          <option value="cleaning" ${d.category==='cleaning'?'selected':''}>${t('moveOut.catCleaning')}</option>
-          <option value="personal_property" ${d.category==='personal_property'?'selected':''}>${t('moveOut.catPersonalProperty')}</option>
-        </select>
-        <input type="text" value="${escapeHtml(d.description||'')}" oninput="updateMoveOutDeductionField(${i},'description',this.value)" placeholder="${t('moveOut.descriptionPlaceholder')}" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;">
-        <input type="number" min="0" step="0.01" value="${d.amount||''}" oninput="updateMoveOutDeductionField(${i},'amount',this.value)" placeholder="0.00" style="width:90px;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;flex-shrink:0;">
-        <button onclick="removeMoveOutDeduction(${i})" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:16px;flex-shrink:0;padding:4px;" title="${t('common.remove')}">×</button>
+      <div style="background:#FDFBF8;padding:10px;border-radius:3px;">
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <select onchange="updateMoveOutDeductionField(${i},'category',this.value)" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;width:150px;flex-shrink:0;">
+            <option value="unpaid_rent" ${d.category==='unpaid_rent'?'selected':''}>${t('moveOut.catUnpaidRent')}</option>
+            <option value="damage" ${d.category==='damage'?'selected':''}>${t('moveOut.catDamage')}</option>
+            <option value="cleaning" ${d.category==='cleaning'?'selected':''}>${t('moveOut.catCleaning')}</option>
+            <option value="personal_property" ${d.category==='personal_property'?'selected':''}>${t('moveOut.catPersonalProperty')}</option>
+          </select>
+          <input type="text" value="${escapeHtml(d.description||'')}" oninput="updateMoveOutDeductionField(${i},'description',this.value)" placeholder="${t('moveOut.descriptionPlaceholder')}" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;">
+          <input type="number" min="0" step="0.01" value="${d.amount||''}" oninput="updateMoveOutDeductionField(${i},'amount',this.value)" placeholder="0.00" style="width:90px;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;flex-shrink:0;">
+          <button onclick="removeMoveOutDeduction(${i})" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:16px;flex-shrink:0;padding:4px;" title="${t('common.remove')}">×</button>
+        </div>
+        ${(d.category==='damage' || d.category==='cleaning') ? `
+        <div style="display:flex;gap:16px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+          <div style="flex:1;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin-bottom:4px;">${t('moveOut.photoBefore')}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+              ${renderMoveOutPhotoThumbs(d.beforePhotos, `removeMoveOutDeductionPhoto.bind(null,${i},'before')`)}
+              ${photoUploadButton(`uploadMoveOutDeductionPhotos(${i},'before',this.files)`)}
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin-bottom:4px;">${t('moveOut.photoAfter')}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;">
+              ${renderMoveOutPhotoThumbs(d.afterPhotos, `removeMoveOutDeductionPhoto.bind(null,${i},'after')`)}
+              ${photoUploadButton(`uploadMoveOutDeductionPhotos(${i},'after',this.files)`)}
+            </div>
+          </div>
+        </div>` : ''}
       </div>
     `).join('');
   }
 
   window.addMoveOutDeduction = () => {
-    _moveOutDeductions.push({ category: 'damage', description: '', amount: '' });
+    _moveOutDeductions.push({ category: 'damage', description: '', amount: '', beforePhotos: [], afterPhotos: [] });
     renderMoveOutDeductions();
     updateMoveOutCalculations();
   };
@@ -4878,6 +5025,22 @@
     if (!_moveOutDeductions[i]) return;
     _moveOutDeductions[i][field] = value;
     updateMoveOutCalculations(); // recalc only — re-rendering the list here would drop input focus mid-keystroke
+  };
+  window.uploadMoveOutDeductionPhotos = async (i, phase, fileList) => {
+    if (!fileList?.length || !_moveOutDeductions[i]) return;
+    const tenantId = document.getElementById('moveout-tenant-id').value;
+    try {
+      const uploaded = await uploadConditionPhotos(fileList, { namePrefix: `Move-out ${phase}`, category: `Repair ${phase === 'before' ? 'Before' : 'After'}`, tenantId });
+      const key = phase === 'before' ? 'beforePhotos' : 'afterPhotos';
+      _moveOutDeductions[i][key] = [...(_moveOutDeductions[i][key]||[]), ...uploaded];
+      renderMoveOutDeductions();
+    } catch (e) { alert('Photo upload failed: ' + e.message); }
+  };
+  window.removeMoveOutDeductionPhoto = (i, phase, pi) => {
+    if (!_moveOutDeductions[i]) return;
+    const key = phase === 'before' ? 'beforePhotos' : 'afterPhotos';
+    _moveOutDeductions[i][key].splice(pi, 1);
+    renderMoveOutDeductions();
   };
 
   window.updateMoveOutCalculations = () => {
@@ -4955,8 +5118,13 @@
     if (isUS) {
       payload.deductions = _moveOutDeductions
         .filter(d => d.description?.trim() && parseFloat(d.amount) > 0)
-        .map(d => ({ category: d.category, description: d.description.trim(), amount: parseFloat(d.amount) }));
+        .map(d => ({
+          category: d.category, description: d.description.trim(), amount: parseFloat(d.amount),
+          beforePhotos: (d.beforePhotos||[]).map(p => ({ storagePath: p.storagePath })),
+          afterPhotos: (d.afterPhotos||[]).map(p => ({ storagePath: p.storagePath })),
+        }));
       payload.refundMethod = document.getElementById('moveout-refund-method').value;
+      payload.conditionPhotos = _moveOutConditionPhotos.map(p => ({ storagePath: p.storagePath }));
     } else {
       payload.conditionNotes = document.getElementById('moveout-condition-notes').value.trim();
     }
@@ -5595,7 +5763,8 @@
           formData.append('totalChunks', String(totalChunks));
           formData.append('originalName', file.name);
         }
-        const res = await fetch('/api/upload-document', { method: 'POST', body: formData });
+        const idToken = await auth.currentUser.getIdToken();
+        const res = await fetch('/api/upload-document', { method: 'POST', headers: { 'Authorization': `Bearer ${idToken}` }, body: formData });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `Upload failed on part ${i + 1} of ${totalChunks}`);
         const pct = Math.round(((i + 1) / totalChunks) * 100);
