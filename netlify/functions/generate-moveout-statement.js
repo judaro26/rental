@@ -47,6 +47,39 @@ function getStore() {
   return _gs({ name: 'moveout-statements', consistency: 'strong', siteID, token });
 }
 
+// Photos are stored in the `documents` Blob store (same one upload-document.js
+// writes to) — reused here directly via the Admin SDK's Netlify Blobs access,
+// bypassing view-doc.js's auth check entirely. That's fine: this is
+// server-side code reading storage directly, not a browser request. The
+// resulting statement embeds photos as base64 data URIs so it's fully
+// self-contained — the tenant opens it via an unguessable, login-free link
+// (same as view-invoice.js), so there's no session available to attach a
+// Bearer token to a separate image request anyway.
+function getDocumentsStore() {
+  const { getStore: _gs } = require('@netlify/blobs');
+  const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const token  = process.env.NETLIFY_API_TOKEN;
+  if (!siteID || !token) throw new Error(`Missing env vars: ${[!siteID&&'NETLIFY_SITE_ID',!token&&'NETLIFY_API_TOKEN'].filter(Boolean).join(', ')}`);
+  return _gs({ name: 'documents', consistency: 'strong', siteID, token });
+}
+
+async function photosToDataUris(photoRefs, documentsStore) {
+  const results = [];
+  for (const ref of (photoRefs || [])) {
+    if (!ref?.storagePath) continue;
+    try {
+      const blob = await documentsStore.getWithMetadata(ref.storagePath, { type: 'arrayBuffer' });
+      if (!blob) continue;
+      const contentType = blob.metadata?.contentType || 'image/jpeg';
+      const base64 = Buffer.from(blob.data).toString('base64');
+      results.push(`data:${contentType};base64,${base64}`);
+    } catch (e) {
+      console.warn(`Could not load photo ${ref.storagePath}:`, e.message);
+    }
+  }
+  return results;
+}
+
 const CATEGORY_LABELS = {
   unpaid_rent: 'Unpaid rent',
   damage: 'Damage beyond ordinary wear and tear',
@@ -59,14 +92,23 @@ function esc(s) {
 }
 
 function buildUsHtml({ siteName, siteUrl, tenantName, tenantEmail, unit, propertyName,
-  moveOutDate, forwardingAddress, deposit, deductions, totalDeductions, netAmount, refundMethod }) {
+  moveOutDate, forwardingAddress, deposit, deductions, totalDeductions, netAmount, refundMethod, conditionPhotos }) {
 
-  const rows = deductions.map(d => `
+  const rows = deductions.map(d => {
+    const photoRow = (d.beforePhotos?.length || d.afterPhotos?.length) ? `
+    <tr><td colspan="3" style="padding:4px 12px 14px;border-bottom:1px solid #F3F4F6;">
+      <div style="display:flex;gap:20px;">
+        ${d.beforePhotos?.length ? `<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#9CA3AF;margin-bottom:4px;">Before</div><div style="display:flex;gap:4px;">${d.beforePhotos.map(src => `<img src="${src}" style="width:56px;height:56px;object-fit:cover;border-radius:2px;border:1px solid #F3F4F6;">`).join('')}</div></div>` : ''}
+        ${d.afterPhotos?.length ? `<div><div style="font-size:9px;text-transform:uppercase;letter-spacing:0.08em;color:#9CA3AF;margin-bottom:4px;">After</div><div style="display:flex;gap:4px;">${d.afterPhotos.map(src => `<img src="${src}" style="width:56px;height:56px;object-fit:cover;border-radius:2px;border:1px solid #F3F4F6;">`).join('')}</div></div>` : ''}
+      </div>
+    </td></tr>` : '';
+    return `
     <tr>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #F3F4F6;">${esc(CATEGORY_LABELS[d.category] || d.category)}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #F3F4F6;">${esc(d.description)}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #F3F4F6;text-align:right;font-weight:500;">$${parseFloat(d.amount).toFixed(2)}</td>
-    </tr>`).join('');
+      <td style="padding:10px 12px;font-size:13px;color:#374151;${photoRow?'':'border-bottom:1px solid #F3F4F6;'}">${esc(CATEGORY_LABELS[d.category] || d.category)}</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;${photoRow?'':'border-bottom:1px solid #F3F4F6;'}">${esc(d.description)}</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;${photoRow?'':'border-bottom:1px solid #F3F4F6;'}text-align:right;font-weight:500;">$${parseFloat(d.amount).toFixed(2)}</td>
+    </tr>${photoRow}`;
+  }).join('');
 
   const repairCleaningTotal = deductions
     .filter(d => d.category === 'damage' || d.category === 'cleaning')
@@ -126,6 +168,14 @@ function buildUsHtml({ siteName, siteUrl, tenantName, tenantEmail, unit, propert
       <span style="color:#6B7280;">Security deposit received</span>
       <strong>$${deposit.toFixed(2)}</strong>
     </div>
+
+    ${conditionPhotos?.length ? `
+    <div style="margin-bottom:24px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#9CA3AF;margin-bottom:8px;">Unit Condition at Move-Out</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${conditionPhotos.map(src => `<img src="${src}" style="width:90px;height:90px;object-fit:cover;border-radius:2px;border:1px solid #F3F4F6;">`).join('')}
+      </div>
+    </div>` : ''}
 
     ${deductions.length ? `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;border:1px solid #F3F4F6;border-radius:3px;overflow:hidden;">
@@ -248,7 +298,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { tenantId, moveOutDate, forwardingAddress, country, deductions, refundMethod, conditionNotes, siteName } = body;
+  const { tenantId, moveOutDate, forwardingAddress, country, deductions, refundMethod, conditionNotes, siteName, conditionPhotos } = body;
   if (!tenantId || !moveOutDate) {
     return { statusCode: 400, body: JSON.stringify({ error: 'tenantId and moveOutDate are required.' }) };
   }
@@ -271,13 +321,34 @@ exports.handler = async (event) => {
     const moveOutDateFormatted = new Date(moveOutDate + 'T00:00:00').toLocaleDateString(isUS ? 'en-US' : 'es-CO', { year:'numeric', month:'long', day:'numeric' });
 
     let html, netAmount = null, cleanDeductions = [], depositAmount = 0;
+    let conditionPhotoRefs = [];
 
     if (isUS) {
       depositAmount = parseFloat(tenant.securityDeposit) || 0;
-      cleanDeductions = Array.isArray(deductions) ? deductions
+      const documentsStore = getDocumentsStore();
+      const rawDeductions = Array.isArray(deductions) ? deductions
         .filter(d => d && d.description && parseFloat(d.amount) > 0)
-        .map(d => ({ category: d.category || 'damage', description: String(d.description).trim().slice(0, 300), amount: parseFloat(d.amount) }))
         .slice(0, 50) : [];
+      // cleanDeductions (saved to Firestore below) stays lightweight —
+      // storagePath references, not photo bytes. A base64-embedded photo
+      // can easily be hundreds of KB to a few MB each, which would blow
+      // past Firestore's 1 MiB per-document limit almost immediately. The
+      // full, data-URI-embedded version is only used for the HTML, which
+      // goes to Blob storage instead and has no such limit. Building both
+      // from a single pass over rawDeductions (rather than two separate
+      // .map() calls relied on to stay index-aligned) keeps that split
+      // straightforward to follow.
+      const combined = await Promise.all(rawDeductions.map(async d => ({
+        category: d.category || 'damage', description: String(d.description).trim().slice(0, 300), amount: parseFloat(d.amount),
+        beforePhotoRefs: (d.beforePhotos || []).map(p => p.storagePath).filter(Boolean).slice(0, 10),
+        afterPhotoRefs:  (d.afterPhotos  || []).map(p => p.storagePath).filter(Boolean).slice(0, 10),
+        beforePhotos: await photosToDataUris(d.beforePhotos, documentsStore),
+        afterPhotos:  await photosToDataUris(d.afterPhotos, documentsStore),
+      })));
+      cleanDeductions = combined.map(({ category, description, amount, beforePhotoRefs, afterPhotoRefs }) => ({ category, description, amount, beforePhotoRefs, afterPhotoRefs }));
+      const deductionsWithPhotos = combined.map(({ category, description, amount, beforePhotos, afterPhotos }) => ({ category, description, amount, beforePhotos, afterPhotos }));
+      conditionPhotoRefs = (conditionPhotos || []).map(p => p.storagePath).filter(Boolean).slice(0, 20);
+      const conditionPhotoUris = await photosToDataUris(conditionPhotos, documentsStore);
       const totalDeductions = cleanDeductions.reduce((s, d) => s + d.amount, 0);
       netAmount = depositAmount - totalDeductions;
 
@@ -285,8 +356,9 @@ exports.handler = async (event) => {
         siteName, siteUrl, tenantName: `${tenant.firstName||''} ${tenant.lastName||''}`.trim(), tenantEmail: tenant.email,
         unit: tenant.unit || '', propertyName: tenant.propertyName || '',
         moveOutDate: moveOutDateFormatted, forwardingAddress: String(forwardingAddress||'').slice(0, 500),
-        deposit: depositAmount, deductions: cleanDeductions, totalDeductions, netAmount,
+        deposit: depositAmount, deductions: deductionsWithPhotos, totalDeductions, netAmount,
         refundMethod: refundMethod === 'check' ? 'check' : 'electronic',
+        conditionPhotos: conditionPhotoUris,
       });
     } else {
       html = buildCoHtml({
@@ -317,6 +389,7 @@ exports.handler = async (event) => {
       deductions: isUS ? cleanDeductions : null,
       netAmount: isUS ? netAmount : null,
       refundMethod: isUS ? (refundMethod === 'check' ? 'check' : 'electronic') : null,
+      conditionPhotos: isUS ? conditionPhotoRefs : null,
       conditionNotes: isUS ? null : String(conditionNotes||'').slice(0, 3000),
       statementUrl, blobKey,
       generatedAt: a.firestore.FieldValue.serverTimestamp(),
