@@ -48,6 +48,17 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'FIREBASE_SERVICE_ACCOUNT env var not set' }) };
   }
 
+  // Admin-only: this had no auth check at all, unlike delete-document.js and
+  // view-doc.js which were fixed for the same collection during an earlier
+  // audit — this upload side was missed at the time. Anyone who could call
+  // this could attach an arbitrary file to an arbitrary tenantId's document
+  // list.
+  const a  = getAdmin();
+  const db = a.firestore();
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
+
   try {
     const { fields, fileBuffer, fileName, mimeType } = await parseMultipart(event);
     if (!fileBuffer?.length) return { statusCode: 400, body: JSON.stringify({ error: 'No file received' }) };
@@ -86,7 +97,6 @@ exports.handler = async (event) => {
     const ext  = fileName.split('.').pop().toLowerCase();
     const type = ext === 'pdf' ? 'pdf' : ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'image' : 'file';
 
-    const a   = getAdmin();
     const ref = await a.firestore().collection('documents').add({
       name: displayName, category: category || 'Other',
       url: viewUrl,
