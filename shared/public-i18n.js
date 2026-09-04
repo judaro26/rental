@@ -105,7 +105,7 @@
       // ── tenant-portal.html ──────────────────────────────────────────────
       'tenant.nav.dashboard': 'Dashboard', 'tenant.nav.payments': 'Payments',
       'tenant.nav.invoices': 'Invoices', 'tenant.nav.documents': 'Documents',
-      'tenant.nav.maintenance': 'Maintenance', 'tenant.nav.support': 'Support',
+      'tenant.nav.maintenance': 'Maintenance', 'tenant.nav.support': 'Support', 'tenant.nav.settings': 'Settings',
       'tenant.dashboard.recentPayments': 'Recent Payments', 'tenant.dashboard.leaseInfo': 'Lease Information',
       'tenant.payments.payRent': 'Pay Rent', 'tenant.payments.autoPay': '🔁 Automated Payments',
       'tenant.payments.history': 'Payment History',
@@ -114,6 +114,10 @@
       'tenant.maintenance.submit': 'Submit Repair Request', 'tenant.maintenance.mine': 'My Requests',
       'tenant.support.send': 'Send a Message', 'tenant.support.history': 'Message History',
       'tenant.support.features': '💡 Feature Requests',
+      'tenant.settings.notifications': 'Notification Preferences',
+      'tenant.settings.emailAlwaysOn': 'Email notifications are always on so you never miss an important update. You can choose below whether you\'d also like to receive text or WhatsApp messages.',
+      'tenant.settings.sms': 'SMS Text Messages', 'tenant.settings.smsHint': 'Receive announcements and alerts by text message',
+      'tenant.settings.whatsapp': 'WhatsApp Messages', 'tenant.settings.whatsappHint': 'Receive announcements and alerts by WhatsApp',
 
       // ── Cookie consent banner ───────────────────────────────────────────
       'cookie.message': 'We use cookies to run this site and process payments securely. Some are required for the site to function; others help us understand how it\'s used. You can accept or decline non-essential cookies.',
@@ -205,7 +209,7 @@
 
       'tenant.nav.dashboard': 'Panel', 'tenant.nav.payments': 'Pagos',
       'tenant.nav.invoices': 'Facturas', 'tenant.nav.documents': 'Documentos',
-      'tenant.nav.maintenance': 'Mantenimiento', 'tenant.nav.support': 'Soporte',
+      'tenant.nav.maintenance': 'Mantenimiento', 'tenant.nav.support': 'Soporte', 'tenant.nav.settings': 'Configuración',
       'tenant.dashboard.recentPayments': 'Pagos Recientes', 'tenant.dashboard.leaseInfo': 'Información del Contrato',
       'tenant.payments.payRent': 'Pagar Renta', 'tenant.payments.autoPay': '🔁 Pagos Automáticos',
       'tenant.payments.history': 'Historial de Pagos',
@@ -214,6 +218,10 @@
       'tenant.maintenance.submit': 'Enviar Solicitud de Reparación', 'tenant.maintenance.mine': 'Mis Solicitudes',
       'tenant.support.send': 'Enviar un Mensaje', 'tenant.support.history': 'Historial de Mensajes',
       'tenant.support.features': '💡 Solicitudes de Funciones',
+      'tenant.settings.notifications': 'Preferencias de Notificación',
+      'tenant.settings.emailAlwaysOn': 'Las notificaciones por correo siempre están activas para que no te pierdas ninguna actualización importante. Puedes elegir abajo si también quieres recibir mensajes de texto o WhatsApp.',
+      'tenant.settings.sms': 'Mensajes de Texto (SMS)', 'tenant.settings.smsHint': 'Recibe anuncios y alertas por mensaje de texto',
+      'tenant.settings.whatsapp': 'Mensajes de WhatsApp', 'tenant.settings.whatsappHint': 'Recibe anuncios y alertas por WhatsApp',
 
       'cookie.message': 'Usamos cookies para operar este sitio y procesar pagos de forma segura. Algunas son necesarias para el funcionamiento del sitio; otras nos ayudan a entender cómo se usa. Puedes aceptar o rechazar las cookies no esenciales.',
       'cookie.accept': 'Aceptar Todo', 'cookie.reject': 'Rechazar No Esenciales',
