@@ -410,6 +410,14 @@
       <div class="modal-body" style="padding-top:20px;">
         <div id="form-alert" class="alert alert-error" style="display:none;"></div>
 
+        <!-- Honeypot: invisible to real applicants (off-screen, not
+             display:none — some bots specifically check for and skip
+             display:none), unreachable by tab order or autofill. A bot
+             that blindly fills every field usually fills this one; a
+             human filling out the visible form never does. -->
+        <input type="text" id="f-website" name="website" tabindex="-1" autocomplete="off"
+               style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;" aria-hidden="true">
+
         <!-- ── STEP 1: Personal Info ── -->
         <div class="form-step active" id="step-1">
           <div class="field-row">
@@ -830,6 +838,7 @@
         consentBackgroundCheck: document.getElementById('c-bgcheck').checked,
         consentTerms:         document.getElementById('c-terms').checked,
         siteName:             siteSettings.siteName || 'Tenant Portal',
+        website:              document.getElementById('f-website').value, // honeypot — see the hidden field near the form's opening tag
       };
 
       const res  = await fetch('/api/submit-application', {
