@@ -143,6 +143,10 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span data-i18n="tenant.nav.support">Support</span>
     </button>
+    <button class="nav-item" onclick="switchSection('settings',this)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span data-i18n="tenant.nav.settings">Settings</span>
+    </button>
   </nav>
   <div class="sidebar-footer">
     <div id="lang-toggle" style="color:rgba(255,255,255,0.6);margin-bottom:10px;"></div>
@@ -514,6 +518,30 @@
         <div id="feat-history" style="display:none;border-top:1px solid #F3F4F6;">
           <div style="padding:12px 16px 4px;font-size:12px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:0.06em;">Your Requests</div>
           <div id="feat-history-list" style="padding:0 4px 4px;"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="section-settings" class="section">
+      <div class="card">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="tenant.settings.notifications">Notification Preferences</h3></div>
+        <div class="card-body">
+          <div id="settings-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+          <p style="font-size:13px;color:var(--slate);margin:0 0 20px;line-height:1.6;" data-i18n="tenant.settings.emailAlwaysOn">Email notifications are always on so you never miss an important update. You can choose below whether you'd also like to receive text or WhatsApp messages.</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid #F3F4F6;">
+            <div>
+              <div style="font-size:14px;font-weight:500;" data-i18n="tenant.settings.sms">SMS Text Messages</div>
+              <div style="font-size:12px;color:var(--slate);" data-i18n="tenant.settings.smsHint">Receive announcements and alerts by text message</div>
+            </div>
+            <input type="checkbox" id="settings-sms-toggle" onchange="updateNotificationPref('sms',this.checked)" style="width:20px;height:20px;accent-color:#C9903A;cursor:pointer;flex-shrink:0;">
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;">
+            <div>
+              <div style="font-size:14px;font-weight:500;" data-i18n="tenant.settings.whatsapp">WhatsApp Messages</div>
+              <div style="font-size:12px;color:var(--slate);" data-i18n="tenant.settings.whatsappHint">Receive announcements and alerts by WhatsApp</div>
+            </div>
+            <input type="checkbox" id="settings-whatsapp-toggle" onchange="updateNotificationPref('whatsapp',this.checked)" style="width:20px;height:20px;accent-color:#C9903A;cursor:pointer;flex-shrink:0;">
+          </div>
         </div>
       </div>
     </section>
@@ -1207,9 +1235,9 @@
       });
 
       // Fire-and-forget notification email to admin (don't block tenant UX on this)
-      fetch('/api/maintenance-notify', {
+      currentUser.getIdToken().then(idToken => fetch('/api/maintenance-notify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({
           tenantName:   `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
           unit:         tenantData?.unit         || '',
@@ -1218,7 +1246,7 @@
           imageUrls,
           siteName: document.getElementById('sidebar-brand')?.textContent || '',
         }),
-      }).catch(e => console.warn('Notify failed:', e));
+      })).catch(e => console.warn('Notify failed:', e));
 
       logAction('maintenance_submitted', `${category} — ${priority} priority: ${desc.slice(0,80)}`);
       alertEl.className='alert alert-success';
@@ -1329,9 +1357,9 @@
       });
 
       // Notify admin of the new comment (fire-and-forget)
-      fetch('/api/maintenance-notify', {
+      currentUser.getIdToken().then(idToken => fetch('/api/maintenance-notify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({
           tenantName:   authorName,
           tenantEmail:  tenantData?.email || '',
@@ -1346,7 +1374,7 @@
           commentText:  text,
           siteName:     document.getElementById('sidebar-brand')?.textContent || '',
         }),
-      }).catch(e => console.warn('Notify failed:', e));
+      })).catch(e => console.warn('Notify failed:', e));
 
       logAction('maintenance_comment', `Added comment on ${req.category||'maintenance'} request`);
       input.value = '';
@@ -1598,139 +1626,6 @@
     document.body.appendChild(overlay);
   };
 
-  // ===== AUTO-PAY =====
-  window.openAutopayModal = () => {
-    const m = document.getElementById('autopay-modal');
-    m.style.display = 'flex';
-    m.style.alignItems = 'center';
-    m.style.justifyContent = 'center';
-    // Populate day-of-month options if not already done
-    const daySelect = document.getElementById('ap-day');
-    if (daySelect && daySelect.options.length <= 1) {
-      daySelect.innerHTML = '';
-      for (let i = 1; i <= 28; i++) {
-        const s = i===1||i===21?'st':i===2||i===22?'nd':i===3||i===23?'rd':'th';
-        const opt = document.createElement('option');
-        opt.value = String(i); opt.text = `${i}${s} of month`;
-        daySelect.appendChild(opt);
-      }
-    }
-    // Pre-fill amount
-    const amtEl = document.getElementById('ap-amount');
-    if (amtEl && tenantData?.monthlyRent) amtEl.value = tenantData.monthlyRent;
-    document.getElementById('ap-signature').value = '';
-    document.getElementById('autopay-alert').classList.add('hidden');
-    updateConsentText();
-  };
-  window.closeAutopayModal = () => {
-    document.getElementById('autopay-modal').style.display = 'none';
-  };
-
-  window.updateConsentText = () => {
-    const sig    = document.getElementById('ap-signature')?.value.trim() || '[Your Name]';
-    const amount = parseFloat(document.getElementById('ap-amount')?.value || 0);
-    const day    = document.getElementById('ap-day')?.value || '1';
-    const method = document.getElementById('ap-method')?.value || 'zelle';
-    const methodLabel = { zelle:'Zelle', cashapp:'Cash App', stripe:'Credit/Debit Card (Stripe)' }[method] || method;
-    const el = document.getElementById('ap-consent-text');
-    if (el) el.textContent =
-`RECURRING PAYMENT AUTHORIZATION AGREEMENT
-
-I, ${sig}, ("Tenant") hereby authorize the Property Manager to initiate recurring monthly payments of $${amount.toFixed(2)} USD via ${methodLabel} on or around the ${day}${['1','21','31'].includes(day)?'st':day==='2'?'nd':day==='3'?'rd':'th'} day of each month.
-
-This authorization remains in effect until cancelled in writing with 30 days notice.
-
-Electronic Signature: ${sig}
-Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})}`;
-  };
-
-  window.submitAutopay = async () => {
-    const sig    = document.getElementById('ap-signature').value.trim();
-    const amount = parseFloat(document.getElementById('ap-amount').value);
-    const day    = document.getElementById('ap-day').value;
-    const method = document.getElementById('ap-method').value;
-    const alertEl = document.getElementById('autopay-alert');
-    alertEl.classList.add('hidden');
-
-    if (!sig)              { alertEl.className='alert alert-error'; alertEl.textContent='Please type your full legal name to sign.'; alertEl.classList.remove('hidden'); return; }
-    if (!amount||amount<1) { alertEl.className='alert alert-error'; alertEl.textContent='Please enter a valid amount.'; alertEl.classList.remove('hidden'); return; }
-
-    const btn = document.getElementById('ap-submit-btn');
-    btn.disabled = true; btn.textContent = 'Submitting...';
-
-    let stripePaymentMethodId = null, stripeCustomerId = null;
-
-    // For card method, set up Stripe SavedIntent first
-    if (method === 'stripe') {
-      try {
-        btn.textContent = 'Saving card...';
-        // Get SetupIntent from server
-        const idToken = await currentUser.getIdToken();
-        const siRes  = await fetch('/api/setup-autopay', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-          body: JSON.stringify({
-            tenantId:    currentUser.uid,
-            tenantEmail: tenantData?.email || currentUser.email,
-            tenantName:  `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
-          }),
-        });
-        const siData = await siRes.json();
-        if (!siRes.ok) throw new Error(siData.error || 'Could not initialize card setup');
-        stripeCustomerId = siData.customerId;
-
-        // Confirm card setup using the Stripe element
-        const { setupIntent, error } = await _apStripeInstance.confirmCardSetup(siData.clientSecret, {
-          payment_method: {
-            card: _apCardElement,
-            billing_details: {
-              name: sig,
-              email: tenantData?.email || currentUser.email,
-            },
-          },
-        });
-        if (error) throw new Error(error.message);
-        stripePaymentMethodId = setupIntent.payment_method;
-        btn.textContent = 'Authorizing...';
-      } catch(cardErr) {
-        alertEl.className='alert alert-error'; alertEl.textContent = cardErr.message; alertEl.classList.remove('hidden');
-        btn.disabled = false; btn.textContent = 'Authorize Auto-Pay'; return;
-      }
-    }
-
-    try {
-      const idToken = await currentUser.getIdToken();
-      const res  = await fetch('/api/record-consent', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
-        body: JSON.stringify({
-          tenantId:    currentUser.uid,
-          tenantName:  `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
-          tenantEmail: tenantData?.email || currentUser.email,
-          unit:        tenantData?.unit || '',
-          propertyId:  tenantData?.propertyId || '',
-          propertyName: tenantData?.propertyName || '',
-          monthlyAmount: amount, paymentMethod: method, paymentDay: day,
-          signatureName: sig,
-          siteName: document.getElementById('sidebar-brand')?.textContent || '',
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-
-      logAction('autopay_authorized', `$${amount.toFixed(2)}/mo via ${method} on day ${day}`);
-      closeAutopayModal();
-      // Update badge
-      const badge = document.getElementById('autopay-status-badge');
-      if (badge) { badge.textContent = `✓ Active — ${method} · $${amount.toFixed(2)}/mo`; badge.style.background='#F0FDF4'; badge.style.color='#16A34A'; }
-      const body = document.getElementById('autopay-body');
-      if (body) body.innerHTML = `<p style="font-size:13px;color:#16A34A;margin:0;">✓ Auto-pay authorized. You'll receive a confirmation email. To cancel, contact your property manager.</p>`;
-    } catch(e) {
-      alertEl.className='alert alert-error'; alertEl.textContent=e.message; alertEl.classList.remove('hidden');
-    }
-    btn.disabled = false; btn.textContent = 'Authorize Auto-Pay';
-  };
-
-
-
   // ===== FEATURE REQUESTS =====
   window.submitFeatureRequest = async () => {
     const title   = document.getElementById('feat-title').value.trim();
@@ -1870,6 +1765,7 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
     _apPaymentEl.mount('#ap-card-element');
   }
 
+  // ===== AUTO-PAY =====
   window.openAutopayModal = async (editMode = false) => {
     _apEditMode = editMode;
     document.getElementById('ap-modal-title').textContent =
@@ -2137,8 +2033,47 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
     if (btn) btn.classList.add('active');
     document.getElementById('page-title').textContent = PublicI18N.t('tenant.nav.' + id) || id;
     if (id === 'dashboard') renderLeaseInfo();
+    if (id === 'settings') renderNotificationPrefs();
     logAction('section_viewed', `Navigated to ${id}`);
     document.getElementById('sidebar').classList.remove('open');
+  };
+
+  function renderNotificationPrefs() {
+    const prefs = tenantData?.notificationPrefs || {};
+    // Default to enabled (true) when unset, so existing tenants who've
+    // never touched this setting keep receiving notifications exactly as
+    // before — this is an opt-out, not an opt-in.
+    document.getElementById('settings-sms-toggle').checked = prefs.sms !== false;
+    document.getElementById('settings-whatsapp-toggle').checked = prefs.whatsapp !== false;
+  }
+
+  window.updateNotificationPref = async (channel, enabled) => {
+    const alertEl = document.getElementById('settings-alert');
+    alertEl.classList.add('hidden');
+    try {
+      // Dot-notation field path updates just this one nested key, leaving
+      // the other channel's setting (and anything else in the object)
+      // untouched — a plain {notificationPrefs: {...}} would overwrite the
+      // whole map. tenants already have update access to their own record
+      // for fields like this one (see firestore.rules), so no backend
+      // endpoint is needed here.
+      await updateDoc(doc(db,'tenants',currentUser.uid), {
+        [`notificationPrefs.${channel}`]: enabled,
+        updatedAt: serverTimestamp(),
+      });
+      if (tenantData) {
+        tenantData.notificationPrefs = tenantData.notificationPrefs || {};
+        tenantData.notificationPrefs[channel] = enabled;
+      }
+      logAction('notification_pref_changed', `${channel} notifications ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (e) {
+      alertEl.className = 'alert alert-error';
+      alertEl.textContent = 'Could not save your preference: ' + e.message;
+      alertEl.classList.remove('hidden');
+      // Revert the toggle visually since the save failed
+      const toggle = document.getElementById(`settings-${channel}-toggle`);
+      if (toggle) toggle.checked = !enabled;
+    }
   };
 </script>
 <!-- AUTO-PAY CONSENT MODAL -->
