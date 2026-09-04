@@ -2029,8 +2029,8 @@
       <div><label class="label" data-i18n="lease.leaseStart">Lease start</label><input type="date" id="lease-start" class="form-input"></div>
       <div><label class="label" data-i18n="lease.leaseEnd">Lease end</label><input type="date" id="lease-end" class="form-input"></div>
       <div><label class="label" data-i18n="lease.monthlyRent">Monthly rent ($)</label><input type="number" id="lease-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
-      <div><label class="label" data-i18n="lease.securityDeposit">Security deposit ($)</label><input type="number" id="lease-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
-      <div class="col-span-2"><label class="label" data-i18n="lease.propertyType">Property type</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="single" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.singleFamily">Single-Family Home / Condo</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="multi" onchange="updateLeaseVisibility()"> <span data-i18n="lease.multiFamily">Multi-Family / Studio Unit</span></label></div></div><div class="col-span-2"><label class="label" data-i18n="lease.rentControl">Rent control (AB 1482)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="exempt" checked> <span data-i18n="lease.exempt">Exempt</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="subject"> <span data-i18n="lease.subjectToRentControl">Subject to rent control</span></label></div></div><div><label class="label" data-i18n="lease.lateFeeDayOfMonth">Late fee day of month</label><input type="number" id="lease-late-fee-day" class="form-input" min="1" max="31" placeholder="5"></div>
+      <div id="lease-deposit-field"><label class="label" data-i18n="lease.securityDeposit">Security deposit ($)</label><input type="number" id="lease-deposit" class="form-input" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="col-span-2"><label class="label" data-i18n="lease.propertyType">Property type</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="single" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.singleFamily">Single-Family Home / Condo</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-property-type" value="multi" onchange="updateLeaseVisibility()"> <span data-i18n="lease.multiFamily">Multi-Family / Studio Unit</span></label></div></div><div class="col-span-2" id="lease-rentcontrol-field"><label class="label" data-i18n="lease.rentControl">Rent control (AB 1482)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="exempt" checked> <span data-i18n="lease.exempt">Exempt</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-rent-control" value="subject"> <span data-i18n="lease.subjectToRentControl">Subject to rent control</span></label></div></div><div><label class="label" data-i18n="lease.lateFeeDayOfMonth">Late fee day of month</label><input type="number" id="lease-late-fee-day" class="form-input" min="1" max="31" placeholder="5"></div>
       <div><label class="label" data-i18n="lease.lateFee">Late fee ($)</label><input type="number" id="lease-late-fee" class="form-input" min="0" step="0.01" placeholder="0.00"></div><div class="col-span-2"><label class="label" data-i18n="lease.utilitiesProvided">Utilities provided</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="a" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.tenantPaysAllUtilities">Tenant pays all utilities</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="b" onchange="updateLeaseVisibility()"> <span data-i18n="lease.landlordProvidesSome">Landlord provides some utilities</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-utilities-option" value="c" onchange="updateLeaseVisibility()"> <span data-i18n="lease.sharedUtilities">Shared / sub-metered utilities</span></label></div></div><div id="lease-utilities-b-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><label class="label" data-i18n="lease.utilitiesIncludedByLandlord">Utilities included by landlord</label><div style="display:flex;gap:16px;font-size:13px;flex-wrap:wrap;"><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="electricity"> <span data-i18n="lease.electricity">Electricity</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="gas"> <span data-i18n="lease.gas">Gas</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="water"> <span data-i18n="lease.water">Water</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-utilities-included" value="trash"> <span data-i18n="lease.trash">Trash</span></label></div></div><div id="lease-utilities-c-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><label class="label" data-i18n="lease.sharedMeterUtilities">Shared meter utilities (select all that apply)</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;flex-wrap:wrap;"><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-shared-meter-included" value="electricity" checked> <span data-i18n="lease.electricity">Electricity</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="checkbox" name="lease-shared-meter-included" value="gas"> <span data-i18n="lease.gas">Gas</span></label></div><label class="label" style="margin-top:8px;" data-i18n="lease.sharedMeterBilling">Shared meter billing</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-shared-meter-billing" value="absorbed" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.landlordAbsorbsCost">Landlord absorbs cost</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-shared-meter-billing" value="prorated" onchange="updateLeaseVisibility()"> <span data-i18n="lease.proratedToTenant">Prorated to tenant</span></label></div><div id="lease-shared-meter-pct-row" class="hidden" style="margin-top:8px;"><label class="label" data-i18n="lease.tenantSharePct">Tenant share (%)</label><input type="number" id="lease-shared-meter-pct" class="form-input" min="0" max="100" placeholder="50"></div></div>
       <div class="col-span-2"><label class="label" data-i18n="lease.pets">Pets</label><div style="display:flex;gap:16px;font-size:13px;padding-top:4px;"><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="none" onchange="updateLeaseVisibility()" checked> <span data-i18n="lease.noPetsAllowed">No pets allowed</span></label><label style="display:flex;align-items:center;gap:4px;"><input type="radio" name="lease-pets" value="allowed" onchange="updateLeaseVisibility()"> <span data-i18n="lease.petAllowed">Pet allowed (with restriction)</span></label></div></div><div id="lease-pets-panel" class="col-span-2 hidden" style="background:#FDFBF8;padding:10px 12px;border-radius:2px;"><div class="grid grid-cols-2 gap-4"><div><label class="label" data-i18n="lease.petBreed">Pet breed</label><input type="text" id="lease-pet-breed" class="form-input" placeholder="e.g. Labrador"></div><div><label class="label" data-i18n="lease.petWeight">Pet weight</label><input type="text" id="lease-pet-weight" class="form-input" placeholder="e.g. 45 lbs"></div><div><label class="label" data-i18n="lease.petName">Pet name</label><input type="text" id="lease-pet-name" class="form-input" placeholder="e.g. Max"></div><div><label class="label" data-i18n="lease.petRent">Pet rent ($/mo)</label><input type="number" id="lease-pet-rent" class="form-input" min="0" step="0.01" placeholder="0.00"></div></div></div>
       <div class="col-span-2"><label class="label" data-i18n="lease.additionalTerms">Additional terms</label><textarea id="lease-additional" class="form-input" rows="3" data-i18n-placeholder="lease.additionalTermsPlaceholder" placeholder="Any extra clauses to include..."></textarea></div>
@@ -2061,6 +2061,67 @@
     <div style="display:flex;gap:10px;margin-top:20px;">
       <button onclick="sendDocRequest()" class="btn btn-primary" style="flex:1;" id="doc-request-btn" data-i18n="applications.sendRequest">Send Request</button>
       <button onclick="closeModal('doc-request-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- MOVE-OUT & DEPOSIT RETURN MODAL -->
+<div id="moveout-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="modal-backdrop absolute inset-0" onclick="closeModal('moveout-modal')"></div>
+  <div style="background:#fff;width:100%;max-width:680px;max-height:92vh;overflow-y:auto;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;">
+    <button onclick="closeModal('moveout-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+    <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:4px;" data-i18n="moveOut.title">🚪 Move-Out &amp; Deposit Return</h3>
+    <p id="moveout-modal-to" style="font-size:13px;color:var(--slate);margin-bottom:16px;"></p>
+    <div id="moveout-alert" class="hidden alert" style="margin-bottom:14px;"></div>
+    <input type="hidden" id="moveout-tenant-id">
+
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="label" data-i18n="moveOut.moveOutDate">Move-out date</label><input type="date" id="moveout-date" class="form-input" onchange="updateMoveOutCalculations()"></div>
+      <div><label class="label" data-i18n="moveOut.forwardingAddress">Forwarding address</label><input type="text" id="moveout-forwarding-address" class="form-input" data-i18n-placeholder="moveOut.forwardingAddressPlaceholder" placeholder="Where to send the statement/refund"></div>
+    </div>
+
+    <!-- US: deposit itemization -->
+    <div id="moveout-us-section" style="margin-top:16px;">
+      <div id="moveout-deadline-banner" style="font-size:12px;padding:10px 14px;border-radius:3px;margin-bottom:14px;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px;margin-bottom:10px;">
+        <span data-i18n="moveOut.depositOnFile">Deposit on file</span>
+        <strong id="moveout-deposit-display">$0.00</strong>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0;" data-i18n="moveOut.deductionsTitle">Deductions</h4>
+        <button onclick="addMoveOutDeduction()" class="btn btn-sm btn-outline" data-i18n="moveOut.addDeduction">+ Add Deduction</button>
+      </div>
+      <div id="moveout-deductions-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+      <p id="moveout-empty-deductions-hint" style="font-size:12px;color:var(--slate);margin:6px 0 0;" data-i18n="moveOut.noDeductionsYet">No deductions added — the full deposit will be refunded.</p>
+
+      <div id="moveout-receipt-warning" class="hidden" style="font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:8px 12px;margin-top:12px;"></div>
+
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:12px;display:flex;flex-direction:column;gap:6px;font-size:13px;">
+        <div style="display:flex;justify-content:space-between;"><span data-i18n="moveOut.totalDeductions">Total deductions</span><strong id="moveout-total-deductions">$0.00</strong></div>
+        <div style="display:flex;justify-content:space-between;font-size:15px;font-weight:600;"><span id="moveout-result-label" data-i18n="moveOut.refundDue">Refund due to tenant</span><strong id="moveout-result-amount">$0.00</strong></div>
+      </div>
+
+      <div style="margin-top:14px;">
+        <label class="label" data-i18n="moveOut.refundMethod">Refund method</label>
+        <select id="moveout-refund-method" class="form-input">
+          <option value="electronic" data-i18n="moveOut.refundElectronic">Electronic (via tenant portal / original payment method)</option>
+          <option value="check" data-i18n="moveOut.refundCheck">Paper check</option>
+        </select>
+        <p id="moveout-electronic-hint" class="hidden" style="font-size:10px;color:var(--slate);margin-top:4px;" data-i18n="moveOut.electronicRequiredHint">This tenant paid electronically, so California law (AB 414) requires offering an electronic refund option.</p>
+      </div>
+    </div>
+
+    <!-- Colombia: no deposit concept, simpler condition record -->
+    <div id="moveout-co-section" class="hidden" style="margin-top:16px;">
+      <p style="font-size:11px;color:var(--slate);background:#FDFBF8;border:1px solid var(--border);border-radius:3px;padding:10px 12px;margin-bottom:14px;" data-i18n="moveOut.coNoDepositNote">Colombian law (Ley 820 de 2003, Art. 16) prohibits cash security deposits for residential leases — there's no deposit to itemize deductions against here. This just records the move-out and property condition.</p>
+      <label class="label" data-i18n="moveOut.conditionNotes">Property condition notes</label>
+      <textarea id="moveout-condition-notes" class="form-input" rows="4" data-i18n-placeholder="moveOut.conditionNotesPlaceholder" placeholder="Condition at move-out, any issues noted..."></textarea>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="generateMoveOutStatement()" class="btn btn-primary" style="flex:1;" id="moveout-generate-btn" data-i18n="moveOut.generateAndSend">Generate Statement &amp; Send</button>
+      <button onclick="closeModal('moveout-modal')" class="btn btn-outline" data-i18n="common.cancel">Cancel</button>
     </div>
   </div>
 </div>
@@ -2686,6 +2747,23 @@
       'lease.petName':'Pet name', 'lease.petRent':'Pet rent ($/mo)', 'lease.additionalTerms':'Additional terms',
       'lease.additionalTermsPlaceholder':'Any extra clauses to include...',
       'lease.documensoHint':'These details are prefilled into your Documenso lease template. The applicant (Tenant) and you (Landlord) will receive signing invitations from Documenso by email.',
+      'tenants.tenant':'Tenant', 'common.unit':'Unit',
+      'moveOut.title':'🚪 Move-Out & Deposit Return', 'moveOut.button':'Move-Out', 'moveOut.buttonTitle':'Start move-out & deposit return',
+      'moveOut.moveOutDate':'Move-out date', 'moveOut.forwardingAddress':'Forwarding address', 'moveOut.forwardingAddressPlaceholder':'Where to send the statement/refund',
+      'moveOut.depositOnFile':'Deposit on file', 'moveOut.deductionsTitle':'Deductions', 'moveOut.addDeduction':'+ Add Deduction',
+      'moveOut.noDeductionsYet':'No deductions added — the full deposit will be refunded.',
+      'moveOut.catUnpaidRent':'Unpaid rent', 'moveOut.catDamage':'Damage', 'moveOut.catCleaning':'Cleaning', 'moveOut.catPersonalProperty':'Personal property',
+      'moveOut.descriptionPlaceholder':'What was this for?',
+      'moveOut.receiptWarning':'Damage + cleaning deductions exceed $125 — California law requires attaching receipts or invoices for these charges.',
+      'moveOut.totalDeductions':'Total deductions', 'moveOut.refundDue':'Refund due to tenant', 'moveOut.tenantOwes':'Tenant owes',
+      'moveOut.refundMethod':'Refund method', 'moveOut.refundElectronic':'Electronic (via tenant portal / original payment method)', 'moveOut.refundCheck':'Paper check',
+      'moveOut.electronicRequiredHint':'This tenant paid electronically, so California law (AB 414) requires offering an electronic refund option.',
+      'moveOut.coNoDepositNote':'Colombian law (Ley 820 de 2003, Art. 16) prohibits cash security deposits for residential leases — there is no deposit to itemize deductions against here. This just records the move-out and property condition.',
+      'moveOut.conditionNotes':'Property condition notes', 'moveOut.conditionNotesPlaceholder':'Condition at move-out, any issues noted...',
+      'moveOut.generateAndSend':'Generate Statement & Send', 'moveOut.moveOutDateRequired':'Please enter a move-out date.',
+      'moveOut.statementSent':'Move-out statement generated and sent.', 'moveOut.viewStatement':'View statement',
+      'moveOut.deadlineIs':'Deadline:', 'moveOut.daysLeftLabel':'days left', 'moveOut.deadlinePassed':'21-day deadline passed',
+      'moveOut.deadlinePassedWarning':'you may have forfeited the right to withhold any portion of the deposit',
       'admins.inviteAdminTitle':'Invite Admin', 'admins.emailRequired':'Email *', 'admins.displayName':'Display Name',
       'admins.roleRequired':'Role *', 'admins.restrictedAdminOption':'Restricted Admin (one country only)',
       'admins.superAdminOption':'Super Admin (full access)', 'admins.countryScopeRequired':'Country Scope *',
@@ -3237,6 +3315,23 @@
       'lease.petName':'Nombre de la mascota', 'lease.petRent':'Renta por mascota ($/mes)', 'lease.additionalTerms':'Términos adicionales',
       'lease.additionalTermsPlaceholder':'Cualquier cláusula adicional a incluir...',
       'lease.documensoHint':'Estos detalles se prellenan en tu plantilla de contrato de Documenso. El solicitante (Inquilino) y tú (Arrendador) recibirán invitaciones de firma de Documenso por correo.',
+      'tenants.tenant':'Inquilino', 'common.unit':'Unidad',
+      'moveOut.title':'🚪 Salida y Devolución de Depósito', 'moveOut.button':'Salida', 'moveOut.buttonTitle':'Iniciar salida y devolución de depósito',
+      'moveOut.moveOutDate':'Fecha de salida', 'moveOut.forwardingAddress':'Dirección de envío', 'moveOut.forwardingAddressPlaceholder':'Dónde enviar el estado de cuenta/reembolso',
+      'moveOut.depositOnFile':'Depósito registrado', 'moveOut.deductionsTitle':'Deducciones', 'moveOut.addDeduction':'+ Agregar Deducción',
+      'moveOut.noDeductionsYet':'No se han agregado deducciones — se reembolsará el depósito completo.',
+      'moveOut.catUnpaidRent':'Renta impaga', 'moveOut.catDamage':'Daños', 'moveOut.catCleaning':'Limpieza', 'moveOut.catPersonalProperty':'Propiedad personal',
+      'moveOut.descriptionPlaceholder':'¿Para qué fue esto?',
+      'moveOut.receiptWarning':'Las deducciones por daños y limpieza superan $125 — la ley de California exige adjuntar recibos o facturas para estos cargos.',
+      'moveOut.totalDeductions':'Total de deducciones', 'moveOut.refundDue':'Reembolso para el inquilino', 'moveOut.tenantOwes':'El inquilino debe',
+      'moveOut.refundMethod':'Método de reembolso', 'moveOut.refundElectronic':'Electrónico (vía portal del inquilino / método de pago original)', 'moveOut.refundCheck':'Cheque en papel',
+      'moveOut.electronicRequiredHint':'Este inquilino pagó electrónicamente, por lo que la ley de California (AB 414) exige ofrecer una opción de reembolso electrónico.',
+      'moveOut.coNoDepositNote':'La ley colombiana (Ley 820 de 2003, Art. 16) prohíbe los depósitos en efectivo para contratos de arrendamiento de vivienda — aquí no hay depósito sobre el cual aplicar deducciones. Esto solo registra la salida y el estado de la propiedad.',
+      'moveOut.conditionNotes':'Notas sobre el estado de la propiedad', 'moveOut.conditionNotesPlaceholder':'Estado al momento de la salida, problemas observados...',
+      'moveOut.generateAndSend':'Generar Estado de Cuenta y Enviar', 'moveOut.moveOutDateRequired':'Por favor ingresa una fecha de salida.',
+      'moveOut.statementSent':'Estado de cuenta de salida generado y enviado.', 'moveOut.viewStatement':'Ver estado de cuenta',
+      'moveOut.deadlineIs':'Fecha límite:', 'moveOut.daysLeftLabel':'días restantes', 'moveOut.deadlinePassed':'Se venció el plazo de 21 días',
+      'moveOut.deadlinePassedWarning':'podrías haber perdido el derecho a retener cualquier parte del depósito',
       'admins.inviteAdminTitle':'Invitar Administrador', 'admins.emailRequired':'Correo *', 'admins.displayName':'Nombre a Mostrar',
       'admins.roleRequired':'Rol *', 'admins.restrictedAdminOption':'Administrador Restringido (un solo país)',
       'admins.superAdminOption':'Super Administrador (acceso total)', 'admins.countryScopeRequired':'Ámbito de País *',
@@ -3922,6 +4017,7 @@
             ${status !== 'active' ? `<button onclick="approveTenant('${tn.id}')" class="btn btn-sm btn-success">${t('tenants.approve')}</button>` : ''}
             <button onclick="openEditTenant('${tn.id}')" class="btn btn-sm btn-outline">${t('common.edit')}</button>
             ${tn.email ? `<button onclick="openTenantEmailModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('tenants.sendEmail')}">✉️</button>` : ''}
+            ${status === 'active' ? `<button onclick="openMoveOutModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('moveOut.buttonTitle')}">🚪 ${t('moveOut.button')}</button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -4660,7 +4756,18 @@
     const app = allApplications.find(a=>a.id===id); if(!app) return;
     const modal = document.getElementById('lease-modal');
     modal.dataset.appId = id;
-    const propName = allProperties.find(p=>p.id===app.propertyId)?.name || app.propertyName || '';
+    const prop = allProperties.find(p=>p.id===app.propertyId);
+    const propName = prop?.name || app.propertyName || '';
+    // Colombia (Ley 820 de 2003, Artículo 16) prohibits cash security
+    // deposits for urban residential leases outright — not a cap, a full
+    // ban, unlike California's AB 12 cap. AB 1482 rent control is also
+    // purely a California concept. Neither field applies to a Colombia
+    // property, so both are hidden rather than left showing a US-specific
+    // control that doesn't mean anything (or worse, inviting a deposit
+    // amount that isn't legal to collect there).
+    const isUS = (prop?.country || 'US') !== 'CO';
+    document.getElementById('lease-deposit-field').classList.toggle('hidden', !isUS);
+    document.getElementById('lease-rentcontrol-field').classList.toggle('hidden', !isUS);
     document.getElementById('lease-modal-to').textContent =
       `Tenant: ${`${app.firstName||''} ${app.lastName||''}`.trim()||'Applicant'}${app.email?` <${app.email}>`:''}${propName?` · Property: ${propName}`:''}`;
     document.getElementById('lease-alert').classList.add('hidden');
@@ -4668,6 +4775,7 @@
     const set = (elId, v) => { document.getElementById(elId).value = v != null ? v : ''; }; const setRadio = (name, val) => { const el = document.querySelector(`input[name="${name}"][value="${val}"]`); if (el) el.checked = true; }; const setChecks = (name, vals) => { document.querySelectorAll(`input[name="${name}"]`).forEach(el => { el.checked = (vals||[]).includes(el.value); }); };
     set('lease-start', t.leaseStart); set('lease-end', t.leaseEnd);
     set('lease-rent', t.monthlyRent); set('lease-deposit', t.securityDeposit);
+    if (!isUS) document.getElementById('lease-deposit').value = ''; // no legal deposit concept to prefill for Colombia
     set('lease-late-fee-day', t.lateFeeDay || 5); set('lease-late-fee', t.lateFee);
     setRadio('lease-property-type', t.propertyType || 'single'); setRadio('lease-rent-control', t.rentControl || 'exempt');
     setRadio('lease-utilities-option', t.utilitiesOption || 'a'); setChecks('lease-utilities-included', t.utilitiesIncluded);
@@ -4706,6 +4814,169 @@
     } catch(e){ showAlert('lease-alert', e.message); }
     btn.disabled=false; btn.textContent=t('applications.generateSendSignature');
   };
+
+  // ===== MOVE-OUT & DEPOSIT RETURN =====
+  let _moveOutDeductions = [];
+
+  window.openMoveOutModal = (id) => {
+    const tenant = allTenants.find(t=>t.id===id); if (!tenant) return;
+    const prop = allProperties.find(p=>p.id===tenant.propertyId);
+    const isUS = (prop?.country || 'US') !== 'CO';
+    document.getElementById('moveout-tenant-id').value = id;
+    document.getElementById('moveout-modal-to').textContent =
+      `${t('tenants.tenant')}: ${`${tenant.firstName||''} ${tenant.lastName||''}`.trim()}${tenant.unit?` · ${t('common.unit')} ${tenant.unit}`:''}${prop?.name?` · ${t('common.property')}: ${prop.name}`:''}`;
+    document.getElementById('moveout-alert').classList.add('hidden');
+    document.getElementById('moveout-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('moveout-forwarding-address').value = '';
+    document.getElementById('moveout-condition-notes').value = '';
+    document.getElementById('moveout-us-section').classList.toggle('hidden', !isUS);
+    document.getElementById('moveout-co-section').classList.toggle('hidden', isUS);
+    if (isUS) {
+      _moveOutDeductions = [];
+      document.getElementById('moveout-deposit-display').textContent = '$' + (parseFloat(tenant.securityDeposit)||0).toFixed(2);
+      // AB 414 requires offering an electronic refund when the tenant paid
+      // electronically. Default to that when their payment history shows
+      // it, but always leave paper check available as an alternative.
+      const paidElectronically = allPayments.some(p => p.tenantId === id && ['stripe','bold'].includes(p.method));
+      document.getElementById('moveout-refund-method').value = paidElectronically ? 'electronic' : 'check';
+      document.getElementById('moveout-electronic-hint').classList.toggle('hidden', !paidElectronically);
+      renderMoveOutDeductions();
+    }
+    updateMoveOutCalculations();
+    openModal('moveout-modal');
+  };
+
+  function renderMoveOutDeductions() {
+    const list = document.getElementById('moveout-deductions-list');
+    document.getElementById('moveout-empty-deductions-hint').classList.toggle('hidden', _moveOutDeductions.length > 0);
+    list.innerHTML = _moveOutDeductions.map((d, i) => `
+      <div style="display:flex;gap:8px;align-items:flex-start;background:#FDFBF8;padding:10px;border-radius:3px;">
+        <select onchange="updateMoveOutDeductionField(${i},'category',this.value)" style="font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;width:150px;flex-shrink:0;">
+          <option value="unpaid_rent" ${d.category==='unpaid_rent'?'selected':''}>${t('moveOut.catUnpaidRent')}</option>
+          <option value="damage" ${d.category==='damage'?'selected':''}>${t('moveOut.catDamage')}</option>
+          <option value="cleaning" ${d.category==='cleaning'?'selected':''}>${t('moveOut.catCleaning')}</option>
+          <option value="personal_property" ${d.category==='personal_property'?'selected':''}>${t('moveOut.catPersonalProperty')}</option>
+        </select>
+        <input type="text" value="${escapeHtml(d.description||'')}" oninput="updateMoveOutDeductionField(${i},'description',this.value)" placeholder="${t('moveOut.descriptionPlaceholder')}" style="flex:1;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;">
+        <input type="number" min="0" step="0.01" value="${d.amount||''}" oninput="updateMoveOutDeductionField(${i},'amount',this.value)" placeholder="0.00" style="width:90px;font-size:12px;padding:6px;border:1px solid var(--border);border-radius:2px;flex-shrink:0;">
+        <button onclick="removeMoveOutDeduction(${i})" style="background:none;border:none;color:#DC2626;cursor:pointer;font-size:16px;flex-shrink:0;padding:4px;" title="${t('common.remove')}">×</button>
+      </div>
+    `).join('');
+  }
+
+  window.addMoveOutDeduction = () => {
+    _moveOutDeductions.push({ category: 'damage', description: '', amount: '' });
+    renderMoveOutDeductions();
+    updateMoveOutCalculations();
+  };
+  window.removeMoveOutDeduction = (i) => {
+    _moveOutDeductions.splice(i, 1);
+    renderMoveOutDeductions();
+    updateMoveOutCalculations();
+  };
+  window.updateMoveOutDeductionField = (i, field, value) => {
+    if (!_moveOutDeductions[i]) return;
+    _moveOutDeductions[i][field] = value;
+    updateMoveOutCalculations(); // recalc only — re-rendering the list here would drop input focus mid-keystroke
+  };
+
+  window.updateMoveOutCalculations = () => {
+    const tenantId = document.getElementById('moveout-tenant-id').value;
+    const tenant = allTenants.find(t=>t.id===tenantId); if (!tenant) return;
+    const prop = allProperties.find(p=>p.id===tenant.propertyId);
+    const isUS = (prop?.country || 'US') !== 'CO';
+    if (!isUS) return;
+
+    const dateStr = document.getElementById('moveout-date').value;
+    const banner = document.getElementById('moveout-deadline-banner');
+    if (dateStr) {
+      // California Civil Code §1950.5(g): 21 calendar days from move-out to
+      // return the deposit or send an itemized statement — weekends and
+      // holidays count, and missing it even briefly risks forfeiting the
+      // right to withhold anything.
+      const moveOutDate = new Date(dateStr + 'T00:00:00');
+      const deadline = new Date(moveOutDate); deadline.setDate(deadline.getDate() + 21);
+      const today = new Date(); today.setHours(0,0,0,0);
+      const daysLeft = Math.round((deadline - today) / 86400000);
+      const deadlineStr = deadline.toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+      if (daysLeft < 0) {
+        banner.style.background='#FEF2F2'; banner.style.color='#991B1B'; banner.style.border='1px solid #FECACA';
+        banner.textContent = `⚠️ ${t('moveOut.deadlinePassed')} (${deadlineStr}) — ${t('moveOut.deadlinePassedWarning')}`;
+      } else if (daysLeft <= 5) {
+        banner.style.background='#FFFBEB'; banner.style.color='#92400E'; banner.style.border='1px solid #FDE68A';
+        banner.textContent = `⏰ ${daysLeft} ${t('moveOut.daysLeftLabel')} — ${t('moveOut.deadlineIs')} ${deadlineStr}`;
+      } else {
+        banner.style.background='#F0FDF4'; banner.style.color='#166534'; banner.style.border='1px solid #BBF7D0';
+        banner.textContent = `${t('moveOut.deadlineIs')} ${deadlineStr} (${daysLeft} ${t('moveOut.daysLeftLabel')})`;
+      }
+    } else {
+      banner.textContent = '';
+    }
+
+    const deposit = parseFloat(tenant.securityDeposit) || 0;
+    const totalDeductions = _moveOutDeductions.reduce((sum,d) => sum + (parseFloat(d.amount)||0), 0);
+    const repairCleaningTotal = _moveOutDeductions.filter(d => d.category==='damage' || d.category==='cleaning').reduce((sum,d) => sum + (parseFloat(d.amount)||0), 0);
+    document.getElementById('moveout-total-deductions').textContent = '$' + totalDeductions.toFixed(2);
+
+    const net = deposit - totalDeductions;
+    const resultLabel = document.getElementById('moveout-result-label');
+    const resultAmount = document.getElementById('moveout-result-amount');
+    if (net >= 0) {
+      resultLabel.textContent = t('moveOut.refundDue');
+      resultAmount.textContent = '$' + net.toFixed(2);
+      resultAmount.style.color = '#166534';
+    } else {
+      resultLabel.textContent = t('moveOut.tenantOwes');
+      resultAmount.textContent = '$' + Math.abs(net).toFixed(2);
+      resultAmount.style.color = '#DC2626';
+    }
+
+    // Civil Code §1950.5(g)(2): receipts/invoices required once repair +
+    // cleaning deductions exceed $125 in total (not per-item).
+    const warning = document.getElementById('moveout-receipt-warning');
+    if (repairCleaningTotal > 125) {
+      warning.classList.remove('hidden');
+      warning.textContent = `⚠️ ${t('moveOut.receiptWarning')}`;
+    } else {
+      warning.classList.add('hidden');
+    }
+  };
+
+  window.generateMoveOutStatement = async () => {
+    const tenantId = document.getElementById('moveout-tenant-id').value;
+    const tenant = allTenants.find(t=>t.id===tenantId); if (!tenant) return;
+    const prop = allProperties.find(p=>p.id===tenant.propertyId);
+    const isUS = (prop?.country || 'US') !== 'CO';
+    const moveOutDate = document.getElementById('moveout-date').value;
+    const forwardingAddress = document.getElementById('moveout-forwarding-address').value.trim();
+    if (!moveOutDate) { showAlert('moveout-alert', t('moveOut.moveOutDateRequired')); return; }
+
+    const payload = { tenantId, moveOutDate, forwardingAddress, country: isUS ? 'US' : 'CO' };
+    if (isUS) {
+      payload.deductions = _moveOutDeductions
+        .filter(d => d.description?.trim() && parseFloat(d.amount) > 0)
+        .map(d => ({ category: d.category, description: d.description.trim(), amount: parseFloat(d.amount) }));
+      payload.refundMethod = document.getElementById('moveout-refund-method').value;
+    } else {
+      payload.conditionNotes = document.getElementById('moveout-condition-notes').value.trim();
+    }
+
+    const btn = document.getElementById('moveout-generate-btn'); btn.disabled=true; btn.textContent=t('common.generating');
+    try {
+      let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
+      const res = await authedFetch('/api/generate-moveout-statement',{...payload,siteName});
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error||'Failed to generate statement');
+      const alertEl = document.getElementById('moveout-alert');
+      alertEl.className='alert alert-success';
+      alertEl.innerHTML = `✓ ${t('moveOut.statementSent')}`
+        + (data.statementUrl?`<div style="margin-top:8px;font-size:12px;">${t('moveOut.viewStatement')}: <a href="${data.statementUrl}" target="_blank" rel="noreferrer noopener">open</a></div>`:'');
+      alertEl.classList.remove('hidden');
+      setTimeout(()=>{ closeModal('moveout-modal'); }, 2200);
+    } catch(e){ showAlert('moveout-alert', e.message); }
+    btn.disabled=false; btn.textContent=t('moveOut.generateAndSend');
+  };
+
 
   // ===== ARCHIVE APPLICATIONS =====
   window.setApplicationArchived = async (id, archived) => {
