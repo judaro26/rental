@@ -5152,7 +5152,18 @@
       </div>`;
     }).join('');
   }
-  function viewUrl(d) { return d.url || '#'; }
+  async function viewUrl(d) {
+    if (!d.url) return '#';
+    // view-doc now requires auth for documents-collection records, so this
+    // fetches with the admin's token and hands back a Blob URL — the same
+    // approach buildGroupedBlobUrl already uses below, just for the
+    // single-file case.
+    const idToken = await auth.currentUser.getIdToken();
+    const res = await fetch(d.url, { headers: { 'Authorization': `Bearer ${idToken}` } });
+    if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
 
   async function buildGroupedBlobUrl(d) {
     // Fetch every part (each is a normal small chunk, already served fine by
@@ -5165,10 +5176,11 @@
     if (parts.length !== d.totalChunks) {
       throw new Error(`Expected ${d.totalChunks} parts but found ${parts.length}. A part may have been deleted separately.`);
     }
+    const idToken = await auth.currentUser.getIdToken();
     const buffers = [];
     let mimeType = 'application/octet-stream';
     for (const part of parts) {
-      const res = await fetch(part.url);
+      const res = await fetch(part.url, { headers: { 'Authorization': `Bearer ${idToken}` } });
       if (!res.ok) throw new Error(`Failed to fetch part ${part.chunkIndex + 1} of ${part.totalChunks}`);
       mimeType = res.headers.get('content-type') || mimeType;
       buffers.push(await res.arrayBuffer());
@@ -5202,7 +5214,13 @@
       // Re-check the person hasn't clicked a different document while this loaded.
       if (_selectedDocId !== id) { URL.revokeObjectURL(src); return; }
     } else {
-      src = viewUrl(d);
+      try {
+        src = await viewUrl(d);
+      } catch (e) {
+        body.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:8px;color:#DC2626;"><span style="font-size:32px;">⚠️</span><p style="font-size:13px;margin:0;text-align:center;max-width:320px;">${e.message}</p></div>`;
+        return;
+      }
+      if (_selectedDocId !== id) { URL.revokeObjectURL(src); return; }
     }
     dl.href = src;
     dl.setAttribute('download', d.originalName || d.name);
