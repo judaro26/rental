@@ -2709,6 +2709,8 @@
       'financials.catchupRemaining':'{amount} to go',
       'applications.generateSendSignature':'Generate &amp; Send for Signature', 'tenants.saveChanges':'Save Changes',
       'tenants.sendEmail':'Send Email', 'tenants.emailModalTitle':'Send Email', 'tenants.emailSubjectPlaceholder':'e.g. A quick update about your unit',
+      'tenants.renewalRequested':'Renewal Requested', 'tenants.renewalRequestedTitle':'This tenant has requested a lease renewal',
+      'tenants.acknowledgeRenewal':'Acknowledge', 'tenants.acknowledgeRenewalTitle':'Mark this renewal request as handled',
       'tenants.emailTabEdit':'✏️ Edit', 'tenants.emailTabPreview':'👁 Preview', 'tenants.clearFormatting':'Clear',
       'tenants.emailFormattingHint':'Select text to bold, italicize, or link it. Check the Preview tab to see exactly what your tenant will receive.',
       'tenants.sendEmailButton':'Send Email', 'tenants.emailToLine':'To: {name} ({email})',
@@ -3284,6 +3286,8 @@
       'financials.catchupRemaining':'faltan {amount}',
       'applications.generateSendSignature':'Generar y Enviar para Firma', 'tenants.saveChanges':'Guardar Cambios',
       'tenants.sendEmail':'Enviar Correo', 'tenants.emailModalTitle':'Enviar Correo', 'tenants.emailSubjectPlaceholder':'ej. Una actualización rápida sobre tu unidad',
+      'tenants.renewalRequested':'Renovación Solicitada', 'tenants.renewalRequestedTitle':'Este inquilino ha solicitado renovar su contrato',
+      'tenants.acknowledgeRenewal':'Confirmar', 'tenants.acknowledgeRenewalTitle':'Marcar esta solicitud de renovación como atendida',
       'tenants.emailTabEdit':'✏️ Editar', 'tenants.emailTabPreview':'👁 Vista Previa', 'tenants.clearFormatting':'Limpiar',
       'tenants.emailFormattingHint':'Selecciona texto para ponerlo en negrita, cursiva, o enlazarlo. Revisa la pestaña de Vista Previa para ver exactamente lo que recibirá tu inquilino.',
       'tenants.sendEmailButton':'Enviar Correo', 'tenants.emailToLine':'Para: {name} ({email})',
@@ -4040,12 +4044,15 @@
       const rent = tn.monthlyRent ? '$' + Number(tn.monthlyRent).toLocaleString(undefined,{minimumFractionDigits:2}) : '—';
       const leaseEnd = tn.leaseEnd || '—';
       const status = tn.status || 'pending';
+      const renewalBadge = tn.renewalRequest?.requested
+        ? `<span title="${t('tenants.renewalRequestedTitle')}" style="font-size:9px;background:#FFFBEB;color:#92400E;padding:2px 6px;border-radius:8px;margin-left:4px;white-space:nowrap;">🔄 ${t('tenants.renewalRequested')}</span>`
+        : '';
       return `<tr>
         <td>${name}</td>
         <td style="font-size:12px;">${tn.email||'—'}</td>
         <td style="font-size:12px;">${property}</td>
         <td>${rent}</td>
-        <td>${leaseEnd}</td>
+        <td>${leaseEnd}${renewalBadge}</td>
         <td><span class="badge badge-${status}">${status}</span></td>
         <td>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -4054,6 +4061,7 @@
             ${tn.email ? `<button onclick="openTenantEmailModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('tenants.sendEmail')}">✉️</button>` : ''}
             <button onclick="openMoveInPhotosModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('moveOut.moveInPhotosTitle')}">📸 ${t('moveOut.moveInPhotos')}</button>
             ${status === 'active' ? `<button onclick="openMoveOutModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('moveOut.buttonTitle')}">🚪 ${t('moveOut.button')}</button>` : ''}
+            ${tn.renewalRequest?.requested ? `<button onclick="acknowledgeRenewalRequest('${tn.id}')" class="btn btn-sm btn-outline" title="${t('tenants.acknowledgeRenewalTitle')}">✓ ${t('tenants.acknowledgeRenewal')}</button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -4849,6 +4857,18 @@
       await loadApplications();
     } catch(e){ showAlert('lease-alert', e.message); }
     btn.disabled=false; btn.textContent=t('applications.generateSendSignature');
+  };
+
+  // ===== LEASE RENEWAL REQUESTS =====
+  window.acknowledgeRenewalRequest = async (id) => {
+    const tenant = allTenants.find(t=>t.id===id); if (!tenant) return;
+    try {
+      await updateDoc(doc(db,'tenants',id), {
+        renewalRequest: { requested: false, acknowledgedAt: serverTimestamp() },
+        updatedAt: serverTimestamp(),
+      });
+      await loadTenants();
+    } catch(e) { alert('Could not update: ' + e.message); }
   };
 
   // ===== MOVE-IN PHOTOS (AB 2801) =====
