@@ -67,6 +67,19 @@ exports.handler = async (event) => {
   const a  = getAdmin();
   const db = a.firestore();
 
+  // Admin-only: this had no auth check, and the impact goes beyond the
+  // usual "who can trigger this" concern — the response body returns
+  // formUrl, which contains the same cryptographically-random
+  // responseToken that submit-application-response.js, upload-application-
+  // document.js, and others treat as proof the caller is the real
+  // applicant. Anyone who could call this endpoint for a known or guessed
+  // applicationId could mint themselves a valid, reusable token for that
+  // applicant's entire application — bypassing the "only sent via email
+  // to the real applicant" assumption the rest of that system relies on.
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
+
   try {
     const ref  = db.collection('applications').doc(applicationId);
     const snap = await ref.get();
