@@ -8442,7 +8442,8 @@
     const btn=event?.target; if(btn){btn.disabled=true;btn.textContent=t('documents.uploading');}
     try {
       const fd=new FormData();fd.append('file',file);
-      const res=await fetch(`/api/upload-qr?method=${method}`,{method:'POST',body:fd});
+      const idToken=await auth.currentUser.getIdToken();
+      const res=await fetch(`/api/upload-qr?method=${method}`,{method:'POST',headers:{'Authorization':`Bearer ${idToken}`},body:fd});
       const data=await res.json(); if(!res.ok) throw new Error(data.error||'Upload failed');
       const flagKey=method==='cashapp'?'cashappQrUploaded':'zelleQrUploaded';
       await setDoc(doc(db,'settings','site'),{[flagKey]:true,updatedAt:serverTimestamp()},{merge:true});
