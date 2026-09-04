@@ -692,12 +692,21 @@
 
     <!-- SUPPORT MESSAGES -->
     <section id="section-support" class="section">
-      <div class="card">
+      <div class="card" style="margin-bottom:20px;">
         <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="support.title">Tenant Support Messages</h3></div>
         <div style="overflow-x:auto;">
           <table class="data-table">
             <thead><tr><th data-i18n="common.date">Date</th><th data-i18n="common.tenant">Tenant</th><th data-i18n="maintenance.colUnit">Unit</th><th data-i18n="support.colSubject">Subject</th><th data-i18n="common.description">Message</th><th data-i18n="common.status">Status</th><th data-i18n="common.actions">Actions</th></tr></thead>
             <tbody id="support-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;" data-i18n="common.loading">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3 style="font-size:1.2rem;font-weight:500;" data-i18n="support.ownerTitle">Owner Messages</h3></div>
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead><tr><th data-i18n="common.date">Date</th><th data-i18n="support.colOwner">Owner</th><th data-i18n="common.property">Property</th><th data-i18n="support.colSubject">Subject</th><th data-i18n="common.description">Message</th><th data-i18n="common.status">Status</th><th data-i18n="common.actions">Actions</th></tr></thead>
+            <tbody id="owner-messages-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;" data-i18n="common.loading">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -2270,7 +2279,7 @@
   const db   = getFirestore(app);
 
   let allTenants = [], allPayments = [], allMaintenance = [], allProperties = [], allDocuments = [],
-      allAnnouncements = [], allInvites = [], allSupport = [], allInvoices = [], allFinancials = [],
+      allAnnouncements = [], allInvites = [], allSupport = [], allOwnerMessages = [], allInvoices = [], allFinancials = [],
       allVendors = [], allConsents = [], allFeatures = [], allAuditLogs = [], allApplications = [];
 
   // ===== ROLE / COUNTRY SCOPE =====
@@ -2505,7 +2514,7 @@
       'audit.adminActionReactivated':'Admin reactivated', 'audit.noAdminActivity':'No admin activity recorded yet.',
       'audit.totalEvents':'Total Events', 'audit.uniqueTenants':'Unique Tenants', 'audit.sessions':'Sessions',
       'audit.logins':'Logins', 'audit.paymentEvents':'Payment Events',
-      'support.colSubject':'Subject', 'support.title':'Tenant Support Messages', 'consents.title':'Auto-Pay Consents', 'consents.active':'Active',
+      'support.colSubject':'Subject', 'support.title':'Tenant Support Messages', 'support.ownerTitle':'Owner Messages', 'support.colOwner':'Owner', 'consents.title':'Auto-Pay Consents', 'consents.active':'Active',
       'consents.cancelled':'Cancelled', 'consents.colMethod':'Method', 'consents.colDay':'Day', 'consents.colAuthorized':'Authorized',
       'features.title':'Feature Requests', 'features.new':'New', 'features.underReview':'Under Review',
       'features.planned':'Planned', 'features.completed':'Completed',
@@ -3082,7 +3091,7 @@
       'audit.adminActionReactivated':'Administrador reactivado', 'audit.noAdminActivity':'Aún no hay actividad de administrador registrada.',
       'audit.totalEvents':'Eventos Totales', 'audit.uniqueTenants':'Inquilinos Únicos', 'audit.sessions':'Sesiones',
       'audit.logins':'Inicios de Sesión', 'audit.paymentEvents':'Eventos de Pago',
-      'support.colSubject':'Asunto', 'support.title':'Mensajes de Soporte de Inquilinos', 'consents.title':'Consentimientos de Auto-Pago', 'consents.active':'Activo',
+      'support.colSubject':'Asunto', 'support.title':'Mensajes de Soporte de Inquilinos', 'support.ownerTitle':'Mensajes de Propietarios', 'support.colOwner':'Propietario', 'consents.title':'Consentimientos de Auto-Pago', 'consents.active':'Activo',
       'consents.cancelled':'Cancelado', 'consents.colMethod':'Método', 'consents.colDay':'Día', 'consents.colAuthorized':'Autorizado',
       'features.title':'Solicitudes de Funciones', 'features.new':'Nueva', 'features.underReview':'En Revisión',
       'features.planned':'Planeada', 'features.completed':'Completada',
@@ -3596,7 +3605,7 @@
     // empty-set race for a restricted admin.
     await loadTenants();
     await Promise.all([loadApplications(), loadPayments(), loadDocuments(), loadMaintenance(),
-      loadAnnouncements(), loadSettings(), loadInvites(), loadSupport(), loadInvoices(),
+      loadAnnouncements(), loadSettings(), loadInvites(), loadSupport(), loadOwnerMessages(), loadInvoices(),
       loadFinancials(), loadVendors(), loadConsents(), loadFeatures(), loadInvoiceReminders(), loadDisclosures()]);
     if (!isRestrictedAdmin()) await loadAdmins();
     updateDashboardStats();
@@ -6834,6 +6843,51 @@
   }
   window.resolveSupport = async (id) => {
     await updateDoc(doc(db,'supportMessages',id),{status:'resolved'}); loadSupport();
+  };
+
+  // ===== OWNER MESSAGES =====
+  // Not country-scoped like allSupport — ownerMessages records store a
+  // plain propertyName string (joined across every property that owner
+  // holds, comma-separated), not a propertyId to look up, and a single
+  // owner can span both countries. Filtering cleanly isn't possible with
+  // this data shape, and volume here is expected to be low enough that
+  // showing everything regardless of the current country toggle isn't a
+  // practical problem.
+  async function loadOwnerMessages() {
+    try {
+      const snap = await getDocs(query(collection(db,'ownerMessages'), orderBy('createdAt','desc')));
+      allOwnerMessages = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+      renderOwnerMessagesTable();
+    } catch(e) {
+      console.error('loadOwnerMessages:',e);
+      const tbody = document.getElementById('owner-messages-tbody');
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#DC2626;padding:24px;">${formatLoadError(e)}</td></tr>`;
+    }
+  }
+  function renderOwnerMessagesTable() {
+    const tbody=document.getElementById('owner-messages-tbody'); if(!tbody) return;
+    if (!allOwnerMessages.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;">No owner messages yet.</td></tr>'; return; }
+    tbody.innerHTML=allOwnerMessages.map(m=>{
+      const date=m.createdAt?.toDate?m.createdAt.toDate().toLocaleDateString():'—';
+      const status=m.status||'open';
+      const statusBadge=status==='resolved'?'<span style="font-size:10px;background:#F0FDF4;color:#16A34A;padding:2px 7px;border-radius:2px;">Resolved</span>':'<span style="font-size:10px;background:#FEF2F2;color:#DC2626;padding:2px 7px;border-radius:2px;">Open</span>';
+      const shortMsg=m.message?.length>80?m.message.slice(0,80)+'…':m.message;
+      return `<tr>
+        <td style="font-size:12px;">${date}</td>
+        <td><strong>${m.ownerName||'—'}</strong><div style="font-size:11px;color:var(--slate);">${m.ownerEmail||''}</div></td>
+        <td style="font-size:12px;">${m.propertyName||'—'}</td>
+        <td style="font-size:13px;">${m.subject||'—'}</td>
+        <td style="font-size:12px;color:var(--slate);max-width:200px;" title="${m.message}">${shortMsg}</td>
+        <td>${statusBadge}</td>
+        <td style="display:flex;gap:4px;">
+          <a href="mailto:${m.ownerEmail||''}?subject=Re: ${encodeURIComponent(m.subject||'')}" class="btn btn-sm btn-primary" style="text-decoration:none;">Reply</a>
+          ${status!=='resolved'?`<button onclick="resolveOwnerMessage('${m.id}')" class="btn btn-sm btn-outline">Resolve</button>`:''}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+  window.resolveOwnerMessage = async (id) => {
+    await updateDoc(doc(db,'ownerMessages',id),{status:'resolved'}); loadOwnerMessages();
   };
 
   // ===== CONSENTS =====
