@@ -4585,8 +4585,7 @@
     if (!subject || !bodyText) { showAlert('message-alert','Please provide a subject and a message.'); return; }
     const btn = document.getElementById('msg-send-btn'); btn.disabled=true; btn.textContent=t('common.sending');
     try {
-      const res = await fetch('/api/send-applicant-message',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({applicationId:id,subject,body:bodyText,includeForm,siteName:_msgSiteName})});
+      const res = await authedFetch('/api/send-applicant-message',{applicationId:id,subject,body:bodyText,includeForm,siteName:_msgSiteName});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed to send');
       showAlert('message-alert',`✓ Message sent to ${data.sentTo}.`+(includeForm?' A response form link was included.':''),'success');
@@ -4643,7 +4642,7 @@
     const btn = document.getElementById('doc-request-btn'); btn.disabled=true; btn.textContent=t('common.sending');
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await fetch('/api/request-documents',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({applicationId:id,requestedDocs,message,siteName})});
+      const res = await authedFetch('/api/request-documents',{applicationId:id,requestedDocs,message,siteName});
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||'Failed to send');
       const alertEl = document.getElementById('doc-request-alert');
@@ -5243,15 +5242,11 @@
       : 'Delete this document? This cannot be undone.';
     if (!confirm(confirmMsg)) return;
     try {
-      const res = await fetch('/api/delete-document', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const res = await authedFetch('/api/delete-document', {
           docId: d.id,
           storagePath: d.storagePath,
           documentGroupId: isGrouped ? d.documentGroupId : undefined,
-        }),
-      });
+        });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Delete failed');
       _selectedDocId=null;
@@ -6378,7 +6373,7 @@
     if(!confirm(`Charge $${parseFloat(c.monthlyAmount).toFixed(2)} to ${c.tenantName}'s saved card?`)) return;
     const btn=event?.target; if(btn){btn.disabled=true;btn.textContent=t('common.charging');}
     try {
-      const res=await fetch('/api/charge-autopay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({consentId:id})});
+      const res=await authedFetch('/api/charge-autopay',{consentId:id});
       const data=await res.json(); if(!res.ok) throw new Error(data.error||'Charge failed');
       alert(`✓ $${parseFloat(c.monthlyAmount).toFixed(2)} charged successfully to ${c.tenantName}.`);
       loadPayments(); loadFinancials();
