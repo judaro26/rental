@@ -70,6 +70,18 @@ exports.handler = async (event) => {
 
   const a   = getAdmin();
   const db  = a.firestore();
+
+  // Admin-only: previously this function had no auth check at all, so
+  // anyone could POST directly to this endpoint (bypassing admin.html and
+  // the Firestore-protected announcements collection entirely) to trigger
+  // real email/SMS/WhatsApp sends to some or all tenants, with whatever
+  // title/message content they chose — SMS and WhatsApp both cost real
+  // money per message, so this was a direct financial-abuse vector too,
+  // not just a spam or phishing one.
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
+
   const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
 
   try {
