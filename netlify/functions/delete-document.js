@@ -28,10 +28,17 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'docId or documentGroupId is required' }) };
   }
 
-  try {
-    const a  = getAdmin();
-    const db = a.firestore();
+  const a  = getAdmin();
+  const db = a.firestore();
 
+  // Admin-only: previously this had no auth check, so anyone who obtained
+  // a docId or documentGroupId could delete that record (and its
+  // underlying file in storage) directly, with no admin involvement.
+  const { verifyAdmin } = require('./_lib/verify-admin');
+  const authResult = await verifyAdmin(event, db, a);
+  if (authResult.error) return authResult.error;
+
+  try {
     // Gather the set of {docId, storagePath} pairs to delete. For a chunked
     // upload this is every part sharing the group id, not just the one
     // record the person clicked on.
