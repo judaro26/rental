@@ -4403,7 +4403,7 @@
           ${app.responseToken?`<span><strong>Secure upload page</strong> <a href="${applicantUploadLink(app)}" target="_blank" rel="noreferrer noopener">open</a> · <button type="button" class="btn btn-sm btn-outline" style="padding:2px 8px;font-size:10px;" onclick="copyText('${applicantUploadLink(app)}',this)">Copy link</button> <span style="font-size:11px;color:#9CA3AF;">(this is the page the applicant uses to upload)</span></span>`:''}
           ${app.docRequest&&app.docRequest.requested&&app.docRequest.requested.length?`<span><strong>Requested</strong> ${app.docRequest.requested.map(d=>escapeHtml(d)).join('; ')}</span>`:''}
           ${(app.applicationDocuments&&app.applicationDocuments.length)
-            ? app.applicationDocuments.map(d=>`<span><strong>${escapeHtml(d.label||d.name||'Document')}</strong> — <a href="${d.url||'#'}" target="_blank" rel="noreferrer noopener">view file</a>${d.uploadedAt?` <span style="color:#9CA3AF;font-size:11px;">(${escapeHtml(new Date(d.uploadedAt).toLocaleDateString())})</span>`:''}</span>`).join('')
+            ? app.applicationDocuments.map(d=>`<span><strong>${escapeHtml(d.label||d.name||'Document')}</strong> — <a href="#" onclick="event.preventDefault();viewApplicationDoc('${d.url||''}',this)">view file</a>${d.uploadedAt?` <span style="color:#9CA3AF;font-size:11px;">(${escapeHtml(new Date(d.uploadedAt).toLocaleDateString())})</span>`:''}</span>`).join('')
             : (app.documentsPurgedAt
                 ? `<span style="color:#B45309;">🗑 Documents were permanently purged per the retention policy${app.documentsPurgedAt.toDate?' on '+escapeHtml(app.documentsPurgedAt.toDate().toLocaleDateString()):''}${app.documentsPurgedCount?` (${app.documentsPurgedCount} file${app.documentsPurgedCount===1?'':'s'})`:''}.</span>`
                 : '<span style="color:#9CA3AF;">No documents uploaded yet.</span>')}
@@ -5462,7 +5462,7 @@
     });
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      fetch('/api/payment-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tenantName:tenant?`${tenant.firstName} ${tenant.lastName}`:'Tenant',amount:p?.amount||0,description:p?.description||'Rent Payment',method:p?.method||'manual',siteName})}).catch(e=>console.warn('Notify:',e));
+      authedFetch('/api/payment-notify',{tenantName:tenant?`${tenant.firstName} ${tenant.lastName}`:'Tenant',amount:p?.amount||0,description:p?.description||'Rent Payment',method:p?.method||'manual',siteName}).catch(e=>console.warn('Notify:',e));
     } catch(e){}
     await loadPayments(); await loadFinancials();
   };
@@ -5484,7 +5484,7 @@
     });
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      fetch('/api/payment-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tenantName:`${tenant?.firstName||''} ${tenant?.lastName||''}`.trim(),amount:p?.amount||0,description:p?.description||'Rent Payment',method:'zelle',siteName})}).catch(e=>console.warn('Notify:',e));
+      authedFetch('/api/payment-notify',{tenantName:`${tenant?.firstName||''} ${tenant?.lastName||''}`.trim(),amount:p?.amount||0,description:p?.description||'Rent Payment',method:'zelle',siteName}).catch(e=>console.warn('Notify:',e));
     } catch(e){}
     if (tenant) {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
@@ -5603,6 +5603,36 @@
     const blob = await res.blob();
     return URL.createObjectURL(blob);
   }
+
+  // Application documents now require either the applicant's own embedded
+  // app+token (present on links generated after that fix) or an admin
+  // Bearer token — a plain link can't carry the latter, so this fetches
+  // with the admin's token and opens the result as a Blob URL instead.
+  // Covers documents uploaded before the app+token fix too, since those
+  // rely entirely on this path.
+  window.viewApplicationDoc = async (url, linkEl) => {
+    if (!url) { alert('No file URL on record for this document.'); return; }
+    // Open the tab synchronously, within the click handler itself, before
+    // any await — browsers generally only pop-up-block window.open() calls
+    // that happen after an async gap, not ones made directly in response
+    // to the click. The tab is navigated to the real content once ready.
+    const tab = window.open('', '_blank', 'noopener');
+    const original = linkEl.textContent;
+    linkEl.textContent = '…';
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${idToken}` } });
+      if (!res.ok) throw new Error(`Could not load document (${res.status})`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      if (tab) tab.location.href = blobUrl;
+    } catch (e) {
+      if (tab) tab.close();
+      alert('Could not open document: ' + e.message);
+    }
+    linkEl.textContent = original;
+  };
+
 
   async function buildGroupedBlobUrl(d) {
     // Fetch every part (each is a normal small chunk, already served fine by
@@ -5847,7 +5877,7 @@
     try {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
       const reqTenant = allTenants.find(t=>t.id===req?.tenantId);
-      fetch('/api/maintenance-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tenantName:req?.tenantName||'',tenantEmail:reqTenant?.email||'',unit:req?.unit||'',propertyName:allProperties.find(p=>p.id===req?.propertyId)?.name||'',category:req?.category||'',priority:req?.priority||'',description:req?.description||'',imageUrls:req?.imageUrls||[],statusUpdate:status,adminNotes:notes,isUpdate:true,notifyTenant:true,siteName})});
+      await authedFetch('/api/maintenance-notify',{tenantName:req?.tenantName||'',tenantEmail:reqTenant?.email||'',unit:req?.unit||'',propertyName:allProperties.find(p=>p.id===req?.propertyId)?.name||'',category:req?.category||'',priority:req?.priority||'',description:req?.description||'',imageUrls:req?.imageUrls||[],statusUpdate:status,adminNotes:notes,isUpdate:true,notifyTenant:true,siteName});
     } catch(e){console.warn('Notify failed:',e);}
     closeModal('maint-modal'); await loadMaintenance(); updateDashboardStats();
   };
