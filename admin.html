@@ -5475,7 +5475,7 @@
     await addDoc(collection(db,'announcements'),{title,message,propertyId:propId||null,tenantIds:tenantIds.length?tenantIds:null,urgent,createdAt:serverTimestamp()});
     let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
     const propName = propId?(allProperties.find(p=>p.id===propId)?.name||''):'';
-    fetch('/api/announce-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,sms,whatsapp,siteName})})
+    authedFetch('/api/announce-notify',{title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,sms,whatsapp,siteName})
       .then(r=>r.json()).then(d=>{
         const parts = [];
         if (d.sent>0) parts.push(t('announcements.emailedCount').replace('{n}', d.sent));
