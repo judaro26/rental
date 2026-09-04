@@ -624,10 +624,12 @@
     sessionStorage.setItem('_sid', id); return id;
   })();
 
-  function logAction(action, details = '') {
+  async function logAction(action, details = '') {
     if (!currentUser || !tenantData) return;
+    const idToken = await currentUser.getIdToken().catch(() => null);
+    if (!idToken) return; // couldn't get a token — skip rather than send unauthenticated
     fetch('/api/log-action', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
       body: JSON.stringify({
         tenantId:    currentUser.uid,
         tenantName:  `${tenantData.firstName||''} ${tenantData.lastName||''}`.trim(),
@@ -1211,9 +1213,10 @@
     const btn = document.getElementById('support-btn');
     btn.disabled = true; btn.textContent = 'Sending...';
     try {
+      const idToken = await currentUser.getIdToken();
       const res = await fetch('/api/send-support', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({
           tenantId:     currentUser.uid,
           tenantName:   `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
@@ -1405,8 +1408,9 @@
 
     btn.disabled = true; btn.textContent = 'Submitting...';
     try {
+      const idToken = await currentUser.getIdToken();
       const res  = await fetch('/api/record-zelle-payment', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({
           tenantId:          currentUser.uid,
           tenantName:        `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
@@ -1450,8 +1454,9 @@
 
     btn.disabled = true; btn.textContent = 'Submitting...';
     try {
+      const idToken = await currentUser.getIdToken();
       const res  = await fetch('/api/record-zelle-payment', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({
           tenantId:          currentUser.uid,
           tenantName:        `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
@@ -1624,8 +1629,9 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
       try {
         btn.textContent = 'Saving card...';
         // Get SetupIntent from server
+        const idToken = await currentUser.getIdToken();
         const siRes  = await fetch('/api/setup-autopay', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
           body: JSON.stringify({
             tenantId:    currentUser.uid,
             tenantEmail: tenantData?.email || currentUser.email,
@@ -1698,8 +1704,9 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
     const btn = document.getElementById('feat-btn');
     btn.disabled = true; btn.textContent = 'Submitting...';
     try {
+      const idToken = await currentUser.getIdToken();
       const res  = await fetch('/api/submit-feature-request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
         body: JSON.stringify({
           tenantId:    currentUser.uid,
           tenantName:  `${tenantData?.firstName||''} ${tenantData?.lastName||''}`.trim(),
@@ -1802,8 +1809,9 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
       // us_bank_account uses Payment Element
       // We get a temp SetupIntent clientSecret just to mount the element
       try {
+        const idToken = await currentUser.getIdToken();
         const res  = await fetch('/api/setup-autopay', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
           body: JSON.stringify({
             tenantId:    currentUser.uid,
             tenantEmail: tenantData?.email || currentUser.email,
@@ -1930,8 +1938,9 @@ Date: ${new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'
 
       if (method === 'card') {
         btn.textContent = 'Saving card...';
+        const idToken = await currentUser.getIdToken();
         const siRes  = await fetch('/api/setup-autopay', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
           body: JSON.stringify({
             tenantId:    currentUser.uid,
             tenantEmail: tenantData?.email || currentUser.email,
