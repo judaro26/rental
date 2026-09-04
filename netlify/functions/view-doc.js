@@ -10,25 +10,35 @@
 // so neither can attach a custom Authorization header the way a fetch()
 // call could.
 //
-// This fix covers the `documents` collection case only: if the key
-// belongs to a document record, a valid Bearer token is now required, and
-// ownership is checked against the exact same logic already enforced by
-// this collection's Firestore rule (admin, the owning tenant, or a
-// propertyWide doc). Frontend callers switched from a plain <a href> to
-// fetching with the token and rendering the result as a Blob URL — see
-// admin.html's previewAdminDoc/buildGroupedBlobUrl for the pattern.
+// The `documents` collection case: if the key belongs to a document
+// record, a valid Bearer token is required, and ownership is checked
+// against the exact same logic already enforced by this collection's
+// Firestore rule (admin, the owning tenant, or a propertyWide doc).
+// Frontend callers switched from a plain <a href> to fetching with the
+// token and rendering the result as a Blob URL — see admin.html's
+// previewAdminDoc/buildGroupedBlobUrl for the pattern.
 //
-// Application documents are NOT covered by this change and are served
-// exactly as before (no auth check) — they're a separate storage/data
-// path (an array field on the applications doc, not a documents-
-// collection record) that needs its own pass, ideally reusing the
-// responseToken this endpoint doesn't yet check. Flagging rather than
-// guessing at that flow in the same change.
+// The application-document case (an array field on the applications doc,
+// not a documents-collection record) has TWO legitimate audiences with
+// different auth models, and needs to accept either:
+//   - The applicant themselves, via ?app={applicationId}&token={responseToken}
+//     — same token already used by submit-application-response.js,
+//     get-application-documents.js, etc. Verified against
+//     applications/{app}.responseToken, then confirmed the specific key
+//     actually belongs to that application's applicationDocuments array
+//     (not just that the token is valid for *some* application).
+//   - The admin reviewing the application, via a Bearer token — same
+//     admin check as the documents-collection case above.
+// A key matching neither branch, and not found in `documents` either, is
+// treated as not found rather than served — this endpoint doesn't accept
+// a bare key with no proof of access as a fallback.
 //
-// GET /api/view-doc?key={blobKey}
+// GET /api/view-doc?key={blobKey}                       (documents collection)
+// GET /api/view-doc?key={blobKey}&app={id}&token={tok}  (application document, applicant)
+// GET /api/view-doc?key={blobKey}                       (application document, admin — Bearer header)
 //
-// Required env vars: FIREBASE_SERVICE_ACCOUNT (for the documents-collection
-// auth check), plus NETLIFY_SITE_ID/SITE_ID and NETLIFY_API_TOKEN as before.
+// Required env vars: FIREBASE_SERVICE_ACCOUNT, plus NETLIFY_SITE_ID/SITE_ID
+// and NETLIFY_API_TOKEN as before.
 
 let admin;
 function getAdmin() {
@@ -79,6 +89,47 @@ exports.handler = async (event) => {
         if (!adminSnap.exists || adminSnap.data().status === 'revoked') {
           return { statusCode: 403, body: 'Not authorized to view this document.' };
         }
+      }
+    } else {
+      // Not a documents-collection record — check whether this is an
+      // application document instead, which has two legitimate audiences
+      // with two different auth models.
+      let authorized = false;
+
+      // Path 1: the applicant themselves, via the same responseToken used
+      // throughout the application-response system (submit-application-
+      // response.js, get-application-documents.js, etc).
+      const { app: appId, token } = event.queryStringParameters || {};
+      if (appId && token) {
+        const appSnap = await db.collection('applications').doc(appId).get();
+        if (appSnap.exists) {
+          const appData = appSnap.data();
+          if (appData.responseToken && appData.responseToken === token) {
+            // Confirm this specific key actually belongs to this
+            // application's own documents — a valid token proves identity
+            // for that application, not blanket access to any file.
+            const belongsToApp = (appData.applicationDocuments || []).some(d => d.storagePath === key);
+            if (belongsToApp) authorized = true;
+          }
+        }
+      }
+
+      // Path 2: an admin reviewing the application, via Bearer token —
+      // same admin check as the documents-collection case above.
+      if (!authorized) {
+        const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+        const bearerMatch = authHeader.match(/^Bearer (.+)$/i);
+        if (bearerMatch) {
+          try {
+            const decoded = await a.auth().verifyIdToken(bearerMatch[1]);
+            const adminSnap = await db.collection('admins').doc(decoded.uid).get();
+            if (adminSnap.exists && adminSnap.data().status !== 'revoked') authorized = true;
+          } catch { /* invalid token just means this path didn't authorize, not a hard error */ }
+        }
+      }
+
+      if (!authorized) {
+        return { statusCode: 403, body: 'Not authorized to view this document.' };
       }
     }
 
