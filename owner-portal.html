@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Owner Portal</title>
+<link rel="manifest" href="/manifest-tenant.json">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#1A1A2E">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --charcoal: #1A1A2E; --amber: #C9903A; --slate: #6B7280; --border: #E5E7EB; --bg: #F7F4EF; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: #374151; min-height: 100vh; }
+  .hidden { display: none !important; }
+  .center-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  .card { background: #fff; width: 100%; max-width: 420px; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 24px rgba(26,26,46,0.1); }
+  .card-header { background: var(--charcoal); padding: 28px 32px; text-align: center; }
+  .card-header span { font-size: 22px; font-weight: 300; color: #E8D5B0; letter-spacing: 0.06em; }
+  .card-body { padding: 32px; }
+  .label { display: block; font-size: 12px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+  .form-input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px; font-size: 14px; font-family: inherit; }
+  .form-input:focus { outline: none; border-color: var(--amber); }
+  .btn { display: inline-block; border: none; cursor: pointer; padding: 11px 20px; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 2px; font-weight: 500; text-align: center; }
+  .btn-primary { background: var(--amber); color: #fff; width: 100%; }
+  .btn-primary:disabled { opacity: 0.6; cursor: default; }
+  .btn-link { background: none; color: var(--amber); text-decoration: underline; font-size: 12px; text-transform: none; letter-spacing: normal; padding: 0; }
+  .alert { padding: 10px 14px; border-radius: 3px; font-size: 13px; margin-bottom: 16px; }
+  .alert-error { background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; }
+  .alert-success { background: #F0FDF4; color: #16A34A; border: 1px solid #BBF7D0; }
+  #app-view { display: none; min-height: 100vh; }
+  #app-view.visible { display: block; }
+  .topbar { background: var(--charcoal); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .topbar span { color: #E8D5B0; font-size: 18px; font-weight: 300; letter-spacing: 0.05em; }
+  .topbar button { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.85); border: none; padding: 8px 16px; border-radius: 2px; font-size: 12px; cursor: pointer; }
+  .content { max-width: 900px; margin: 0 auto; padding: 32px 20px 60px; }
+  .prop-card { background: #fff; border-radius: 4px; box-shadow: 0 2px 12px rgba(26,26,46,0.06); margin-bottom: 24px; overflow: hidden; }
+  .prop-header { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+  .prop-header h2 { font-size: 20px; font-weight: 500; color: var(--charcoal); }
+  .prop-header p { font-size: 13px; color: var(--slate); margin-top: 2px; }
+  .section { padding: 20px 24px; border-bottom: 1px solid var(--border); }
+  .section:last-child { border-bottom: none; }
+  .section h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--slate); margin-bottom: 12px; }
+  .owner-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #F3F4F6; }
+  .owner-row:last-child { border-bottom: none; }
+  .owner-row.me { font-weight: 600; color: var(--charcoal); }
+  .bar-track { background: #F3F4F6; border-radius: 10px; height: 8px; overflow: hidden; margin: 4px 0; }
+  .bar-fill { height: 100%; transition: width 0.3s; }
+  table.tx { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.tx th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate); padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table.tx td { padding: 8px; border-bottom: 1px solid #F3F4F6; }
+  table.tx a { color: var(--amber); text-decoration: none; }
+  .empty-note { font-size: 12px; color: var(--slate); }
+  .loading-screen { text-align: center; padding: 60px 20px; color: var(--slate); }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(26,26,46,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+  .modal-overlay.visible { display: flex; }
+  .modal-card { background: #fff; width: 100%; max-width: 460px; border-radius: 4px; overflow: hidden; box-shadow: 0 8px 40px rgba(26,26,46,0.2); }
+  .modal-close { position: absolute; top: 14px; right: 18px; background: none; border: none; font-size: 20px; cursor: pointer; color: rgba(255,255,255,0.7); }
+  textarea.form-input { resize: vertical; min-height: 100px; font-family: inherit; }
+
+  @media print {
+    body { background: #fff; }
+    .topbar button, #login-view, .modal-overlay { display: none !important; }
+    .topbar { background: #fff; border-bottom: 2px solid var(--charcoal); padding: 12px 0; }
+    .topbar span { color: var(--charcoal); }
+    .content { max-width: 100%; padding: 0; }
+    .prop-card { box-shadow: none; border: 1px solid var(--border); page-break-inside: avoid; margin-bottom: 16px; }
+    .bar-fill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN VIEW -->
+<div id="login-view" class="center-screen">
+  <div class="card">
+    <div class="card-header"><span>Owner Portal</span></div>
+    <div class="card-body">
+      <div id="login-alert" class="alert alert-error hidden"></div>
+      <div style="margin-bottom:14px;">
+        <label class="label">Email</label>
+        <input type="email" id="login-email" class="form-input" placeholder="you@example.com">
+      </div>
+      <div style="margin-bottom:18px;">
+        <label class="label">Password</label>
+        <input type="password" id="login-password" class="form-input" placeholder="••••••••">
+      </div>
+      <button onclick="handleLogin()" class="btn btn-primary" id="login-btn">Sign In</button>
+      <div style="text-align:center;margin-top:14px;">
+        <button onclick="handleForgotPassword()" class="btn-link">Forgot password?</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP VIEW -->
+<div id="app-view">
+  <div class="topbar">
+    <span id="topbar-name">Owner Portal</span>
+    <div style="display:flex;gap:8px;">
+      <button onclick="window.print()">🖨 Print</button>
+      <button onclick="openYearEndModal()">📊 Year-End Summary</button>
+      <button onclick="openContactModal()">✉️ Contact Us</button>
+      <button onclick="handleSignOut()">Sign Out</button>
+    </div>
+  </div>
+  <div class="content">
+    <div id="dashboard-loading" class="loading-screen">Loading your properties...</div>
+    <div id="dashboard-content"></div>
+  </div>
+</div>
+
+<!-- CONTACT MODAL -->
+<div id="contact-modal" class="modal-overlay">
+  <div class="modal-card">
+    <div class="card-header" style="position:relative;text-align:left;">
+      <span>Contact Property Manager</span>
+      <button class="modal-close" onclick="closeContactModal()">×</button>
+    </div>
+    <div class="card-body">
+      <div id="contact-alert" class="alert alert-error hidden"></div>
+      <div style="margin-bottom:14px;">
+        <label class="label">Subject</label>
+        <input type="text" id="contact-subject" class="form-input" placeholder="What's this about?">
+      </div>
+      <div style="margin-bottom:18px;">
+        <label class="label">Message</label>
+        <textarea id="contact-message" class="form-input" placeholder="How can we help?"></textarea>
+      </div>
+      <button onclick="submitContactMessage()" class="btn btn-primary" id="contact-submit-btn">Send Message</button>
+    </div>
+  </div>
+</div>
+
+<!-- YEAR-END SUMMARY MODAL -->
+<div id="yearend-modal" class="modal-overlay">
+  <div class="modal-card" style="max-width:640px;max-height:88vh;display:flex;flex-direction:column;">
+    <div class="card-header" style="position:relative;text-align:left;flex-shrink:0;">
+      <span>Year-End Summary</span>
+      <button class="modal-close" onclick="closeYearEndModal()">×</button>
+    </div>
+    <div class="card-body" style="overflow-y:auto;">
+      <div id="yearend-controls" style="display:flex;gap:10px;align-items:flex-end;margin-bottom:20px;">
+        <div style="flex:1;">
+          <label class="label">Year</label>
+          <select id="yearend-year-select" class="form-input"></select>
+        </div>
+        <button onclick="generateYearEndSummary()" class="btn btn-primary" style="width:auto;padding:11px 24px;">Generate</button>
+      </div>
+      <div id="yearend-content"></div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+  let _cfg;
+  try {
+    const res = await fetch('/api/config');
+    if (!res.ok) throw new Error(`Config fetch failed: ${res.status}`);
+    _cfg = await res.json();
+  } catch (err) {
+    console.error('Failed to load app config:', err);
+    document.body.innerHTML = '<p style="text-align:center;padding:4rem;font-family:sans-serif">Failed to load site configuration. Please try again later.</p>';
+    throw err;
+  }
+  const app = initializeApp(_cfg.firebase);
+  const auth = getAuth(app);
+
+  function showAlert(id, message, type = 'error') {
+    const el = document.getElementById(id);
+    el.textContent = message;
+    el.className = `alert alert-${type}`;
+  }
+
+  window.handleLogin = async () => {
+    const email = document.getElementById('login-email').value.trim();
+    const pass = document.getElementById('login-password').value;
+    document.getElementById('login-alert').classList.add('hidden');
+    if (!email || !pass) { showAlert('login-alert', 'Please enter your email and password.'); return; }
+    const btn = document.getElementById('login-btn'); btn.disabled = true; btn.textContent = 'Signing in...';
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err) {
+      showAlert('login-alert', err.message.replace('Firebase: ', '').replace(/\(auth.*\)\./, ''));
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  };
+
+  window.handleForgotPassword = async () => {
+    const email = document.getElementById('login-email').value.trim();
+    if (!email) { showAlert('login-alert', 'Enter your email address above first.'); return; }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showAlert('login-alert', 'Password reset email sent. Check your inbox.', 'success');
+    } catch (err) { showAlert('login-alert', err.message.replace('Firebase: ', '').replace(/\(auth.*\)\./, '')); }
+  };
+
+  window.handleSignOut = () => signOut(auth);
+
+  function formatAmount(amount, currency) {
+    const n = parseFloat(amount) || 0;
+    if (currency === 'COP') return `$${Math.round(n).toLocaleString('es-CO')} COP`;
+    return `$${n.toFixed(2)}`;
+  }
+  function formatByCurrency(byCurrency) {
+    const entries = Object.entries(byCurrency || {});
+    if (!entries.length) return formatAmount(0, 'USD');
+    return entries.map(([cur, amt]) => formatAmount(amt, cur)).join(' + ');
+  }
+
+  function renderProperty(p) {
+    const isMixed = p.breakdown?.mixedCurrency;
+    const cur = p.breakdown?.currency || 'USD';
+    let breakdownHtml = '';
+    if (isMixed) {
+      breakdownHtml = `<p class="empty-note">This property's expenses span more than one currency, so a combined breakdown isn't shown here.</p>`;
+    } else if (p.breakdown?.rows?.length) {
+      breakdownHtml = p.breakdown.rows.map(r => {
+        const isMe = r.name === p.myOwnerName;
+        const deltaHtml = r.delta != null
+          ? `<span style="font-weight:500;color:${r.delta >= 0 ? '#16A34A' : '#DC2626'};margin-left:10px;">${r.delta >= 0 ? 'Owed back' : 'Owes'} ${formatAmount(Math.abs(r.delta), cur)}</span>`
+          : '';
+        return `<div class="owner-row ${isMe ? 'me' : ''}">
+          <span>${r.name}${isMe ? ' (you)' : ''}${r.ownershipPct != null ? ` <span style="color:var(--slate);font-weight:400;">(owns ${r.ownershipPct}%)</span>` : ''}</span>
+          <span>${formatAmount(r.spent, cur)} <span style="color:var(--slate);">${r.pct.toFixed(1)}%</span>${deltaHtml}</span>
+        </div>`;
+      }).join('');
+    } else {
+      breakdownHtml = `<p class="empty-note">No expenses recorded yet.</p>`;
+    }
+
+    let catchupHtml = '';
+    if (p.catchup) {
+      const c = p.catchup;
+      const isMe = c.catchingUpOwnerName === p.myOwnerName;
+      if (!c.targets.length) {
+        catchupHtml = `<div class="section"><h3>⏳ Purchase Catch-Up</h3><p class="empty-note">No ${c.targetYear} expenses recorded for the other owner(s) yet, so there's no target to show.</p></div>`;
+      } else {
+        catchupHtml = `<div class="section"><h3>⏳ Purchase Catch-Up</h3>
+          <p style="font-size:12px;color:var(--slate);margin-bottom:10px;">${isMe ? 'You have' : `${c.catchingUpOwnerName} has`} contributed ${formatAmount(c.progress, cur)} in total toward this property.</p>
+          ${c.targets.map(target => {
+            const pct = Math.min(100, (c.progress / target.total) * 100);
+            const met = c.progress >= target.total;
+            return `<div style="margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                <span>vs. ${target.name}'s ${c.targetYear} contribution</span>
+                <span style="font-weight:500;color:${met ? '#16A34A' : 'inherit'};">${met ? '✓ Matched' : `${formatAmount(target.total - c.progress, cur)} to go`}</span>
+              </div>
+              <div class="bar-track"><div class="bar-fill" style="background:${met ? '#16A34A' : 'var(--amber)'};width:${pct}%;"></div></div>
+              <div style="font-size:10px;color:var(--slate);margin-top:2px;">${formatAmount(c.progress, cur)} / ${formatAmount(target.total, cur)}</div>
+            </div>`;
+          }).join('')}
+          ${c.note ? `<p style="font-size:10px;color:var(--slate);margin-top:8px;font-style:italic;">"${c.note.replace(/</g,'&lt;')}"</p>` : ''}
+        </div>`;
+      }
+    }
+
+    const txHtml = p.myTransactions.length
+      ? `<table class="tx"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Receipt</th></tr></thead><tbody>
+          ${p.myTransactions.map(tx => `<tr>
+            <td>${tx.date || '—'}</td><td>${tx.category || '—'}</td><td>${(tx.description||'—').replace(/</g,'&lt;')}</td>
+            <td>${formatAmount(tx.amount, tx.currency)}</td>
+            <td>${tx.receiptUrl ? `<a href="${tx.receiptUrl}" target="_blank" rel="noopener">📎 View</a>` : '—'}</td>
+          </tr>`).join('')}
+        </tbody></table>`
+      : `<p class="empty-note">You haven't paid for anything on this property yet.</p>`;
+
+    return `<div class="prop-card">
+      <div class="prop-header">
+        <h2>${p.propertyName}</h2>
+        ${p.address ? `<p>${p.address}</p>` : ''}
+      </div>
+      <div class="section">
+        <h3>Ownership Split</h3>
+        ${p.owners.length
+          ? p.owners.map(o => `<div class="owner-row ${o.name === p.myOwnerName ? 'me' : ''}"><span>${o.name}${o.name === p.myOwnerName ? ' (you)' : ''}</span><span>${o.percentage}%</span></div>`).join('')
+          : `<p class="empty-note">No formal ownership percentages have been set for this property yet.</p>`}
+      </div>
+      <div class="section">
+        <h3>Income (Rent Received)</h3>
+        <p style="font-size:20px;font-weight:600;color:#16A34A;">${formatByCurrency(p.incomeByCurrency)}</p>
+      </div>
+      <div class="section">
+        <h3>👥 Spending by Owner (all-time, all categories)</h3>
+        ${breakdownHtml}
+      </div>
+      ${catchupHtml}
+      <div class="section">
+        <h3>Your Transactions on This Property</h3>
+        ${txHtml}
+      </div>
+    </div>`;
+  }
+
+  let _dashboardData = null;
+
+  async function loadDashboard() {
+    document.getElementById('dashboard-loading').classList.remove('hidden');
+    document.getElementById('dashboard-content').innerHTML = '';
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/get-owner-dashboard', { headers: { 'Authorization': `Bearer ${idToken}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not load your dashboard.');
+      _dashboardData = data;
+      document.getElementById('topbar-name').textContent = data.name ? `Owner Portal — ${data.name}` : 'Owner Portal';
+      document.getElementById('dashboard-loading').classList.add('hidden');
+      if (!data.properties.length) {
+        document.getElementById('dashboard-content').innerHTML = `<p style="text-align:center;color:var(--slate);padding:40px 0;">You're not currently linked to any properties. If this seems wrong, contact your property manager.</p>`;
+        return;
+      }
+      document.getElementById('dashboard-content').innerHTML = data.properties.map(renderProperty).join('');
+    } catch (err) {
+      document.getElementById('dashboard-loading').classList.add('hidden');
+      document.getElementById('dashboard-content').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    }
+  }
+
+  window.openContactModal = () => {
+    document.getElementById('contact-alert').classList.add('hidden');
+    document.getElementById('contact-subject').value = '';
+    document.getElementById('contact-message').value = '';
+    document.getElementById('contact-modal').classList.add('visible');
+  };
+  window.closeContactModal = () => {
+    document.getElementById('contact-modal').classList.remove('visible');
+  };
+
+  window.submitContactMessage = async () => {
+    const alertEl = document.getElementById('contact-alert');
+    alertEl.classList.add('hidden');
+    const subject = document.getElementById('contact-subject').value.trim();
+    const message = document.getElementById('contact-message').value.trim();
+    if (!subject || !message) {
+      showAlert('contact-alert', 'Please fill in a subject and message.');
+      return;
+    }
+    const btn = document.getElementById('contact-submit-btn');
+    btn.disabled = true; btn.textContent = 'Sending...';
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      // All of this owner's property names as context — an owner can hold
+      // more than one, and their message might concern any of them, so
+      // this saves them from having to specify rather than adding a
+      // property-picker for what's meant to be a quick contact form.
+      const propertyName = (_dashboardData?.properties || []).map(p => p.propertyName).join(', ');
+      const res = await fetch('/api/send-owner-message', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ subject, message, propertyName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not send your message.');
+      showAlert('contact-alert', 'Message sent — we will get back to you soon.', 'success');
+      setTimeout(closeContactModal, 1800);
+    } catch (e) {
+      showAlert('contact-alert', e.message);
+    }
+    btn.disabled = false; btn.textContent = 'Send Message';
+  };
+
+  window.openYearEndModal = () => {
+    const props = _dashboardData?.properties || [];
+    // Years derived from actual transaction and income dates across every
+    // property this owner holds, not a fixed lookback window — an owner
+    // who's held a property for 5 years should see all 5, and one with no
+    // history yet still gets the current year as a usable default.
+    const years = new Set([new Date().getFullYear().toString()]);
+    props.forEach(p => {
+      p.myTransactions.forEach(t => { if (t.date) years.add(t.date.slice(0,4)); });
+      Object.keys(p.incomeByYear || {}).forEach(y => years.add(y));
+    });
+    const sortedYears = [...years].sort().reverse();
+    document.getElementById('yearend-year-select').innerHTML =
+      sortedYears.map(y => `<option value="${y}">${y}</option>`).join('');
+    document.getElementById('yearend-content').innerHTML = '';
+    document.getElementById('yearend-modal').classList.add('visible');
+  };
+  window.closeYearEndModal = () => {
+    document.getElementById('yearend-modal').classList.remove('visible');
+  };
+
+  window.generateYearEndSummary = () => {
+    const year = document.getElementById('yearend-year-select').value;
+    const props = _dashboardData?.properties || [];
+    const html = props.map(p => {
+      const yearTx = p.myTransactions.filter(t => (t.date||'').startsWith(year));
+      const totalsByCurrency = {};
+      yearTx.forEach(t => { totalsByCurrency[t.currency] = (totalsByCurrency[t.currency]||0) + parseFloat(t.amount||0); });
+      const totalStr = Object.entries(totalsByCurrency).map(([cur,amt]) => formatAmount(amt,cur)).join(' + ') || formatAmount(0,'USD');
+
+      const myOwnership = p.owners.find(o => o.name === p.myOwnerName)?.percentage ?? null;
+      const yearIncome = (p.incomeByYear || {})[year] || {};
+      const myIncomeShareStr = myOwnership != null
+        ? (Object.entries(yearIncome).length
+            ? Object.entries(yearIncome).map(([cur,amt]) => formatAmount(amt * myOwnership / 100, cur)).join(' + ')
+            : formatAmount(0,'USD'))
+        : null;
+
+      const rows = yearTx.length
+        ? yearTx.map(t => `<tr><td>${t.date||'—'}</td><td>${t.category||'—'}</td><td>${(t.description||'—').replace(/</g,'&lt;')}</td><td>${formatAmount(t.amount,t.currency)}</td></tr>`).join('')
+        : `<tr><td colspan="4" class="empty-note" style="padding:10px 8px;">No expenses recorded for ${year}.</td></tr>`;
+
+      return `<div class="prop-card">
+        <div class="prop-header"><h2>${p.propertyName}</h2>${p.address ? `<p>${p.address}</p>` : ''}</div>
+        <div class="section">
+          <h3>Your Income Share (${year})</h3>
+          ${myIncomeShareStr != null
+            ? `<p style="font-size:18px;font-weight:600;color:#16A34A;">${myIncomeShareStr}</p><p class="empty-note">Based on your ${myOwnership}% ownership share of total rent received.</p>`
+            : `<p class="empty-note">No ownership percentage is on file for you on this property, so a share can't be calculated.</p>`}
+        </div>
+        <div class="section">
+          <h3>Your Expenses Paid (${year}) — Total: ${totalStr}</h3>
+          <table class="tx"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.getElementById('yearend-content').innerHTML = html + `
+      <p style="font-size:11px;color:var(--slate);margin-top:8px;">This summary reflects income share and expenses recorded in the system for ${year}. It is not tax advice — please consult your accountant for how these figures apply to your own return.</p>`;
+  };
+
+  onAuthStateChanged(auth, user => {
+    if (!user) {
+      document.getElementById('login-view').classList.remove('hidden');
+      document.getElementById('app-view').classList.remove('visible');
+      return;
+    }
+    document.getElementById('login-view').classList.add('hidden');
+    document.getElementById('app-view').classList.add('visible');
+    loadDashboard();
+  });
+</script>
+</body>
+</html>
