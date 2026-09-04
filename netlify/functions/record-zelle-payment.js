@@ -36,8 +36,31 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'tenantId and amount are required' }) };
   }
 
+  // Authentication: previously this function had no auth check, so an
+  // unauthenticated caller could submit a fake "I paid via Zelle/Cash App"
+  // claim for any tenantId — landing in the admin's pending-approval
+  // queue as if it were real. If approved without careful cross-checking
+  // against an actual bank record, this could mark real rent as paid when
+  // it wasn't.
   const a  = getAdmin();
   const db = a.firestore();
+
+  const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
+  const bearerMatch = authHeader.match(/^Bearer (.+)$/i);
+  if (!bearerMatch) return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) };
+
+  let decoded;
+  try { decoded = await a.auth().verifyIdToken(bearerMatch[1]); }
+  catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
+
+  const isOwnPayment = decoded.uid === tenantId;
+  if (!isOwnPayment) {
+    const adminSnap = await db.collection('admins').doc(decoded.uid).get();
+    if (!adminSnap.exists || adminSnap.data().status === 'revoked') {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Not authorized to record a payment for this tenant.' }) };
+    }
+  }
+
   const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
 
   try {
