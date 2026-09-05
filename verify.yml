@@ -1,0 +1,31 @@
+name: Verify
+
+# Runs the same checks documented in scripts/verify.js on every push and
+# every pull request against main — syntax validation, dangling handlers,
+# duplicate definitions, missing DOM references, and i18n key parity.
+# This doesn't test actual runtime behavior; it catches the specific,
+# easy-to-miss class of mistake that's broken this project before: an
+# edit that silently drops a function declaration, an i18n key added in
+# one language but not the other, a handler wired to something that no
+# longer exists.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Run verification checks
+        run: npm run verify
