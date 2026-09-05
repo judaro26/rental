@@ -188,6 +188,19 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ success: true }) };
   }
 
+  // Rate limit: this endpoint has no auth of any kind (prospective
+  // applicants aren't signed in), and the honeypot above only stops bots
+  // that blindly fill every field — it does nothing against a caller
+  // hitting this endpoint directly and repeatedly. 5 submissions per IP
+  // per hour is generous for a legitimate applicant (including multiple
+  // household members sharing a connection, or a retry after a mistake)
+  // while still limiting scripted abuse.
+  const a  = getAdmin();
+  const db = a.firestore();
+  const { checkRateLimit } = require('./_lib/rate-limit');
+  const rl = await checkRateLimit(event, db, { endpoint: 'submit-application', limit: 5, windowMinutes: 60 });
+  if (rl.limited) return rl.error;
+
   // ── Validate required fields ─────────────────────────────────────────────
   if (!firstName || !lastName || !email) {
     return { statusCode: 400, body: JSON.stringify({ error: 'First name, last name, and email are required.' }) };
@@ -210,9 +223,6 @@ exports.handler = async (event) => {
   const submittedAtISO = new Date().toISOString();
 
   const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
-
-  const a  = getAdmin();
-  const db = a.firestore();
 
   try {
     // ── Check property is still available ───────────────────────────────────
