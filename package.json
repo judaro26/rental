@@ -4,6 +4,9 @@
   "engines": {
     "node": ">=18"
   },
+  "scripts": {
+    "verify": "node scripts/verify.js"
+  },
   "dependencies": {
     "firebase-admin": "^12.0.0",
     "stripe": "^14.0.0",
