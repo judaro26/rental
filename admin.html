@@ -1047,11 +1047,25 @@
             <h4 style="font-size:1rem;font-weight:500;margin:0;" data-i18n="settings.screeningProvider">🔍 Screening Provider (Credit / Background / Income)</h4>
             <button onclick="openScreeningProviderModal()" class="btn btn-outline btn-sm" data-i18n="settings.addScreeningProvider">+ Add Screening Provider</button>
           </div>
-          <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="settings.screeningProviderHelp">SingleKey is currently the only supported screening backend. <strong>US properties only</strong> — this provider does not support Colombia. Tenants complete their own screening directly with SingleKey (credit, background, and identity data never passes through this app), and results appear on the applicant's page once ready.</p>
+          <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="settings.screeningProviderHelp">SingleKey and RentPrep (TransUnion SmartMove) are supported screening backends. <strong>US properties only</strong> — neither provider covers Colombia. Tenants complete their own screening directly with the provider (credit, background, and identity data never passes through this app), and results appear on the applicant's page once ready.</p>
+          <div style="overflow-x:auto;margin-bottom:20px;">
+            <table class="data-table">
+              <thead><tr><th data-i18n="settings.colLabel">Label</th><th data-i18n="settings.colProvider">Provider</th><th data-i18n="settings.colEnvironment">Environment</th><th data-i18n="common.status">Status</th><th data-i18n="common.actions">Actions</th></tr></thead>
+              <tbody id="screening-providers-tbody"><tr><td colspan="5" style="text-align:center;color:var(--slate);padding:16px;" data-i18n="common.loading">Loading...</td></tr></tbody>
+            </table>
+          </div>
+
+          <hr style="border:none;border-top:1px solid var(--border);margin:8px 0 16px;">
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h4 style="font-size:1rem;font-weight:500;margin:0;" data-i18n="settings.incomeVerificationProvider">💰 Income Verification Provider</h4>
+            <button onclick="openIncomeVerificationProviderModal()" class="btn btn-outline btn-sm" data-i18n="settings.addIncomeVerificationProvider">+ Add Income Verification Provider</button>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-bottom:12px;" data-i18n="settings.incomeVerificationProviderHelp">Truv is the supported backend for verifying an applicant's income and employment directly from their payroll or bank account. This runs independently of the screening provider above — an admin can request a background check via SingleKey/RentPrep <strong>and</strong> income verification via Truv on the same applicant. US only.</p>
           <div style="overflow-x:auto;margin-bottom:20px;">
             <table class="data-table">
               <thead><tr><th data-i18n="settings.colLabel">Label</th><th data-i18n="settings.colEnvironment">Environment</th><th data-i18n="common.status">Status</th><th data-i18n="common.actions">Actions</th></tr></thead>
-              <tbody id="screening-providers-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;" data-i18n="common.loading">Loading...</td></tr></tbody>
+              <tbody id="income-verification-providers-tbody"><tr><td colspan="4" style="text-align:center;color:var(--slate);padding:16px;" data-i18n="common.loading">Loading...</td></tr></tbody>
             </table>
           </div>
 
@@ -1206,15 +1220,47 @@
           <div style="display:flex;flex-direction:column;gap:14px;">
             <div><label class="label" data-i18n="settings.colLabel">Label</label><input type="text" id="int-screening-label" class="form-input" placeholder="My SingleKey Account"></div>
             <div>
+              <label class="label" data-i18n="settings.screeningProviderSelect">Provider</label>
+              <select id="int-screening-provider" class="form-input" onchange="updateScreeningProviderVisibility()">
+                <option value="singlekey">SingleKey</option>
+                <option value="rentprep">RentPrep (TransUnion SmartMove)</option>
+              </select>
+            </div>
+            <div>
               <label class="label" data-i18n="settings.activeEnvironment">Active Environment</label>
               <select id="int-screening-environment" class="form-input">
                 <option value="sandbox" data-i18n="settings.sandboxOption">Sandbox (testing — no real charges or checks)</option>
                 <option value="production" data-i18n="settings.productionOption">Production (live — real charges and checks)</option>
               </select>
             </div>
-            <div><label class="label"><span data-i18n="settings.sandboxToken">Sandbox Token</span> <span id="screening-sandbox-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-sandboxtoken" class="form-input" data-i18n-placeholder="settings.fromSingleKeyManager" placeholder="From your SingleKey account manager"></div>
-            <div><label class="label"><span data-i18n="settings.productionToken">Production Token</span> <span id="screening-production-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-productiontoken" class="form-input" data-i18n-placeholder="settings.fromSingleKeyManager" placeholder="From your SingleKey account manager"></div>
-            <div><label class="label"><span data-i18n="settings.handshakeToken">Handshake Token</span> <span id="screening-handshake-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-handshaketoken" class="form-input" data-i18n-placeholder="settings.handshakeTokenPlaceholder" placeholder="Optional — set to match your SingleKey Partner Portal webhook config"></div>
+            <div id="screening-singlekey-fields" style="display:flex;flex-direction:column;gap:14px;">
+              <div><label class="label"><span data-i18n="settings.sandboxToken">Sandbox Token</span> <span id="screening-sandbox-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-sandboxtoken" class="form-input" data-i18n-placeholder="settings.fromSingleKeyManager" placeholder="From your SingleKey account manager"></div>
+              <div><label class="label"><span data-i18n="settings.productionToken">Production Token</span> <span id="screening-production-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-productiontoken" class="form-input" data-i18n-placeholder="settings.fromSingleKeyManager" placeholder="From your SingleKey account manager"></div>
+              <div><label class="label"><span data-i18n="settings.handshakeToken">Handshake Token</span> <span id="screening-handshake-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-handshaketoken" class="form-input" data-i18n-placeholder="settings.handshakeTokenPlaceholder" placeholder="Optional — set to match your SingleKey Partner Portal webhook config"></div>
+            </div>
+            <div id="screening-rentprep-fields" class="hidden" style="display:flex;flex-direction:column;gap:14px;">
+              <div><label class="label"><span data-i18n="settings.sandboxKey">Sandbox API Key</span> <span id="screening-rp-sandbox-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-sandboxkey" class="form-input" placeholder="From RentPrep — email them to register"></div>
+              <div><label class="label"><span data-i18n="settings.productionKey">Production API Key</span> <span id="screening-rp-production-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-screening-productionkey" class="form-input" placeholder="From RentPrep — email them to register"></div>
+              <p style="font-size:11px;color:var(--slate);margin:0;" data-i18n="settings.rentprepLandlordHint">RentPrep's API requires your contact details on every request — entered once here, not per application.</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div><label class="label" data-i18n="settings.landlordFirstName">Your First Name</label><input type="text" id="int-rp-landlord-firstname" class="form-input"></div>
+                <div><label class="label" data-i18n="settings.landlordLastName">Your Last Name</label><input type="text" id="int-rp-landlord-lastname" class="form-input"></div>
+              </div>
+              <div><label class="label" data-i18n="settings.landlordStreet">Your Street Address</label><input type="text" id="int-rp-landlord-street" class="form-input"></div>
+              <div class="grid grid-cols-3 gap-3">
+                <div><label class="label" data-i18n="settings.landlordCity">City</label><input type="text" id="int-rp-landlord-city" class="form-input"></div>
+                <div><label class="label" data-i18n="settings.landlordState">State</label><input type="text" id="int-rp-landlord-state" class="form-input" maxlength="2" placeholder="CA"></div>
+                <div><label class="label" data-i18n="settings.landlordZip">ZIP</label><input type="text" id="int-rp-landlord-zip" class="form-input"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div><label class="label" data-i18n="settings.landlordPhone">Your Phone</label><input type="tel" id="int-rp-landlord-phone" class="form-input"></div>
+                <div><label class="label" data-i18n="settings.landlordEmail">Your Email</label><input type="email" id="int-rp-landlord-email" class="form-input"></div>
+              </div>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                <input type="checkbox" id="int-rp-evictions" checked style="width:16px;height:16px;"> <span data-i18n="settings.evictionsIncluded">Include eviction records (unchecked = credit + criminal only)</span>
+              </label>
+              <p style="font-size:11px;color:var(--slate);margin:0;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:8px 10px;" data-i18n="settings.rentprepNyNote">Note: New York State law requires landlord-paid, eviction-excluded screenings — this is enforced automatically for NY properties regardless of the settings above.</p>
+            </div>
             <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
               <input type="checkbox" id="int-screening-tenantpays" style="width:16px;height:16px;"> <span data-i18n="settings.tenantPaysFee">Tenant pays the screening fee (unchecked = you pay)</span>
             </label>
@@ -1224,6 +1270,35 @@
           <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
             <button onclick="saveScreeningProvider()" class="btn btn-primary" style="flex:1;" id="screening-int-save-btn" data-i18n="common.save">Save</button>
             <button onclick="testScreeningIntegration()" class="btn btn-outline" id="screening-int-test-btn" data-i18n="settings.testConnection">Test Connection</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- INCOME VERIFICATION PROVIDER MODAL -->
+      <div id="income-verification-provider-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="modal-backdrop absolute inset-0" onclick="closeModal('income-verification-provider-modal')"></div>
+        <div style="background:#fff;width:100%;max-width:480px;padding:32px;border-radius:2px;box-shadow:0 24px 64px rgba(26,26,46,0.2);position:relative;z-index:1;max-height:90vh;overflow-y:auto;">
+          <button onclick="closeModal('income-verification-provider-modal')" style="position:absolute;top:14px;right:16px;background:none;border:none;cursor:pointer;font-size:20px;color:var(--slate);">×</button>
+          <h3 style="font-size:1.8rem;font-weight:400;margin-bottom:20px;" id="income-verification-provider-modal-title" data-i18n="settings.addIncomeVerificationProviderTitle">Add Income Verification Provider</h3>
+          <input type="hidden" id="int-iv-id">
+          <div id="income-verification-provider-modal-alert" class="hidden alert" style="margin-bottom:16px;"></div>
+          <div style="display:flex;flex-direction:column;gap:14px;">
+            <div><label class="label" data-i18n="settings.colLabel">Label</label><input type="text" id="int-iv-label" class="form-input" placeholder="My Truv Account"></div>
+            <div>
+              <label class="label" data-i18n="settings.activeEnvironment">Active Environment</label>
+              <select id="int-iv-environment" class="form-input">
+                <option value="sandbox" data-i18n="settings.sandboxOption">Sandbox (testing — no real charges or checks)</option>
+                <option value="production" data-i18n="settings.productionOption">Production (live — real charges and checks)</option>
+              </select>
+            </div>
+            <div><label class="label" data-i18n="settings.truvClientId">Client ID</label><input type="text" id="int-iv-clientid" class="form-input" placeholder="From dashboard.truv.com → Development → API Keys"></div>
+            <div><label class="label"><span data-i18n="settings.sandboxSecret">Sandbox Access Secret</span> <span id="iv-sandbox-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-iv-sandboxsecret" class="form-input" placeholder="sandbox-..."></div>
+            <div><label class="label"><span data-i18n="settings.productionSecret">Production Access Secret</span> <span id="iv-production-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-iv-productionsecret" class="form-input" placeholder="prod-..."></div>
+          </div>
+          <p style="font-size:11px;color:var(--slate);margin-top:14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:10px 12px;" data-i18n="settings.incomeVerificationUsOnlyWarning">⚠️ US only. The applicant connects their payroll or bank account directly with Truv — this app never receives or stores their banking credentials.</p>
+          <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+            <button onclick="saveIncomeVerificationProvider()" class="btn btn-primary" style="flex:1;" id="iv-int-save-btn" data-i18n="common.save">Save</button>
+            <button onclick="testIncomeVerificationIntegration()" class="btn btn-outline" id="iv-int-test-btn" data-i18n="settings.testConnection">Test Connection</button>
           </div>
         </div>
       </div>
@@ -2621,7 +2696,18 @@
       'settings.envelopeProvidersHelp':'Documenso is currently the only supported e-signature backend (used for lease agreements). The template ID set here is the default for any property that doesn\'t have its own <code>documensoTemplateId</code> override.',
       'settings.colTemplateId':'Template ID', 'settings.screeningProvider':'🔍 Screening Provider (Credit / Background / Income)',
       'settings.addScreeningProvider':'+ Add Screening Provider',
-      'settings.screeningProviderHelp':'SingleKey is currently the only supported screening backend. <strong>US properties only</strong> — this provider does not support Colombia. Tenants complete their own screening directly with SingleKey (credit, background, and identity data never passes through this app), and results appear on the applicant\'s page once ready.',
+      'settings.screeningProviderHelp':'SingleKey and RentPrep (TransUnion SmartMove) are supported screening backends. <strong>US properties only</strong> — neither provider covers Colombia. Tenants complete their own screening directly with the provider (credit, background, and identity data never passes through this app), and results appear on the applicant\'s page once ready.',
+      'settings.screeningProviderSelect':'Provider', 'settings.sandboxKey':'Sandbox API Key', 'settings.productionKey':'Production API Key',
+      'settings.rentprepLandlordHint':'RentPrep requires your contact details on every request — entered once here, not per application.',
+      'settings.landlordFirstName':'Your First Name', 'settings.landlordLastName':'Your Last Name', 'settings.landlordStreet':'Your Street Address',
+      'settings.landlordCity':'City', 'settings.landlordState':'State', 'settings.landlordZip':'ZIP', 'settings.landlordPhone':'Your Phone', 'settings.landlordEmail':'Your Email',
+      'settings.evictionsIncluded':'Include eviction records (unchecked = credit + criminal only)',
+      'settings.rentprepNyNote':'Note: New York State law requires landlord-paid, eviction-excluded screenings — this is enforced automatically for NY properties regardless of the settings above.',
+      'settings.incomeVerificationProvider':'💰 Income Verification Provider', 'settings.addIncomeVerificationProvider':'+ Add Income Verification Provider',
+      'settings.addIncomeVerificationProviderTitle':'Add Income Verification Provider',
+      'settings.incomeVerificationProviderHelp':'Truv verifies an applicant income and employment directly from their payroll or bank account. This runs independently of the screening provider above — an admin can request a background check via SingleKey/RentPrep <strong>and</strong> income verification via Truv on the same applicant. US only.',
+      'settings.truvClientId':'Client ID', 'settings.sandboxSecret':'Sandbox Access Secret', 'settings.productionSecret':'Production Access Secret',
+      'settings.incomeVerificationUsOnlyWarning':'⚠️ US only. The applicant connects their payroll or bank account directly with Truv — this app never receives or stores their banking credentials.',
       'settings.colEnvironment':'Environment', 'settings.smsProvider':'💬 SMS Provider', 'settings.addSmsProvider':'+ Add SMS Provider',
       'settings.smsProviderHelp':'Telnyx, Twilio, or ClickSend. Powers SMS delivery for urgent announcements (in addition to email). Testing this sends a real text message with a real, small cost — there\'s no free validation check for SMS the way there is for email or storage. Independent of the WhatsApp provider below — choosing Twilio here doesn\'t configure WhatsApp, and choosing a different provider here doesn\'t disable it.',
       'settings.colFromNumber':'From Number',
@@ -2888,6 +2974,9 @@
       'properties.ownerNameRequiredForInvite':'Enter this owner\'s name first.', 'properties.ownerEmailRequiredForInvite':'Enter an email address to send the invite to.',
       'properties.inviteSent':'✓ Invitation sent to {email}.',
       'properties.testReminder':'Send Test', 'properties.testSentTo':'Test sent to {email}. Check your inbox.',
+      'properties.sendNow':'🔔 Send Now', 'properties.sendNowHint':'Send this reminder for real, right now, to actual tenants/notify email — not a test.',
+      'properties.sendNowConfirm':'Send "{label}" now to actual tenants and/or the notify email configured for this reminder? This is a real send, not a test.',
+      'properties.sentToCount':'sent to {n} recipient(s)', 'properties.failedForCount':'failed for {n} recipient(s)',
       'properties.reminderLanguage':'Language this reminder is sent in',
       'settings.reminderTemplateTitle':'📧 Reminder Email Template',
       'settings.reminderTemplateHelp':'Customize the look of reminder emails sent to tenants — colors, logo, and sign-off. Applies to all reminders across every property.',
@@ -3465,6 +3554,9 @@
       'properties.ownerNameRequiredForInvite':'Ingresa primero el nombre de este propietario.', 'properties.ownerEmailRequiredForInvite':'Ingresa un correo electrónico para enviar la invitación.',
       'properties.inviteSent':'✓ Invitación enviada a {email}.',
       'properties.testReminder':'Enviar Prueba', 'properties.testSentTo':'Prueba enviada a {email}. Revisa tu correo.',
+      'properties.sendNow':'🔔 Enviar Ahora', 'properties.sendNowHint':'Enviar este recordatorio de verdad, ahora mismo, a los inquilinos reales/correo de notificación — no es una prueba.',
+      'properties.sendNowConfirm':'¿Enviar "{label}" ahora a los inquilinos reales y/o al correo de notificación configurado para este recordatorio? Este es un envío real, no una prueba.',
+      'properties.sentToCount':'enviado a {n} destinatario(s)', 'properties.failedForCount':'falló para {n} destinatario(s)',
       'properties.reminderLanguage':'Idioma en que se envía este recordatorio',
       'settings.reminderTemplateTitle':'📧 Plantilla de Correo de Recordatorios',
       'settings.reminderTemplateHelp':'Personaliza la apariencia de los correos de recordatorio enviados a los inquilinos — colores, logo y despedida. Se aplica a todos los recordatorios en todas las propiedades.',
@@ -8314,6 +8406,7 @@
       renderProvidersTable('storage', 'storage-providers-tbody');
       renderProvidersTable('envelope', 'envelope-providers-tbody');
       renderProvidersTable('screening', 'screening-providers-tbody');
+      renderProvidersTable('income_verification', 'income-verification-providers-tbody');
       renderProvidersTable('sms', 'sms-providers-tbody');
       renderProvidersTable('whatsapp', 'whatsapp-providers-tbody');
     } catch (e) {
@@ -8325,21 +8418,21 @@
     const tbody = document.getElementById(tbodyId);
     const rows = allIntegrationProviders.filter(p => p.type === type);
     if (!rows.length) {
-      tbody.innerHTML = `<tr><td colspan="${type === 'email' || type === 'sms' || type === 'whatsapp' ? 5 : 4}" style="text-align:center;color:var(--slate);padding:16px;">No ${type} providers saved yet — using the environment default.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${['email','sms','whatsapp','screening'].includes(type) ? 5 : 4}" style="text-align:center;color:var(--slate);padding:16px;">No ${type} providers saved yet — using the environment default.</td></tr>`;
       return;
     }
-    const openFns = { email: 'openEmailProviderModal', storage: 'openStorageProviderModal', envelope: 'openEnvelopeProviderModal', screening: 'openScreeningProviderModal', sms: 'openSmsProviderModal', whatsapp: 'openWhatsappProviderModal' };
+    const openFns = { email: 'openEmailProviderModal', storage: 'openStorageProviderModal', envelope: 'openEnvelopeProviderModal', screening: 'openScreeningProviderModal', income_verification: 'openIncomeVerificationProviderModal', sms: 'openSmsProviderModal', whatsapp: 'openWhatsappProviderModal' };
     tbody.innerHTML = rows.map(p => {
       const statusBadge = p.isActive ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-pending">Inactive</span>';
       const openFn = openFns[type];
       const middleCell = type === 'email' ? `<td style="font-size:12px;">${p.host || '—'}</td>`
         : type === 'storage' ? `<td style="font-size:12px;">${p.backend === 'r2' ? `R2: ${p.bucketName || '—'}` : `Cloudinary: ${p.cloudName || '—'}`}</td>`
-        : type === 'screening' ? `<td style="font-size:12px;text-transform:capitalize;">${p.environment || 'sandbox'}</td>`
+        : (type === 'screening' || type === 'income_verification') ? `<td style="font-size:12px;text-transform:capitalize;">${p.environment || 'sandbox'}</td>`
         : (type === 'sms' || type === 'whatsapp') ? `<td style="font-size:12px;">${p.fromNumber || '—'}</td>`
         : `<td style="font-size:12px;">${p.templateId || '—'}</td>`;
       return `<tr>
         <td><strong>${p.label}</strong></td>
-        ${type === 'email' || type === 'sms' ? `<td style="font-size:12px;text-transform:capitalize;">${p.provider}</td>` : ''}
+        ${type === 'email' || type === 'sms' || type === 'screening' ? `<td style="font-size:12px;text-transform:capitalize;">${p.provider}</td>` : ''}
         ${middleCell}
         ${type === 'whatsapp' ? `<td style="font-size:11px;font-family:monospace;">${p.contentSid || '—'}</td>` : ''}
         <td>${statusBadge}</td>
@@ -8375,7 +8468,7 @@
     const original = btnEl.textContent; btnEl.textContent=t('common.testing');
     resultEl.textContent = '';
     try {
-      const action = { email: 'test_email', storage: 'test_storage', envelope: 'test_envelope', screening: 'test_screening', sms: 'test_sms', whatsapp: 'test_whatsapp' }[type];
+      const action = { email: 'test_email', storage: 'test_storage', envelope: 'test_envelope', screening: 'test_screening', income_verification: 'test_income_verification', sms: 'test_sms', whatsapp: 'test_whatsapp' }[type];
       const result = await callManageIntegrations(action, { id, ...extraParams });
       resultEl.style.color = '#16A34A';
       resultEl.textContent = '✓ ' + (result.message || `Test email sent to ${result.sentTo}.`);
@@ -8628,35 +8721,77 @@
   };
 
   // ── Screening provider modal (SingleKey) ────────────────────────────────
+  window.updateScreeningProviderVisibility = () => {
+    const provider = document.getElementById('int-screening-provider').value;
+    document.getElementById('screening-singlekey-fields').classList.toggle('hidden', provider !== 'singlekey');
+    document.getElementById('screening-rentprep-fields').classList.toggle('hidden', provider !== 'rentprep');
+  };
   window.openScreeningProviderModal = (id) => {
     const p = id ? allIntegrationProviders.find(x => x.id === id) : null;
+    const provider = p?.provider || 'singlekey';
     document.getElementById('int-screening-id').value = id || '';
     document.getElementById('int-screening-label').value = p?.label || '';
+    document.getElementById('int-screening-provider').value = provider;
+    document.getElementById('int-screening-provider').disabled = !!p; // provider is fixed once saved — add a new one to switch
     document.getElementById('int-screening-environment').value = p?.environment || 'sandbox';
     document.getElementById('int-screening-sandboxtoken').value = '';
     document.getElementById('int-screening-productiontoken').value = '';
     document.getElementById('int-screening-handshaketoken').value = '';
+    document.getElementById('int-screening-sandboxkey').value = '';
+    document.getElementById('int-screening-productionkey').value = '';
     document.getElementById('int-screening-tenantpays').checked = p?.tenantPays === true;
     document.getElementById('int-screening-minscore').value = p?.minScore || '';
+    document.getElementById('int-rp-evictions').checked = p?.evictionsIncluded !== false;
+    document.getElementById('int-rp-landlord-firstname').value = p?.landlordFirstName || '';
+    document.getElementById('int-rp-landlord-lastname').value = p?.landlordLastName || '';
+    document.getElementById('int-rp-landlord-street').value = p?.landlordStreet || '';
+    document.getElementById('int-rp-landlord-city').value = p?.landlordCity || '';
+    document.getElementById('int-rp-landlord-state').value = p?.landlordState || '';
+    document.getElementById('int-rp-landlord-zip').value = p?.landlordZip || '';
+    document.getElementById('int-rp-landlord-phone').value = p?.landlordPhone || '';
+    document.getElementById('int-rp-landlord-email').value = p?.landlordEmail || '';
     document.getElementById('screening-sandbox-hint').textContent = p?.sandboxTokenMasked ? `(leave blank to keep current: ${p.sandboxTokenMasked})` : '';
     document.getElementById('screening-production-hint').textContent = p?.productionTokenMasked ? `(leave blank to keep current: ${p.productionTokenMasked})` : '';
     document.getElementById('screening-handshake-hint').textContent = p?.handshakeTokenMasked ? `(leave blank to keep current: ${p.handshakeTokenMasked})` : '';
+    document.getElementById('screening-rp-sandbox-hint').textContent = p?.sandboxKeyMasked ? `(leave blank to keep current: ${p.sandboxKeyMasked})` : '';
+    document.getElementById('screening-rp-production-hint').textContent = p?.productionKeyMasked ? `(leave blank to keep current: ${p.productionKeyMasked})` : '';
     document.getElementById('screening-provider-modal-title').textContent = p ? 'Edit Screening Provider' : 'Add Screening Provider';
     document.getElementById('screening-provider-modal-alert').classList.add('hidden');
+    updateScreeningProviderVisibility();
     openModal('screening-provider-modal');
   };
   window.saveScreeningProvider = async () => {
     const id = document.getElementById('int-screening-id').value;
+    const provider = document.getElementById('int-screening-provider').value;
     const btn = document.getElementById('screening-int-save-btn'); btn.disabled = true; btn.textContent=t('common.saving');
     const payload = {
       label: document.getElementById('int-screening-label').value.trim(),
+      provider,
       environment: document.getElementById('int-screening-environment').value,
-      sandboxToken: document.getElementById('int-screening-sandboxtoken').value.trim(),
-      productionToken: document.getElementById('int-screening-productiontoken').value.trim(),
-      handshakeToken: document.getElementById('int-screening-handshaketoken').value.trim(),
       tenantPays: document.getElementById('int-screening-tenantpays').checked,
       minScore: document.getElementById('int-screening-minscore').value.trim(),
     };
+    if (provider === 'rentprep') {
+      Object.assign(payload, {
+        sandboxKey: document.getElementById('int-screening-sandboxkey').value.trim(),
+        productionKey: document.getElementById('int-screening-productionkey').value.trim(),
+        evictionsIncluded: document.getElementById('int-rp-evictions').checked,
+        landlordFirstName: document.getElementById('int-rp-landlord-firstname').value.trim(),
+        landlordLastName: document.getElementById('int-rp-landlord-lastname').value.trim(),
+        landlordStreet: document.getElementById('int-rp-landlord-street').value.trim(),
+        landlordCity: document.getElementById('int-rp-landlord-city').value.trim(),
+        landlordState: document.getElementById('int-rp-landlord-state').value.trim().toUpperCase(),
+        landlordZip: document.getElementById('int-rp-landlord-zip').value.trim(),
+        landlordPhone: document.getElementById('int-rp-landlord-phone').value.trim(),
+        landlordEmail: document.getElementById('int-rp-landlord-email').value.trim(),
+      });
+    } else {
+      Object.assign(payload, {
+        sandboxToken: document.getElementById('int-screening-sandboxtoken').value.trim(),
+        productionToken: document.getElementById('int-screening-productiontoken').value.trim(),
+        handshakeToken: document.getElementById('int-screening-handshaketoken').value.trim(),
+      });
+    }
     try {
       if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('screening_provider_updated', 'settings', id, payload.label); }
       else { await callManageIntegrations('add_provider', { type: 'screening', ...payload }); logAdminAction('screening_provider_added', 'settings', null, payload.label); }
@@ -8667,16 +8802,69 @@
   };
   window.testScreeningIntegration = async () => {
     const id = document.getElementById('int-screening-id').value;
+    const provider = document.getElementById('int-screening-provider').value;
     const btn = document.getElementById('screening-int-test-btn'); btn.disabled = true; btn.textContent=t('common.testing');
     try {
-      const result = await callManageIntegrations('test_screening', {
-        id: id || undefined,
-        sandboxToken: document.getElementById('int-screening-sandboxtoken').value.trim(),
-        productionToken: document.getElementById('int-screening-productiontoken').value.trim(),
-        environment: document.getElementById('int-screening-environment').value,
-      });
+      const testPayload = { id: id || undefined, provider, environment: document.getElementById('int-screening-environment').value };
+      if (provider === 'rentprep') {
+        testPayload.sandboxKey = document.getElementById('int-screening-sandboxkey').value.trim();
+        testPayload.productionKey = document.getElementById('int-screening-productionkey').value.trim();
+      } else {
+        testPayload.sandboxToken = document.getElementById('int-screening-sandboxtoken').value.trim();
+        testPayload.productionToken = document.getElementById('int-screening-productiontoken').value.trim();
+      }
+      const result = await callManageIntegrations('test_screening', testPayload);
       showAlert('screening-provider-modal-alert', '✓ ' + result.message, 'success');
     } catch (e) { showAlert('screening-provider-modal-alert', 'Test failed: ' + e.message); }
+    btn.disabled = false; btn.textContent = t('settings.testConnection');
+  };
+
+  // ── Income Verification provider modal (Truv) ───────────────────────────
+  window.openIncomeVerificationProviderModal = (id) => {
+    const p = id ? allIntegrationProviders.find(x => x.id === id) : null;
+    document.getElementById('int-iv-id').value = id || '';
+    document.getElementById('int-iv-label').value = p?.label || '';
+    document.getElementById('int-iv-environment').value = p?.environment || 'sandbox';
+    document.getElementById('int-iv-clientid').value = p?.clientId || '';
+    document.getElementById('int-iv-sandboxsecret').value = '';
+    document.getElementById('int-iv-productionsecret').value = '';
+    document.getElementById('iv-sandbox-hint').textContent = p?.sandboxSecretMasked ? `(leave blank to keep current: ${p.sandboxSecretMasked})` : '';
+    document.getElementById('iv-production-hint').textContent = p?.productionSecretMasked ? `(leave blank to keep current: ${p.productionSecretMasked})` : '';
+    document.getElementById('income-verification-provider-modal-title').textContent = p ? 'Edit Income Verification Provider' : 'Add Income Verification Provider';
+    document.getElementById('income-verification-provider-modal-alert').classList.add('hidden');
+    openModal('income-verification-provider-modal');
+  };
+  window.saveIncomeVerificationProvider = async () => {
+    const id = document.getElementById('int-iv-id').value;
+    const btn = document.getElementById('iv-int-save-btn'); btn.disabled = true; btn.textContent=t('common.saving');
+    const payload = {
+      label: document.getElementById('int-iv-label').value.trim(),
+      environment: document.getElementById('int-iv-environment').value,
+      clientId: document.getElementById('int-iv-clientid').value.trim(),
+      sandboxSecret: document.getElementById('int-iv-sandboxsecret').value.trim(),
+      productionSecret: document.getElementById('int-iv-productionsecret').value.trim(),
+    };
+    try {
+      if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('income_verification_provider_updated', 'settings', id, payload.label); }
+      else { await callManageIntegrations('add_provider', { type: 'income_verification', ...payload }); logAdminAction('income_verification_provider_added', 'settings', null, payload.label); }
+      closeModal('income-verification-provider-modal');
+      await loadIntegrationsStatus();
+    } catch (e) { showAlert('income-verification-provider-modal-alert', e.message); }
+    btn.disabled = false; btn.textContent = t('common.save');
+  };
+  window.testIncomeVerificationIntegration = async () => {
+    const id = document.getElementById('int-iv-id').value;
+    const btn = document.getElementById('iv-int-test-btn'); btn.disabled = true; btn.textContent=t('common.testing');
+    try {
+      const result = await callManageIntegrations('test_income_verification', {
+        id: id || undefined,
+        clientId: document.getElementById('int-iv-clientid').value.trim(),
+        sandboxSecret: document.getElementById('int-iv-sandboxsecret').value.trim(),
+        productionSecret: document.getElementById('int-iv-productionsecret').value.trim(),
+        environment: document.getElementById('int-iv-environment').value,
+      });
+      showAlert('income-verification-provider-modal-alert', '✓ ' + result.message, 'success');
+    } catch (e) { showAlert('income-verification-provider-modal-alert', 'Test failed: ' + e.message); }
     btn.disabled = false; btn.textContent = t('settings.testConnection');
   };
 
@@ -9438,6 +9626,7 @@
             <input type="checkbox" ${r.notifyTenants!==false?'checked':''} onchange="updateReminderField(${idx},'notifyTenants',this.checked)"> ${t('properties.notifyTenantsToo')}
           </label>
           <button type="button" onclick="testReminderRow(${idx},this)" class="btn btn-sm btn-outline" style="margin-left:auto;">${t('properties.testReminder')}</button>
+          <button type="button" onclick="sendReminderNow(${idx},this)" class="btn btn-sm btn-outline" title="${t('properties.sendNowHint')}">${t('properties.sendNow')}</button>
         </div>
         <div class="reminder-test-result" style="font-size:11px;padding-left:2px;"></div>
       </div>
@@ -9467,6 +9656,45 @@
       const result = await callManagePropertyPayments('test_reminder', { propertyId, label: r.label, message: r.message || '', dueDayLabel, lang: reminderLang });
       resultEl.style.color = '#16A34A';
       resultEl.textContent = '✓ ' + t('properties.testSentTo').replace('{email}', result.sentTo);
+    } catch (e) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = '✗ ' + e.message;
+    }
+    btnEl.disabled = false; btnEl.textContent = original;
+  };
+
+  window.sendReminderNow = async (idx, btnEl) => {
+    const r = currentReminders[idx];
+    const resultEl = btnEl.closest('div').nextElementSibling;
+    if (!r || !r.label || !r.label.trim()) {
+      resultEl.style.color = '#DC2626';
+      resultEl.textContent = t('properties.reminderLabelRequired');
+      return;
+    }
+    // Real send to real recipients, not a self-test — confirm first since
+    // it can't be un-sent, unlike clicking Test Reminder repeatedly.
+    if (!confirm(t('properties.sendNowConfirm').replace('{label}', r.label))) return;
+
+    const propertyId = document.getElementById('prop-id').value;
+    const occurrence = getNextReminderOccurrence(r);
+    const reminderLang = r.lang === 'es' ? 'es' : 'en';
+    const dateLocale = reminderLang === 'es' ? 'es-ES' : 'en-US';
+    const dueDayLabel = occurrence ? occurrence.dueDate.toLocaleDateString(dateLocale, { month: 'long', day: 'numeric', timeZone: 'UTC' }) : '';
+
+    btnEl.disabled = true;
+    const original = btnEl.textContent; btnEl.textContent = t('common.sending');
+    resultEl.textContent = '';
+    try {
+      const result = await callManagePropertyPayments('send_reminder_now', {
+        propertyId, label: r.label, message: r.message || '', dueDayLabel, lang: reminderLang,
+        notifyEmail: r.notifyEmail || '', notifyTenants: r.notifyTenants !== false,
+      });
+      resultEl.style.color = result.failed?.length ? '#92400E' : '#16A34A';
+      const parts = [];
+      if (result.sent?.length) parts.push(t('properties.sentToCount').replace('{n}', result.sent.length));
+      if (result.failed?.length) parts.push(t('properties.failedForCount').replace('{n}', result.failed.length));
+      resultEl.textContent = '✓ ' + parts.join(', ');
+      logAdminAction('property_reminder_sent_manually', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, r.label);
     } catch (e) {
       resultEl.style.color = '#DC2626';
       resultEl.textContent = '✗ ' + e.message;
