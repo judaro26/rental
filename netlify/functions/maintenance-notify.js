@@ -7,6 +7,19 @@
 
 const nodemailer = require('nodemailer');
 
+let admin;
+function getAdmin() {
+  if (!admin) {
+    admin = require('firebase-admin');
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)),
+      });
+    }
+  }
+  return admin;
+}
+
 function getTransporter() {
   return nodemailer.createTransport({
     host:   process.env.SMTP_HOST,
@@ -149,6 +162,16 @@ exports.handler = async (event) => {
   let body;
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
+
+  // No tenantId is passed here (just free-form name/email/description text
+  // for the email body), so there's no ownership relationship to verify —
+  // this only rules out fully anonymous callers, not impersonation of a
+  // specific tenant. See verify-authenticated.js for why that's still a
+  // meaningful improvement over the no-auth-at-all state this had before.
+  const a = getAdmin();
+  const { verifyAuthenticated } = require('./_lib/verify-authenticated');
+  const authResult = await verifyAuthenticated(event, a);
+  if (authResult.error) return authResult.error;
 
   const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
   if (!adminEmail) {
