@@ -218,6 +218,89 @@ exports.handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ success: true, sentTo: caller.email }) };
     }
 
+    // ── SEND REMINDER NOW — a real, manual send to actual recipients
+    //    (tenants + notifyEmail), not the admin-only test above. Exists
+    //    because send-property-reminders.js marks a rule's lastSentPeriod
+    //    as done unconditionally, even when every individual send in that
+    //    cycle failed (e.g. the renderReminderSubject bug this endpoint
+    //    was added to work around) — so a genuinely failed reminder does
+    //    NOT get retried by the next scheduled run, only next month's
+    //    cycle. This runs the same recipient-resolution and send logic as
+    //    the scheduled function, on demand, for exactly this situation.
+    if (action === 'send_reminder_now') {
+      const { label, message, dueDayLabel, lang, notifyEmail, notifyTenants } = body;
+      if (!label || !label.trim()) return { statusCode: 400, body: JSON.stringify({ error: 'This reminder has no label — check the rule is saved correctly.' }) };
+
+      await require('./_lib/apply-email-config')();
+      if (!process.env.SMTP_HOST) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
+      }
+      const { renderReminderEmailHtml, renderReminderSubject } = require('./_lib/render-reminder-email');
+      const nodemailer = require('nodemailer');
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '587'),
+        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      });
+
+      const effectiveLang = lang === 'es' ? 'es' : 'en';
+      const dueLabel = dueDayLabel || (effectiveLang === 'es' ? 'su próxima fecha de vencimiento' : 'its next due date');
+      let emailTemplate = {};
+      try {
+        const settingsSnap = await db.collection('settings').doc('site').get();
+        if (settingsSnap.exists) emailTemplate = settingsSnap.data().reminderEmailTemplate || {};
+      } catch { /* fall back to default template styling */ }
+
+      // Same recipient resolution as send-property-reminders.js — active
+      // tenants on this property (if notifyTenants), plus the rule's own
+      // notifyEmail if set. Independent lookups for the same reason as
+      // there: a tenant-query hiccup shouldn't block the admin's own copy.
+      const recipients = [];
+      if (notifyTenants !== false) {
+        try {
+          const tenantsSnap = await db.collection('tenants')
+            .where('propertyId', '==', propertyId)
+            .where('status', '==', 'active')
+            .get();
+          tenantsSnap.docs.forEach(tDoc => {
+            const tenant = tDoc.data();
+            if (tenant.email) recipients.push({ email: tenant.email, name: tenant.firstName || 'there', isAdminCopy: false });
+          });
+        } catch (err) {
+          return { statusCode: 500, body: JSON.stringify({ error: `Could not look up tenants: ${err.message}` }) };
+        }
+      }
+      if ((notifyEmail || '').trim()) {
+        recipients.push({ email: notifyEmail.trim(), name: 'there', isAdminCopy: true });
+      }
+      if (!recipients.length) return { statusCode: 400, body: JSON.stringify({ error: 'No recipients to send to — no active tenants and no notify email configured for this reminder.' }) };
+
+      const results = { sent: [], failed: [] };
+      for (const recipient of recipients) {
+        try {
+          await transporter.sendMail({
+            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            to: recipient.email,
+            subject: renderReminderSubject({ lang: effectiveLang, label, dueLabel }),
+            html: renderReminderEmailHtml({
+              lang: effectiveLang, recipientName: recipient.name, label,
+              propertyName: caller.propertyName || '', dueLabel, customMessage: (message || '').trim(),
+              isAdminCopy: recipient.isAdminCopy, template: emailTemplate,
+            }),
+          });
+          results.sent.push(recipient.email);
+        } catch (err) {
+          results.failed.push({ email: recipient.email, error: err.message });
+        }
+      }
+
+      if (results.failed.length && !results.sent.length) {
+        return { statusCode: 500, body: JSON.stringify({ error: `Failed to send to all ${results.failed.length} recipient(s): ${results.failed.map(f=>f.error).join('; ')}` }) };
+      }
+      return { statusCode: 200, body: JSON.stringify({ success: true, ...results }) };
+    }
+
     if (action === 'test_annual_event') {
       const { label, month, day, lang } = body;
       if (!label || !label.trim()) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a label to test with.' }) };
