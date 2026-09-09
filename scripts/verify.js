@@ -7,16 +7,20 @@
 // dangling onclick/onchange handlers, duplicate function/window.X
 // definitions, getElementById calls with no matching id="", i18n key
 // parity between English and Spanish (both admin.html's inline
-// dictionary and shared/public-i18n.js's separate one), and
+// dictionary and shared/public-i18n.js's separate one), _lib module
+// exports actually matching what their callers destructure, and
 // firestore.rules brace balance.
 //
 // None of this replaces real testing of actual behavior — it catches
 // the class of mistake that's bitten this project before: a str_replace
 // edit that silently drops a function declaration or a section comment,
 // a new i18n key added in English but not Spanish, a handler wired to a
-// function that was renamed or removed. Those are exactly the kind of
-// small, easy-to-miss breaks that don't show up until someone clicks the
-// broken button in production.
+// function that was renamed or removed, a shared _lib file that got its
+// content overwritten by a copy of a different file with the same
+// interface shape expected but never actually implemented. Those are
+// exactly the kind of small, easy-to-miss breaks that don't show up
+// until someone clicks the broken button — or a scheduled function
+// fails silently in production — rather than at review time.
 //
 // Usage: node scripts/verify.js
 // Exits 1 if any check fails, 0 if everything passes — safe to wire into
@@ -103,7 +107,56 @@ function checkFunctionSyntax() {
   }
 }
 
-// ── 2. Syntax-check every HTML page's embedded script ───────────────────────
+// ── 2. _lib module exports actually match what callers destructure ─────────
+// The exact bug class this check exists for: send-property-reminders.js,
+// send-annual-event-reminders.js, and manage-property-payments.js all
+// destructure { renderReminderEmailHtml, renderReminderSubject } from
+// _lib/render-reminder-email.js — but that file's content had been
+// overwritten with a byte-for-byte copy of the unrelated
+// _lib/invoice-reminder-email.js, which exports completely different
+// names (buildEmail, buildSubject) with a completely different parameter
+// shape. `node --check` can't catch this — the file is syntactically
+// valid JavaScript, it just doesn't export what its callers need. This
+// only surfaced when a scheduled function actually ran in production and
+// threw "renderReminderSubject is not a function".
+function extractLibExports(fileContent) {
+  const m = fileContent.match(/module\.exports\s*=\s*\{([^}]*)\}/);
+  if (!m) return null; // no plain object export — can't verify safely, skip rather than guess
+  return new Set([...m[1].matchAll(/([a-zA-Z_$][a-zA-Z0-9_$]*)/g)].map(x => x[1]));
+}
+
+function checkLibExports() {
+  const libDir = path.join(ROOT, 'netlify/functions/_lib');
+  if (!fs.existsSync(libDir)) return;
+
+  const fnDir = path.join(ROOT, 'netlify/functions');
+  const callerFiles = fs.readdirSync(fnDir).filter(f => f.endsWith('.js'));
+
+  for (const callerFile of callerFiles) {
+    const content = fs.readFileSync(path.join(fnDir, callerFile), 'utf8');
+    // Matches: const { a, b } = require('./_lib/some-module');
+    for (const m of content.matchAll(/const\s*\{([^}]*)\}\s*=\s*require\(['"]\.\/_lib\/([a-zA-Z0-9_-]+)['"]\)/g)) {
+      const destructured = [...m[1].matchAll(/([a-zA-Z_$][a-zA-Z0-9_$]*)/g)].map(x => x[1]);
+      const libFile = `${m[2]}.js`;
+      const libPath = path.join(libDir, libFile);
+      if (!fs.existsSync(libPath)) {
+        fail(`${callerFile} requires missing _lib file`, `./_lib/${m[2]} does not exist`);
+        continue;
+      }
+      const exported = extractLibExports(fs.readFileSync(libPath, 'utf8'));
+      if (!exported) continue; // non-standard export shape (e.g. module.exports = someFunction) — not this check's job
+      const missing = destructured.filter(name => !exported.has(name));
+      if (missing.length) {
+        fail(`${callerFile} imports from _lib/${libFile}`, `${missing.join(', ')} not exported — actual exports: ${[...exported].join(', ') || '(none found)'}`);
+      } else {
+        pass(`${callerFile} → _lib/${libFile}: all imports match (${destructured.join(', ')})`);
+      }
+    }
+  }
+}
+
+
+// ── 3. Syntax-check every HTML page's embedded script ───────────────────────
 // Two script styles exist in this codebase: <script type="module"> (admin,
 // tenant-portal, owner-portal, apply, index) and plain <script> (documents,
 // respond). Both are checked; a page with neither is skipped rather than
@@ -137,7 +190,7 @@ function checkHtmlSyntax() {
   }
 }
 
-// ── 3-5. Dangling handlers, duplicate definitions, missing DOM ids ──────────
+// ── 4-6. Dangling handlers, duplicate definitions, missing DOM ids ──────────
 function checkHtmlRegressions() {
   for (const page of HTML_PAGES) {
     const html = readIfExists(page);
@@ -189,7 +242,7 @@ function checkHtmlRegressions() {
   }
 }
 
-// ── 6. i18n key parity ───────────────────────────────────────────────────────
+// ── 7. i18n key parity ───────────────────────────────────────────────────────
 // Two separate i18n systems exist in this codebase: admin.html's inline
 // `const I18N = { en: {...}, es: {...} }` dictionary, and the standalone
 // shared/public-i18n.js file that tenant-portal.html (and other public-
@@ -255,7 +308,7 @@ function checkI18n() {
   }
 }
 
-// ── 7. firestore.rules brace balance ────────────────────────────────────────
+// ── 8. firestore.rules brace balance ────────────────────────────────────────
 function checkFirestoreRules() {
   const rules = readIfExists('firestore.rules');
   if (rules == null) return;
@@ -268,6 +321,7 @@ function checkFirestoreRules() {
 // ── Run everything ───────────────────────────────────────────────────────────
 console.log('Running verification checks...\n');
 checkFunctionSyntax();
+checkLibExports();
 checkHtmlSyntax();
 checkHtmlRegressions();
 checkI18n();
