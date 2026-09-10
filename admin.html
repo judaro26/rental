@@ -512,9 +512,17 @@
             </div>
             <div class="col-span-2">
               <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-                <input type="checkbox" id="ann-whatsapp"> <span data-i18n="announcements.alsoWhatsapp">💚 Also send via WhatsApp</span>
+                <input type="checkbox" id="ann-whatsapp" onchange="toggleAnnWhatsappLang()"> <span data-i18n="announcements.alsoWhatsapp">💚 Also send via WhatsApp</span>
               </label>
               <p style="font-size:11px;color:var(--slate);margin-top:2px;margin-left:24px;" data-i18n="announcements.whatsappHint">Requires a WhatsApp provider configured above, and a phone number on file for each tenant. Real messages with a real (small) cost per tenant — not free like email.</p>
+              <div id="ann-whatsapp-lang-wrap" class="hidden" style="margin-top:8px;margin-left:24px;max-width:280px;">
+                <label class="label" style="font-size:11px;" data-i18n="announcements.whatsappLangLabel">WhatsApp Template Language</label>
+                <select id="ann-whatsapp-lang" class="form-input" style="font-size:13px;">
+                  <option value="en" data-i18n="announcements.whatsappLangEn">English</option>
+                  <option value="es" data-i18n="announcements.whatsappLangEs">Español</option>
+                </select>
+                <p style="font-size:10px;color:var(--slate);margin-top:4px;" data-i18n="announcements.whatsappLangHint">WhatsApp requires a separately-approved template per language — this title and message are still written once above and sent as-is in whichever template you pick here, so write them in the language you select.</p>
+              </div>
             </div>
           </div>
           <button onclick="postAnnouncement()" class="btn btn-primary" data-i18n="announcements.postButton">Post Announcement</button>
@@ -1193,9 +1201,14 @@
             <div><label class="label" data-i18n="settings.accountSid">Account SID</label><input type="text" id="int-whatsapp-accountsid" class="form-input" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div>
             <div><label class="label"><span data-i18n="settings.authToken">Auth Token</span> <span id="whatsapp-token-hint" style="font-size:10px;font-weight:400;color:var(--slate);"></span></label><input type="password" id="int-whatsapp-authtoken" class="form-input" placeholder="Twilio Console → Account Info"></div>
             <div>
-              <label class="label"><span data-i18n="settings.colContentSid">Content SID</span></label>
+              <label class="label"><span data-i18n="settings.colContentSidEn">Content SID (English)</span></label>
               <input type="text" id="int-whatsapp-contentsid" class="form-input" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
               <p style="font-size:10px;color:var(--slate);margin-top:4px;" data-i18n="settings.whatsappTemplateHint">The approved Content Template SID from Twilio Console → Content Editor. This template must have exactly two variables: {{1}} for the announcement title, {{2}} for its message body — e.g. "📢 {{1}}: {{2}}".</p>
+            </div>
+            <div>
+              <label class="label"><span data-i18n="settings.colContentSidEs">Content SID (Spanish)</span> <span style="font-size:10px;font-weight:400;color:var(--slate);" data-i18n="settings.contentSidEsOptionalHint">(optional — leave blank to send everything in English)</span></label>
+              <input type="text" id="int-whatsapp-contentsidEs" class="form-input" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+              <p style="font-size:10px;color:var(--slate);margin-top:4px;" data-i18n="settings.whatsappTemplateEsHint">A separate, Spanish-approved template — WhatsApp/Meta reviews and approves each language of a template independently, so this needs its own Content SID, not a translated variable inside the English one. Same two-variable structure required.</p>
             </div>
           </div>
           <p style="font-size:11px;color:var(--slate);margin-top:14px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:10px 12px;" data-i18n="settings.whatsappTestWarning">⚠️ Testing sends a real WhatsApp message with a real (small) cost — there's no free credential-only check available for WhatsApp.</p>
@@ -2513,6 +2526,8 @@
       'announcements.textedCount':'texted {n} tenant(s)', 'announcements.postedAnd':'✓ Announcement posted and {parts}.',
       'announcements.skippedOptOut':'skipped {n} tenant(s) who opted out',
       'announcements.alsoWhatsapp':'💚 Also send via WhatsApp',
+      'announcements.whatsappLangLabel':'WhatsApp Template Language', 'announcements.whatsappLangEn':'English', 'announcements.whatsappLangEs':'Español',
+      'announcements.whatsappLangHint':'WhatsApp requires a separately-approved template per language — this title and message are still written once above and sent as-is in whichever template you pick here, so write them in the language you select.',
       'announcements.whatsappHint':'Requires a WhatsApp provider configured above, and a phone number on file for each tenant. Real messages with a real (small) cost per tenant — not free like email.',
       'announcements.whatsappConfirm':'This will send a real WhatsApp message (with a real, small cost per tenant) to everyone targeted who has a phone number on file. Continue?',
       'announcements.whatsappedCount':'WhatsApped {n} tenant(s)',
@@ -2734,7 +2749,10 @@
       'settings.enterPhoneForTest':'Enter a phone number to send the test to.',
       'settings.whatsappProvider':'💚 WhatsApp Provider', 'settings.addWhatsappProvider':'+ Add WhatsApp Provider',
       'settings.whatsappProviderHelp':'Twilio only — WhatsApp business messaging requires Meta business verification and a pre-approved message template, set up directly in your Twilio Console (not something this app can configure for you). Powers WhatsApp delivery for announcements, in addition to email and SMS. Testing this sends a real WhatsApp message with a real, small cost. This is independent of the SMS provider above — it needs its own Twilio credentials here even if SMS is set to Telnyx or ClickSend.',
-      'settings.colContentSid':'Content SID', 'settings.addWhatsappProviderTitle':'Add WhatsApp Provider', 'settings.editWhatsappProviderTitle':'Edit WhatsApp Provider',
+      'settings.colContentSid':'Content SID', 'settings.colContentSidEn':'Content SID (English)', 'settings.colContentSidEs':'Content SID (Spanish)',
+      'settings.contentSidEsOptionalHint':'(optional — leave blank to send everything in English)',
+      'settings.whatsappTemplateEsHint':'A separate, Spanish-approved template — WhatsApp/Meta reviews and approves each language of a template independently, so this needs its own Content SID, not a translated variable inside the English one. Same two-variable structure required.',
+      'settings.addWhatsappProviderTitle':'Add WhatsApp Provider', 'settings.editWhatsappProviderTitle':'Edit WhatsApp Provider',
       'settings.whatsappFromNumberHint':'(+E.164 format — your Twilio WhatsApp Sender number, enabled via Meta business verification)',
       'settings.whatsappTemplateHint':'The approved Content Template SID from Twilio Console → Content Editor. This template must have exactly two variables: {{1}} for the announcement title, {{2}} for its message body — e.g. "📢 {{1}}: {{2}}".',
       'settings.whatsappTestWarning':'⚠️ Testing sends a real WhatsApp message with a real (small) cost — there\'s no free credential-only check available for WhatsApp.',
@@ -3104,6 +3122,8 @@
       'announcements.textedCount':'SMS enviado a {n} inquilino(s)', 'announcements.postedAnd':'✓ Anuncio publicado y {parts}.',
       'announcements.skippedOptOut':'se omitió a {n} inquilino(s) que optaron por no recibir',
       'announcements.alsoWhatsapp':'💚 También enviar por WhatsApp',
+      'announcements.whatsappLangLabel':'Idioma de la Plantilla de WhatsApp', 'announcements.whatsappLangEn':'Inglés', 'announcements.whatsappLangEs':'Español',
+      'announcements.whatsappLangHint':'WhatsApp requiere una plantilla aprobada por separado para cada idioma — este título y mensaje se escriben una sola vez arriba y se envían tal cual en la plantilla que elija aquí, así que escríbalos en el idioma que seleccione.',
       'announcements.whatsappHint':'Requiere un proveedor de WhatsApp configurado arriba, y un número de teléfono registrado para cada inquilino. Mensajes reales con un costo real (pequeño) por inquilino — no es gratis como el correo.',
       'announcements.whatsappConfirm':'Esto enviará un mensaje de WhatsApp real (con un costo real y pequeño por inquilino) a todos los destinatarios que tengan un número de teléfono registrado. ¿Continuar?',
       'announcements.whatsappedCount':'WhatsApp enviado a {n} inquilino(s)',
@@ -3287,7 +3307,18 @@
       'settings.envelopeProvidersHelp':'Documenso es actualmente el único backend de firma electrónica compatible (usado para contratos de arrendamiento). El ID de plantilla configurado aquí es el predeterminado para cualquier propiedad que no tenga su propia anulación de <code>documensoTemplateId</code>.',
       'settings.colTemplateId':'ID de Plantilla', 'settings.screeningProvider':'🔍 Proveedor de Verificación (Crédito / Antecedentes / Ingresos)',
       'settings.addScreeningProvider':'+ Agregar Proveedor de Verificación',
-      'settings.screeningProviderHelp':'SingleKey es actualmente el único backend de verificación compatible. <strong>Solo propiedades en EE.UU.</strong> — este proveedor no admite Colombia. Los inquilinos completan su propia verificación directamente con SingleKey (los datos de crédito, antecedentes e identidad nunca pasan por esta app), y los resultados aparecen en la página del solicitante una vez listos.',
+      'settings.screeningProviderHelp':'SingleKey y RentPrep (TransUnion SmartMove) son los backends de verificación compatibles. <strong>Solo propiedades en EE.UU.</strong> — ningún proveedor cubre Colombia. Los inquilinos completan su propia verificación directamente con el proveedor (los datos de crédito, antecedentes e identidad nunca pasan por esta app), y los resultados aparecen en la página del solicitante una vez listos.',
+      'settings.screeningProviderSelect':'Proveedor', 'settings.sandboxKey':'Clave API de Pruebas (Sandbox)', 'settings.productionKey':'Clave API de Producción',
+      'settings.rentprepLandlordHint':'RentPrep requiere sus datos de contacto en cada solicitud — se ingresan una vez aquí, no por cada solicitud.',
+      'settings.landlordFirstName':'Su Nombre', 'settings.landlordLastName':'Su Apellido', 'settings.landlordStreet':'Su Dirección',
+      'settings.landlordCity':'Ciudad', 'settings.landlordState':'Estado', 'settings.landlordZip':'Código Postal', 'settings.landlordPhone':'Su Teléfono', 'settings.landlordEmail':'Su Correo Electrónico',
+      'settings.evictionsIncluded':'Incluir récord de desalojos (sin marcar = solo crédito + antecedentes penales)',
+      'settings.rentprepNyNote':'Nota: La ley del estado de Nueva York exige verificaciones pagadas por el arrendador y sin desalojos — esto se aplica automáticamente para propiedades en NY sin importar la configuración anterior.',
+      'settings.incomeVerificationProvider':'💰 Proveedor de Verificación de Ingresos', 'settings.addIncomeVerificationProvider':'+ Agregar Proveedor de Verificación de Ingresos',
+      'settings.addIncomeVerificationProviderTitle':'Agregar Proveedor de Verificación de Ingresos',
+      'settings.incomeVerificationProviderHelp':'Truv verifica los ingresos y el empleo de un solicitante directamente desde su nómina o cuenta bancaria. Esto funciona de manera independiente al proveedor de verificación anterior — un administrador puede solicitar una verificación de antecedentes vía SingleKey/RentPrep <strong>y</strong> verificación de ingresos vía Truv para el mismo solicitante. Solo EE.UU.',
+      'settings.truvClientId':'ID de Cliente', 'settings.sandboxSecret':'Secreto de Acceso de Pruebas (Sandbox)', 'settings.productionSecret':'Secreto de Acceso de Producción',
+      'settings.incomeVerificationUsOnlyWarning':'⚠️ Solo EE.UU. El solicitante conecta su nómina o cuenta bancaria directamente con Truv — esta aplicación nunca recibe ni almacena sus credenciales bancarias.',
       'settings.colEnvironment':'Entorno', 'settings.smsProvider':'💬 Proveedor de SMS', 'settings.addSmsProvider':'+ Agregar Proveedor de SMS',
       'settings.smsProviderHelp':'Telnyx, Twilio o ClickSend. Impulsa el envío de SMS para anuncios urgentes (además del correo). Probarlo envía un mensaje de texto real con un costo real pequeño — no hay una verificación gratuita para SMS como la hay para correo o almacenamiento. Es independiente del proveedor de WhatsApp de abajo — elegir Twilio aquí no configura WhatsApp, y elegir un proveedor distinto aquí no lo deshabilita.',
       'settings.colFromNumber':'Número de Origen',
@@ -3314,7 +3345,10 @@
       'settings.enterPhoneForTest':'Ingresa un número de teléfono al que enviar la prueba.',
       'settings.whatsappProvider':'💚 Proveedor de WhatsApp', 'settings.addWhatsappProvider':'+ Agregar Proveedor de WhatsApp',
       'settings.whatsappProviderHelp':'Solo Twilio — la mensajería empresarial de WhatsApp requiere verificación empresarial de Meta y una plantilla de mensaje pre-aprobada, configurada directamente en tu Consola de Twilio (no es algo que esta aplicación pueda configurar por ti). Habilita el envío de anuncios por WhatsApp, además de correo y SMS. Probar esto envía un mensaje de WhatsApp real con un costo real y pequeño. Esto es independiente del proveedor de SMS de arriba — necesita sus propias credenciales de Twilio aquí, incluso si el SMS está configurado con Telnyx o ClickSend.',
-      'settings.colContentSid':'SID de Contenido', 'settings.addWhatsappProviderTitle':'Agregar Proveedor de WhatsApp', 'settings.editWhatsappProviderTitle':'Editar Proveedor de WhatsApp',
+      'settings.colContentSid':'SID de Contenido', 'settings.colContentSidEn':'SID de Contenido (Inglés)', 'settings.colContentSidEs':'SID de Contenido (Español)',
+      'settings.contentSidEsOptionalHint':'(opcional — dejar en blanco para enviar todo en inglés)',
+      'settings.whatsappTemplateEsHint':'Una plantilla separada, aprobada en español — WhatsApp/Meta revisa y aprueba cada idioma de una plantilla de forma independiente, así que esto necesita su propio SID de Contenido, no una variable traducida dentro de la plantilla en inglés. Se requiere la misma estructura de dos variables.',
+      'settings.addWhatsappProviderTitle':'Agregar Proveedor de WhatsApp', 'settings.editWhatsappProviderTitle':'Editar Proveedor de WhatsApp',
       'settings.whatsappFromNumberHint':'(formato +E.164 — tu número de Remitente de WhatsApp en Twilio, habilitado mediante verificación empresarial de Meta)',
       'settings.whatsappTemplateHint':'El SID de la Plantilla de Contenido aprobada desde Twilio Console → Content Editor. Esta plantilla debe tener exactamente dos variables: {{1}} para el título del anuncio, {{2}} para el cuerpo del mensaje — ej. "📢 {{1}}: {{2}}".',
       'settings.whatsappTestWarning':'⚠️ Probar esto envía un mensaje de WhatsApp real con un costo real (pequeño) — no hay una verificación gratuita de solo credenciales disponible para WhatsApp.',
@@ -6031,6 +6065,9 @@
     document.getElementById('ann-property').disabled = use; // irrelevant once specific tenants are hand-picked
     if (use) renderAnnTenantChecklist();
   };
+  window.toggleAnnWhatsappLang = () => {
+    document.getElementById('ann-whatsapp-lang-wrap').classList.toggle('hidden', !document.getElementById('ann-whatsapp').checked);
+  };
   function renderAnnTenantChecklist() {
     const search = (document.getElementById('ann-tenant-search').value || '').toLowerCase();
     const container = document.getElementById('ann-tenant-checklist');
@@ -6072,6 +6109,7 @@
     const urgent = document.getElementById('ann-urgent').checked;
     const sms = document.getElementById('ann-sms').checked;
     const whatsapp = document.getElementById('ann-whatsapp').checked;
+    const whatsappLang = document.getElementById('ann-whatsapp-lang').value;
     if (!title||!message) { showAlert('ann-alert', t('announcements.titleMessageRequired')); return; }
     if (useSpecific && !tenantIds.length) { showAlert('ann-alert', t('announcements.selectAtLeastOneTenant')); return; }
     if (sms && !confirm(t('announcements.smsConfirm'))) return;
@@ -6081,7 +6119,7 @@
     await addDoc(collection(db,'announcements'),{title,message,propertyId:propId||null,tenantIds:tenantIds.length?tenantIds:null,urgent,createdAt:serverTimestamp()});
     let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
     const propName = propId?(allProperties.find(p=>p.id===propId)?.name||''):'';
-    authedFetch('/api/announce-notify',{title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,sms,whatsapp,siteName})
+    authedFetch('/api/announce-notify',{title,message,propertyId:propId||null,propertyName:propName,tenantIds:tenantIds.length?tenantIds:undefined,urgent,sms,whatsapp,whatsappLang,siteName})
       .then(r=>r.json()).then(d=>{
         const parts = [];
         if (d.sent>0) parts.push(t('announcements.emailedCount').replace('{n}', d.sent));
@@ -6096,6 +6134,7 @@
     document.getElementById('ann-urgent').checked = false;
     document.getElementById('ann-sms').checked = false;
     document.getElementById('ann-whatsapp').checked = false;
+    toggleAnnWhatsappLang();
     selectedAnnouncementTenantIds.clear();
     document.getElementById('ann-use-specific-tenants').checked = false;
     toggleAnnSpecificTenants();
@@ -8969,6 +9008,7 @@
     document.getElementById('int-whatsapp-authtoken').value = '';
     document.getElementById('whatsapp-token-hint').textContent = p ? `(leave blank to keep current: ${p.authTokenMasked || '••••'})` : '';
     document.getElementById('int-whatsapp-contentsid').value = p?.contentSid || '';
+    document.getElementById('int-whatsapp-contentsidEs').value = p?.contentSidEs || '';
     document.getElementById('int-whatsapp-test-to').value = '';
     document.getElementById('whatsapp-provider-modal-title').textContent = p ? t('settings.editWhatsappProviderTitle') : t('settings.addWhatsappProviderTitle');
     document.getElementById('whatsapp-provider-modal-alert').classList.add('hidden');
@@ -8985,6 +9025,7 @@
       accountSid: document.getElementById('int-whatsapp-accountsid').value.trim(),
       authToken: document.getElementById('int-whatsapp-authtoken').value.trim(), // blank on edit = keep existing
       contentSid: document.getElementById('int-whatsapp-contentsid').value.trim(),
+      contentSidEs: document.getElementById('int-whatsapp-contentsidEs').value.trim(),
     };
     try {
       if (id) { await callManageIntegrations('update_provider', { id, ...payload }); logAdminAction('whatsapp_provider_updated', 'settings', id, payload.label); }
