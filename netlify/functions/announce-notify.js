@@ -63,7 +63,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  const { title, message, propertyId, propertyName, siteName, tenantIds, urgent, sms, whatsapp } = body;
+  const { title, message, propertyId, propertyName, siteName, tenantIds, urgent, sms, whatsapp, whatsappLang } = body;
   if (!title || !message) {
     return { statusCode: 400, body: JSON.stringify({ error: 'title and message are required' }) };
   }
@@ -181,13 +181,19 @@ exports.handler = async (event) => {
       if (whatsappProvider) {
         const { sendWhatsApp } = require('./_lib/send-whatsapp');
         const whatsappTitle = `${urgent ? '🚨 URGENT' : '📢'} ${title}`;
+        // WhatsApp/Meta approves each language of a template independently
+        // — contentSidEs is a separate, optional template, not a
+        // translated variable inside the English one. Falls back to
+        // English if Spanish was requested but never configured, rather
+        // than silently failing every send.
+        const effectiveContentSid = (whatsappLang === 'es' && whatsappProvider.contentSidEs) ? whatsappProvider.contentSidEs : whatsappProvider.contentSid;
         for (const tenant of tenants) {
           if (!tenant.phone) continue;
           if (tenant.notificationPrefs?.whatsapp === false) { whatsappSkipped++; continue; }
           try {
             await sendWhatsApp({
               accountSid: whatsappProvider.accountSid, authToken: whatsappProvider.authToken,
-              fromNumber: whatsappProvider.fromNumber, contentSid: whatsappProvider.contentSid,
+              fromNumber: whatsappProvider.fromNumber, contentSid: effectiveContentSid,
               contentVariables: { '1': whatsappTitle, '2': message },
               to: tenant.phone,
             });
