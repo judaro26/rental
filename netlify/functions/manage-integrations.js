@@ -80,7 +80,13 @@ function maskProvider(id, d, activeId) {
     return { ...base, provider: 'documenso', apiUrl: d.apiUrl, appUrl: d.appUrl, templateId: d.templateId, apiKeyMasked: mask(d.apiKey), webhookSecretMasked: mask(d.webhookSecret) };
   }
   if (d.type === 'screening') {
+    if (d.provider === 'rentprep') {
+      return { ...base, provider: 'rentprep', environment: d.environment || 'sandbox', sandboxKeyMasked: mask(d.sandboxKey), productionKeyMasked: mask(d.productionKey), tenantPays: d.tenantPays === true, minScore: d.minScore || null, evictionsIncluded: d.evictionsIncluded !== false, landlordFirstName: d.landlordFirstName, landlordLastName: d.landlordLastName, landlordStreet: d.landlordStreet, landlordCity: d.landlordCity, landlordState: d.landlordState, landlordZip: d.landlordZip, landlordPhone: d.landlordPhone, landlordEmail: d.landlordEmail };
+    }
     return { ...base, provider: 'singlekey', environment: d.environment || 'sandbox', sandboxTokenMasked: mask(d.sandboxToken), productionTokenMasked: mask(d.productionToken), handshakeTokenMasked: mask(d.handshakeToken), tenantPays: d.tenantPays === true, minScore: d.minScore || null };
+  }
+  if (d.type === 'income_verification') {
+    return { ...base, provider: 'truv', environment: d.environment || 'sandbox', clientId: d.clientId, sandboxSecretMasked: mask(d.sandboxSecret), productionSecretMasked: mask(d.productionSecret) };
   }
   if (d.type === 'sms') {
     if (d.provider === 'twilio') {
@@ -92,7 +98,7 @@ function maskProvider(id, d, activeId) {
     return { ...base, provider: 'telnyx', apiKeyMasked: mask(d.apiKey), fromNumber: d.fromNumber, messagingProfileId: d.messagingProfileId };
   }
   if (d.type === 'whatsapp') {
-    return { ...base, provider: 'twilio', accountSid: d.accountSid, authTokenMasked: mask(d.authToken), fromNumber: d.fromNumber, contentSid: d.contentSid };
+    return { ...base, provider: 'twilio', accountSid: d.accountSid, authTokenMasked: mask(d.authToken), fromNumber: d.fromNumber, contentSid: d.contentSid, contentSidEs: d.contentSidEs || null };
   }
   return base;
 }
@@ -130,7 +136,7 @@ exports.handler = async (event) => {
     // ── ADD a new provider ───────────────────────────────────────────────────
     if (action === 'add_provider') {
       const { type, label } = body;
-      if (!['email', 'storage', 'envelope', 'screening', 'sms', 'whatsapp'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", "envelope", "screening", "sms", or "whatsapp".' }) };
+      if (!['email', 'storage', 'envelope', 'screening', 'income_verification', 'sms', 'whatsapp'].includes(type)) return { statusCode: 400, body: JSON.stringify({ error: 'type must be "email", "storage", "envelope", "screening", "income_verification", "sms", or "whatsapp".' }) };
 
       let fields;
       if (type === 'email') {
@@ -158,15 +164,50 @@ exports.handler = async (event) => {
           webhookSecret: webhookSecret || null,
         };
       } else if (type === 'screening') {
-        const { sandboxToken, productionToken, environment, handshakeToken, tenantPays, minScore } = body;
-        if (!sandboxToken && !productionToken) return { statusCode: 400, body: JSON.stringify({ error: 'At least a sandbox token is required for a new screening provider.' }) };
+        const { provider, sandboxToken, productionToken, sandboxKey, productionKey, environment, handshakeToken, tenantPays, minScore, evictionsIncluded } = body;
+        if (provider === 'rentprep') {
+          if (!sandboxKey && !productionKey) return { statusCode: 400, body: JSON.stringify({ error: 'At least a sandbox key is required for a new RentPrep screening provider.' }) };
+          const { landlordFirstName, landlordLastName, landlordStreet, landlordCity, landlordState, landlordZip, landlordPhone, landlordEmail } = body;
+          if (!landlordFirstName || !landlordLastName || !landlordStreet || !landlordCity || !landlordState || !landlordZip || !landlordPhone || !landlordEmail) {
+            return { statusCode: 400, body: JSON.stringify({ error: 'RentPrep\'s API requires your name, address, phone, and email on every request (their "native" order flow, entered here once rather than per application) — all fields are required.' }) };
+          }
+          fields = {
+            provider: 'rentprep',
+            sandboxKey: sandboxKey || null,
+            productionKey: productionKey || null,
+            environment: environment === 'production' ? 'production' : 'sandbox',
+            tenantPays: tenantPays === true,
+            minScore: minScore ? parseInt(minScore) : null,
+            evictionsIncluded: evictionsIncluded !== false,
+            landlordFirstName, landlordLastName, landlordStreet, landlordCity, landlordState, landlordZip, landlordPhone, landlordEmail,
+          };
+        } else {
+          if (!sandboxToken && !productionToken) return { statusCode: 400, body: JSON.stringify({ error: 'At least a sandbox token is required for a new screening provider.' }) };
+          fields = {
+            provider: 'singlekey',
+            sandboxToken: sandboxToken || null,
+            productionToken: productionToken || null,
+            environment: environment === 'production' ? 'production' : 'sandbox',
+            handshakeToken: handshakeToken || null,
+            tenantPays: tenantPays === true,
+            minScore: minScore ? parseInt(minScore) : null,
+          };
+        }
+      } else if (type === 'income_verification') {
+        // Truv only, for now — a separate type from 'screening' rather
+        // than a third provider option there, since it runs independently
+        // (an admin can have RentPrep or SingleKey active for background
+        // checks *and* Truv active for income, at the same time — these
+        // aren't alternatives to each other the way SingleKey/RentPrep are).
+        const { clientId, sandboxSecret, productionSecret, environment } = body;
+        if (!clientId) return { statusCode: 400, body: JSON.stringify({ error: 'clientId is required for a new income verification provider.' }) };
+        if (!sandboxSecret && !productionSecret) return { statusCode: 400, body: JSON.stringify({ error: 'At least a sandbox secret is required for a new income verification provider.' }) };
         fields = {
-          sandboxToken: sandboxToken || null,
-          productionToken: productionToken || null,
+          provider: 'truv',
+          clientId,
+          sandboxSecret: sandboxSecret || null,
+          productionSecret: productionSecret || null,
           environment: environment === 'production' ? 'production' : 'sandbox',
-          handshakeToken: handshakeToken || null,
-          tenantPays: tenantPays === true,
-          minScore: minScore ? parseInt(minScore) : null,
         };
       } else if (type === 'sms') {
         const { provider, apiKey, messagingProfileId, accountSid, authToken, fromNumber, username } = body;
@@ -186,14 +227,18 @@ exports.handler = async (event) => {
         // whatsapp — Twilio only. contentSid identifies the WhatsApp
         // template approved for the "new announcement" use case; see
         // _lib/send-whatsapp.js for why a template is required at all.
-        const { accountSid, authToken, fromNumber, contentSid } = body;
+        // contentSidEs is optional — WhatsApp/Meta approves each language
+        // of a template independently, so a Spanish announcement needs
+        // its own, separately-approved template and SID, not a translated
+        // variable inside the English one.
+        const { accountSid, authToken, fromNumber, contentSid, contentSidEs } = body;
         if (!accountSid || !authToken) return { statusCode: 400, body: JSON.stringify({ error: 'accountSid and authToken are required for a new WhatsApp provider.' }) };
         if (!fromNumber) return { statusCode: 400, body: JSON.stringify({ error: 'fromNumber is required for a new WhatsApp provider (your Twilio WhatsApp Sender number, in +E.164 format).' }) };
         if (!contentSid) return { statusCode: 400, body: JSON.stringify({ error: 'contentSid is required — the approved Content Template SID (starts with "HX") from your Twilio Console.' }) };
-        fields = { provider: 'twilio', accountSid, authToken, fromNumber, contentSid };
+        fields = { provider: 'twilio', accountSid, authToken, fromNumber, contentSid, contentSidEs: contentSidEs || null };
       }
 
-      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider', screening: 'Screening Provider', sms: 'SMS Provider', whatsapp: 'WhatsApp Provider' }[type];
+      const defaultLabel = { email: 'Email Provider', storage: 'Storage Provider', envelope: 'Envelope Provider', screening: 'Screening Provider', income_verification: 'Income Verification Provider', sms: 'SMS Provider', whatsapp: 'WhatsApp Provider' }[type];
       const ref = await coll.add({
         type, label: label || defaultLabel,
         ...fields,
@@ -252,9 +297,23 @@ exports.handler = async (event) => {
         if (body.environment !== undefined) update.environment = body.environment === 'production' ? 'production' : 'sandbox';
         if (body.tenantPays !== undefined) update.tenantPays = body.tenantPays === true;
         if (body.minScore !== undefined) update.minScore = body.minScore ? parseInt(body.minScore) : null;
-        if (body.sandboxToken) update.sandboxToken = body.sandboxToken; // blank = keep existing
-        if (body.productionToken) update.productionToken = body.productionToken; // blank = keep existing
-        if (body.handshakeToken) update.handshakeToken = body.handshakeToken; // blank = keep existing
+        if (d.provider === 'rentprep') {
+          if (body.evictionsIncluded !== undefined) update.evictionsIncluded = body.evictionsIncluded !== false;
+          if (body.sandboxKey) update.sandboxKey = body.sandboxKey; // blank = keep existing
+          if (body.productionKey) update.productionKey = body.productionKey; // blank = keep existing
+          for (const f of ['landlordFirstName','landlordLastName','landlordStreet','landlordCity','landlordState','landlordZip','landlordPhone','landlordEmail']) {
+            if (body[f] !== undefined) update[f] = body[f];
+          }
+        } else {
+          if (body.sandboxToken) update.sandboxToken = body.sandboxToken; // blank = keep existing
+          if (body.productionToken) update.productionToken = body.productionToken; // blank = keep existing
+          if (body.handshakeToken) update.handshakeToken = body.handshakeToken; // blank = keep existing
+        }
+      } else if (d.type === 'income_verification') {
+        if (body.environment !== undefined) update.environment = body.environment === 'production' ? 'production' : 'sandbox';
+        if (body.clientId !== undefined) update.clientId = body.clientId;
+        if (body.sandboxSecret) update.sandboxSecret = body.sandboxSecret; // blank = keep existing
+        if (body.productionSecret) update.productionSecret = body.productionSecret; // blank = keep existing
       } else if (d.type === 'sms') {
         if (body.fromNumber !== undefined) update.fromNumber = body.fromNumber; // no-op for ClickSend, which has no fromNumber field
         if (d.provider === 'twilio') {
@@ -271,6 +330,7 @@ exports.handler = async (event) => {
         if (body.accountSid !== undefined) update.accountSid = body.accountSid;
         if (body.fromNumber !== undefined) update.fromNumber = body.fromNumber;
         if (body.contentSid !== undefined) update.contentSid = body.contentSid;
+        if (body.contentSidEs !== undefined) update.contentSidEs = body.contentSidEs;
         if (body.authToken) update.authToken = body.authToken; // blank = keep existing
       }
 
@@ -490,22 +550,44 @@ exports.handler = async (event) => {
     //    is the way to verify a token works; it's read-only and doesn't
     //    create or charge anything. ─────────────────────────────────────
     if (action === 'test_screening') {
-      const { id, sandboxToken, productionToken, environment } = body;
-      let token, baseUrl;
+      const { id, provider, sandboxToken, productionToken, sandboxKey, productionKey, environment } = body;
       const env = environment === 'production' ? 'production' : 'sandbox';
-      baseUrl = env === 'production' ? 'https://platform.singlekey.com' : 'https://sandbox.singlekey.com';
+      let effectiveProvider = provider;
+      let key, token, baseUrl;
 
-      if (sandboxToken || productionToken) {
-        token = env === 'production' ? productionToken : sandboxToken;
-      } else if (id) {
+      if (id && !sandboxToken && !productionToken && !sandboxKey && !productionKey) {
         const snap = await coll.doc(id).get();
         if (!snap.exists || snap.data().type !== 'screening') return { statusCode: 404, body: JSON.stringify({ error: 'Screening provider not found.' }) };
         const d = snap.data();
-        token = d.environment === 'production' ? d.productionToken : d.sandboxToken;
-        baseUrl = d.environment === 'production' ? 'https://platform.singlekey.com' : 'https://sandbox.singlekey.com';
+        effectiveProvider = d.provider || 'singlekey';
+        if (effectiveProvider === 'rentprep') key = d.environment === 'production' ? d.productionKey : d.sandboxKey;
+        else token = d.environment === 'production' ? d.productionToken : d.sandboxToken;
+      } else {
+        key = env === 'production' ? productionKey : sandboxKey;
+        token = env === 'production' ? productionToken : sandboxToken;
       }
-      if (!token) return { statusCode: 400, body: JSON.stringify({ error: `No ${env} token given to test with.` }) };
 
+      if (effectiveProvider === 'rentprep') {
+        if (!key) return { statusCode: 400, body: JSON.stringify({ error: `No ${env} key given to test with.` }) };
+        baseUrl = env === 'production' ? 'https://apiv3.rentprep.com' : 'https://apiv3.sandbox.rentprep.com';
+        // No dedicated health-check endpoint is documented, so this uses
+        // "get all applications" for a reference ID that's never actually
+        // been used to create anything — a bad key fails with an auth
+        // error before RentPrep even looks at the reference ID, so this
+        // is a safe, read-only way to validate credentials.
+        const res = await fetch(`${baseUrl}/smartmove/application/all/connection-test?limit=1`, {
+          headers: { 'x-apiKey': key },
+        });
+        let data = null; try { data = await res.json(); } catch {}
+        if (!res.ok) {
+          return { statusCode: 400, body: JSON.stringify({ error: data?.Message || `RentPrep rejected this ${env} key (HTTP ${res.status}). Check it's correct for this environment.` }) };
+        }
+        return { statusCode: 200, body: JSON.stringify({ success: true, message: `${env === 'production' ? 'Production' : 'Sandbox'} key validated successfully.` }) };
+      }
+
+      // SingleKey
+      if (!token) return { statusCode: 400, body: JSON.stringify({ error: `No ${env} token given to test with.` }) };
+      baseUrl = env === 'production' ? 'https://platform.singlekey.com' : 'https://sandbox.singlekey.com';
       const res = await fetch(`${baseUrl}/api/payments`, {
         headers: { Authorization: `Token ${token}` },
       });
@@ -520,6 +602,42 @@ exports.handler = async (event) => {
           message: `${env === 'production' ? 'Production' : 'Sandbox'} token validated successfully.${data?.has_payment_method === false ? ' Note: no payment method on file yet — needed before real screenings can be purchased.' : ''}`,
         }),
       };
+    }
+
+    if (action === 'test_income_verification') {
+      const { id, clientId, sandboxSecret, productionSecret, environment } = body;
+      const env = environment === 'production' ? 'production' : 'sandbox';
+      let effectiveClientId = clientId, secret = env === 'production' ? productionSecret : sandboxSecret;
+
+      if (id && !sandboxSecret && !productionSecret) {
+        const snap = await coll.doc(id).get();
+        if (!snap.exists || snap.data().type !== 'income_verification') return { statusCode: 404, body: JSON.stringify({ error: 'Income verification provider not found.' }) };
+        const d = snap.data();
+        effectiveClientId = d.clientId;
+        secret = d.environment === 'production' ? d.productionSecret : d.sandboxSecret;
+      }
+      if (!effectiveClientId || !secret) return { statusCode: 400, body: JSON.stringify({ error: `A client ID and ${env} secret are both needed to test.` }) };
+
+      // Truv's own docs describe a single base URL for every environment —
+      // the Access Secret's prefix (sandbox-/prod-) is what actually
+      // routes the request, not the URL itself.
+      //
+      // No dedicated, read-only "just validate my credentials" endpoint
+      // was found in the documentation gathered for this integration, so
+      // this uses "create a user" as the test call — a bad key fails
+      // before a user is ever created, but valid credentials will leave
+      // behind one small, real (empty) user record per test click. Worth
+      // knowing if RentBay's own dashboard ever surfaces a user count.
+      const res = await fetch('https://prod.truv.com/v1/users/', {
+        method: 'POST',
+        headers: { 'X-Access-Client-Id': effectiveClientId, 'X-Access-Secret': secret, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      let data = null; try { data = await res.json(); } catch {}
+      if (!res.ok) {
+        return { statusCode: 400, body: JSON.stringify({ error: data?.message || data?.detail || `Truv rejected these ${env} credentials (HTTP ${res.status}). Check they're correct for this environment.` }) };
+      }
+      return { statusCode: 200, body: JSON.stringify({ success: true, message: `${env === 'production' ? 'Production' : 'Sandbox'} credentials validated successfully.` }) };
     }
 
     // ── TEST SMS — unlike every other provider's test action, this sends
@@ -562,12 +680,12 @@ exports.handler = async (event) => {
     }
 
     if (action === 'test_whatsapp') {
-      const { id, accountSid, authToken, fromNumber, contentSid, toNumber } = body;
+      const { id, accountSid, authToken, fromNumber, contentSid, contentSidEs, toNumber, lang } = body;
       if (!toNumber) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a WhatsApp number (in +E.164 format) to send the test to.' }) };
 
       let creds = null;
       if (accountSid && authToken && fromNumber && contentSid) {
-        creds = { accountSid, authToken, fromNumber, contentSid };
+        creds = { accountSid, authToken, fromNumber, contentSid, contentSidEs };
       } else if (id) {
         const snap = await coll.doc(id).get();
         if (!snap.exists || snap.data().type !== 'whatsapp') return { statusCode: 404, body: JSON.stringify({ error: 'WhatsApp provider not found.' }) };
@@ -576,14 +694,24 @@ exports.handler = async (event) => {
         return { statusCode: 400, body: JSON.stringify({ error: 'No WhatsApp configuration given to test.' }) };
       }
 
+      const testInSpanish = lang === 'es';
+      if (testInSpanish && !creds.contentSidEs) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'No Spanish Content SID is configured for this provider yet — save one first, then test it.' }) };
+      }
+      const testContentSid = testInSpanish ? creds.contentSidEs : creds.contentSid;
+
       try {
         const { sendWhatsApp } = require('./_lib/send-whatsapp');
         // Matches the {{1}}, {{2}} placeholders the announcement template
         // is documented to expect — see settings.whatsappTemplateHint in
-        // admin.html for the exact wording shown to the admin.
+        // admin.html for the exact wording shown to the admin. Content
+        // itself is in whichever language is actually being tested, so a
+        // successful send is meaningful, not just a connectivity check.
         const result = await sendWhatsApp({
-          accountSid: creds.accountSid, authToken: creds.authToken, fromNumber: creds.fromNumber, contentSid: creds.contentSid,
-          contentVariables: { '1': 'Test', '2': 'This is a test message from your property management portal. If you received this, your WhatsApp integration is working.' },
+          accountSid: creds.accountSid, authToken: creds.authToken, fromNumber: creds.fromNumber, contentSid: testContentSid,
+          contentVariables: testInSpanish
+            ? { '1': 'Prueba', '2': 'Este es un mensaje de prueba de su portal de administración de propiedades. Si recibió esto, su integración de WhatsApp está funcionando.' }
+            : { '1': 'Test', '2': 'This is a test message from your property management portal. If you received this, your WhatsApp integration is working.' },
           to: toNumber,
         });
         return { statusCode: 200, body: JSON.stringify({ success: true, message: `Test WhatsApp message sent to ${toNumber} (status: ${result.status}). This was a real message, not a free validation check.` }) };
