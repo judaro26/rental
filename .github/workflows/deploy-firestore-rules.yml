@@ -36,7 +36,17 @@ jobs:
           node-version: '18'
 
       - name: Install Firebase CLI
-        run: npm install -g firebase-tools
+        # Pinned, not latest — firebase-tools 15.22.2 (published 2026-06-24)
+        # introduced a confirmed regression where GOOGLE_APPLICATION_CREDENTIALS
+        # auth is silently rejected in CI with "Failed to authenticate, have
+        # you run firebase login?" even with fully valid credentials (see
+        # firebase/firebase-tools issue #10716 — 15.22.1 is the last version
+        # confirmed unaffected). Several releases have shipped since without
+        # an explicit fix note for this issue, so this pins to the known-good
+        # version rather than assuming a later one resolved it. Worth
+        # revisiting this pin if a confirmed fix shows up in a firebase-tools
+        # changelog later.
+        run: npm install -g firebase-tools@15.22.1
 
       - name: Write service account credentials to a temp file
         # Single-quoted so the shell treats the substituted JSON as a
