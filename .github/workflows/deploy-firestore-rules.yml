@@ -33,7 +33,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          # firebase-tools@15.22.1 requires Node >=20 — this workflow was
+          # copying the Node 18 version the Netlify functions happen to run
+          # on, which isn't actually relevant here (a separate CLI tool with
+          # its own requirements, not code running in this app itself). 24
+          # matches what GitHub's own runners are already forcing checkout/
+          # setup-node onto in this same job, per the deprecation warning.
+          node-version: '24'
 
       - name: Install Firebase CLI
         # Pinned, not latest — firebase-tools 15.22.2 (published 2026-06-24)
