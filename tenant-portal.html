@@ -603,7 +603,7 @@
 <!-- ===== FIREBASE + APP LOGIC ===== -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-  import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  import { getAuth, onAuthStateChanged, signOut, signInWithCustomToken, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
   import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, arrayUnion, query, where, orderBy, serverTimestamp, Timestamp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
   // ============================================================
@@ -664,10 +664,76 @@
   let stripeInstance = null;
   let stripeElements = null;
 
+  // ===== IMPERSONATION (opened via admin.html's "View As") =====
+  // ?impersonate=1 means this tab was opened specifically to receive a
+  // custom-token handoff from the admin tab that opened it, rather than a
+  // normal visit — see startImpersonation() in admin.html for the other
+  // side of this handshake.
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
+  let _impersonationHandshake = null;
+  if (_isImpersonationTarget) {
+    // Must happen before signInWithCustomToken below — scopes this tab's
+    // session to sessionStorage (this tab only) rather than the default
+    // localStorage, which is shared across every tab on this origin.
+    // Without this, signing in here as the target could silently replace
+    // the super admin's own session in their original admin.html tab.
+    _impersonationHandshake = setPersistence(auth, browserSessionPersistence).then(() => new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        window.removeEventListener('message', onToken);
+        reject(new Error('Did not receive an impersonation session in time. The admin tab that opened this one may have been closed.'));
+      }, 15000);
+      function onToken(event) {
+        if (event.source !== window.opener || event.origin !== window.location.origin) return;
+        if (event.data?.type !== 'impersonation_token') return;
+        clearTimeout(timeoutId);
+        window.removeEventListener('message', onToken);
+        signInWithCustomToken(auth, event.data.token).then(resolve).catch(reject);
+      }
+      window.addEventListener('message', onToken);
+      if (window.opener) window.opener.postMessage({ type: 'impersonation_ready' }, window.location.origin);
+      else { clearTimeout(timeoutId); reject(new Error('This page was not opened from the admin portal — impersonation requires using the "View As" button there.')); }
+    })).catch(err => {
+      alert('Could not start impersonation session: ' + err.message);
+      window.location.href = '/index.html';
+      throw err; // keep the rejection so nothing below tries to proceed
+    });
+  }
+
+  function showImpersonationBanner(byName) {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:sticky;top:0;z-index:9999;background:#7C2D12;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:13px;font-family:inherit;';
+    bar.innerHTML = `<span>🔍 Viewing as this tenant — impersonated by ${byName}. This session is logged.</span>
+      <button id="end-impersonation-btn" style="background:#fff;color:#7C2D12;border:none;padding:4px 12px;border-radius:2px;font-size:12px;font-weight:600;cursor:pointer;">End impersonation</button>`;
+    document.body.prepend(bar);
+    document.getElementById('end-impersonation-btn').onclick = async () => {
+      await signOut(auth);
+      window.close();
+      // Fallback for browsers that block script-initiated window.close()
+      // on tabs they don't consider "opened by script" in every case.
+      window.location.href = '/index.html';
+    };
+  }
+
   // ===== AUTH GUARD =====
   onAuthStateChanged(auth, async user => {
-    if (!user) { window.location.href = '/index.html'; return; }
+    if (!user) {
+      // A legitimately empty, temporary state while the handshake above
+      // is still in flight — that promise has its own explicit redirect
+      // if it ultimately fails, so this listener should just wait rather
+      // than bouncing to the login page on this first, user-less firing.
+      if (_isImpersonationTarget) return;
+      window.location.href = '/index.html'; return;
+    }
     currentUser = user;
+    if (_isImpersonationTarget) {
+      try {
+        const idTokenResult = await user.getIdTokenResult();
+        if (idTokenResult.claims.impersonatedBy) {
+          showImpersonationBanner(idTokenResult.claims.impersonatedByName || idTokenResult.claims.impersonatedByEmail || 'an admin');
+        }
+      } catch (e) { console.warn('Could not read impersonation claims:', e); }
+    }
     await loadTenantData();
   });
 
@@ -899,10 +965,21 @@
   // ===== DOCUMENTS =====
   async function loadDocuments() {
     try {
-      // Load tenant-specific docs
+      // Load tenant-specific docs — both this tenant's own primary
+      // documents, and any additional documents explicitly shared with
+      // them via sharedTenantIds (e.g. a lease co-signed by a second
+      // tenant on the same unit) — merged into one chronological list,
+      // since both are "documents shared with me specifically", just via
+      // two different fields.
       const q1   = query(collection(db,'documents'), where('tenantId','==',currentUser.uid), orderBy('uploadedAt','desc'));
-      const snap1 = await getDocs(q1);
-      renderDocuments(snap1.docs.map(d => ({ id: d.id, ...d.data() })), 'documents-list');
+      const q3   = query(collection(db,'documents'), where('sharedTenantIds','array-contains',currentUser.uid), orderBy('uploadedAt','desc'));
+      const [snap1, snap3] = await Promise.all([getDocs(q1), getDocs(q3)]);
+      const ownDocs = snap1.docs.map(d => ({ id: d.id, ...d.data() }));
+      const sharedDocs = snap3.docs.map(d => ({ id: d.id, ...d.data() }));
+      const seenIds = new Set(ownDocs.map(d => d.id));
+      const combined = [...ownDocs, ...sharedDocs.filter(d => !seenIds.has(d.id))]
+        .sort((a, b) => (b.uploadedAt?.toMillis?.() || 0) - (a.uploadedAt?.toMillis?.() || 0));
+      renderDocuments(combined, 'documents-list');
 
       // Load property-wide docs for tenant's property
       if (currentTenant?.propertyId) {
