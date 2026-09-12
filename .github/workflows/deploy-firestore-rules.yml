@@ -58,4 +58,4 @@ jobs:
         # but there's no reason to leave a service account key sitting on
         # disk for the remainder of this job's run either.
         if: always()
-        run: rm -f "$RUNNER_TEMP/firebase-service-account.json"
+        run: rm -f "$RUNNER_TEMP/firebase-service-account.json" 
