@@ -1528,7 +1528,12 @@
     <div class="grid grid-cols-1 gap-4 mb-4">
       <div><label class="label" data-i18n="documents.nameLabel">Document Name *</label><input type="text" id="doc-edit-name" class="form-input"></div>
       <div><label class="label" data-i18n="common.category">Category</label><select id="doc-edit-category" class="form-input"><option data-i18n="documents.catLease">Lease Agreement</option><option data-i18n="documents.catReceipt">Rent Receipt</option><option data-i18n="documents.catInspection">Move-in Inspection</option><option data-i18n="documents.catNotice">Notice</option><option data-i18n="documents.catRules">Rules &amp; Regulations</option><option data-i18n="documents.catOther">Other</option></select></div>
-      <div><label class="label" data-i18n="documents.visibility">Visibility</label><select id="doc-edit-scope" class="form-input"><option value="tenant" data-i18n="documents.scopeTenant">Tenant Document</option><option value="property" data-i18n="documents.scopeProperty">Property-Wide</option><option value="admin" data-i18n="documents.adminOnlyLock">Admin Only 🔒</option></select></div>
+      <div><label class="label" data-i18n="documents.visibility">Visibility</label><select id="doc-edit-scope" class="form-input" onchange="toggleDocEditSharedTenants()"><option value="tenant" data-i18n="documents.scopeTenant">Tenant Document</option><option value="property" data-i18n="documents.scopeProperty">Property-Wide</option><option value="admin" data-i18n="documents.adminOnlyLock">Admin Only 🔒</option></select></div>
+      <div id="doc-edit-shared-tenants-wrap" class="hidden">
+        <label class="label" data-i18n="documents.alsoShareWithLabel">Also share with these specific tenants</label>
+        <p style="font-size:11px;color:var(--slate);margin:0 0 8px;" data-i18n="documents.alsoShareWithHint">Other tenants on the same property — e.g. a co-signer. Different from Property-Wide, which is every tenant on the property, not a hand-picked subset.</p>
+        <div id="doc-edit-shared-tenants-list" style="max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:2px;padding:8px;display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
     </div>
     <div style="display:flex;gap:10px;">
       <button onclick="saveDocEdit()" class="btn btn-primary" style="flex:1;" data-i18n="tenants.saveChanges">Save Changes</button>
@@ -2348,7 +2353,7 @@
 <!-- FIREBASE + ADMIN LOGIC -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
-  import { getAuth, onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+  import { getAuth, onAuthStateChanged, signOut, signInWithCustomToken, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
   import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, startAfter, limit, serverTimestamp, Timestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
   let _cfg;
@@ -2495,6 +2500,9 @@
       'payments.title':'All Payments', 'payments.searchPlaceholder':'Search tenant or description...',
       'payments.paid':'Paid', 'payments.failed':'Failed', 'payments.recordPayment':'+ Record Payment',
       'documents.uploadTitle':'Upload Document', 'documents.scopeTenant':'Tenant Document',
+      'documents.alsoShareWithLabel':'Also share with these specific tenants',
+      'documents.alsoShareWithHint':'Other tenants on the same property — e.g. a co-signer. Different from Property-Wide, which is every tenant on the property, not a hand-picked subset.',
+      'documents.noOtherTenants':'No other active tenants on this property.',
       'documents.scopeProperty':'Property-Wide', 'documents.scopeAdmin':'🔒 Admin Only',
       'documents.selectTenant':'Select tenant...', 'documents.selectProperty':'Select property...',
       'documents.catLease':'Lease Agreement', 'documents.catReceipt':'Rent Receipt', 'documents.catInspection':'Move-in Inspection',
@@ -2824,6 +2832,7 @@
       'tenants.sendEmail':'Send Email', 'tenants.emailModalTitle':'Send Email', 'tenants.emailSubjectPlaceholder':'e.g. A quick update about your unit',
       'tenants.renewalRequested':'Renewal Requested', 'tenants.renewalRequestedTitle':'This tenant has requested a lease renewal',
       'tenants.acknowledgeRenewal':'Acknowledge', 'tenants.acknowledgeRenewalTitle':'Mark this renewal request as handled',
+      'impersonation.viewAs':'View As', 'impersonation.viewAsTitle':'Sign in as this person to see exactly what they see — logged, super admins only',
       'tenants.emailTabEdit':'✏️ Edit', 'tenants.emailTabPreview':'👁 Preview', 'tenants.clearFormatting':'Clear',
       'tenants.emailFormattingHint':'Select text to bold, italicize, or link it. Check the Preview tab to see exactly what your tenant will receive.',
       'tenants.sendEmailButton':'Send Email', 'tenants.emailToLine':'To: {name} ({email})',
@@ -2833,6 +2842,7 @@
       'tenants.emailSubjectRequired':'Enter a subject line.', 'tenants.emailBodyRequired':'Write a message before sending.',
       'tenants.emailSent':'✓ Email sent to {email}.',
       'audit.adminActionTenantEmailSent':'Sent custom email to tenant',
+      'audit.adminActionImpersonationStarted':'Started viewing as another user',
       'invitations.firstNameEmailRequired':'First name and email are required.', 'invitations.sentTo':'✓ Invitation sent to {email}',
       'invitations.sendInvitation':'Send Invitation', 'invitations.sendLink':'Send Link',
       'invitations.hoursLabel':'{n} hour(s)', 'invitations.daysLabel':'{n} day(s)',
@@ -3091,6 +3101,9 @@
       'payments.title':'Todos los Pagos', 'payments.searchPlaceholder':'Buscar inquilino o descripción...',
       'payments.paid':'Pagado', 'payments.failed':'Fallido', 'payments.recordPayment':'+ Registrar Pago',
       'documents.uploadTitle':'Subir Documento', 'documents.scopeTenant':'Documento de Inquilino',
+      'documents.alsoShareWithLabel':'También compartir con estos inquilinos específicos',
+      'documents.alsoShareWithHint':'Otros inquilinos de la misma propiedad — por ejemplo, un cofirmante. Diferente de Toda la Propiedad, que incluye a todos los inquilinos de la propiedad, no un subconjunto elegido.',
+      'documents.noOtherTenants':'No hay otros inquilinos activos en esta propiedad.',
       'documents.scopeProperty':'Toda la Propiedad', 'documents.scopeAdmin':'🔒 Solo Administrador',
       'documents.selectTenant':'Selecciona inquilino...', 'documents.selectProperty':'Selecciona propiedad...',
       'documents.catLease':'Contrato de Arrendamiento', 'documents.catReceipt':'Recibo de Renta', 'documents.catInspection':'Inspección de Ingreso',
@@ -3420,6 +3433,7 @@
       'tenants.sendEmail':'Enviar Correo', 'tenants.emailModalTitle':'Enviar Correo', 'tenants.emailSubjectPlaceholder':'ej. Una actualización rápida sobre tu unidad',
       'tenants.renewalRequested':'Renovación Solicitada', 'tenants.renewalRequestedTitle':'Este inquilino ha solicitado renovar su contrato',
       'tenants.acknowledgeRenewal':'Confirmar', 'tenants.acknowledgeRenewalTitle':'Marcar esta solicitud de renovación como atendida',
+      'impersonation.viewAs':'Ver Como', 'impersonation.viewAsTitle':'Iniciar sesión como esta persona para ver exactamente lo que ve — registrado, solo administradores super',
       'tenants.emailTabEdit':'✏️ Editar', 'tenants.emailTabPreview':'👁 Vista Previa', 'tenants.clearFormatting':'Limpiar',
       'tenants.emailFormattingHint':'Selecciona texto para ponerlo en negrita, cursiva, o enlazarlo. Revisa la pestaña de Vista Previa para ver exactamente lo que recibirá tu inquilino.',
       'tenants.sendEmailButton':'Enviar Correo', 'tenants.emailToLine':'Para: {name} ({email})',
@@ -3429,6 +3443,7 @@
       'tenants.emailSubjectRequired':'Ingresa una línea de asunto.', 'tenants.emailBodyRequired':'Escribe un mensaje antes de enviar.',
       'tenants.emailSent':'✓ Correo enviado a {email}.',
       'audit.adminActionTenantEmailSent':'Envió correo personalizado al inquilino',
+      'audit.adminActionImpersonationStarted':'Comenzó a ver como otro usuario',
       'invitations.firstNameEmailRequired':'El nombre y el correo son obligatorios.', 'invitations.sentTo':'✓ Invitación enviada a {email}',
       'invitations.sendInvitation':'Enviar Invitación', 'invitations.sendLink':'Enviar Enlace',
       'invitations.hoursLabel':'{n} hora(s)', 'invitations.daysLabel':'{n} día(s)',
@@ -3670,8 +3685,66 @@
     } catch (e) { console.warn('Could not persist language preference:', e); }
   };
 
+  // ===== IMPERSONATION (opened via this same page's "View As", targeting
+  // another admin) — see startImpersonation() and the identical handshake
+  // in tenant-portal.html for the tenant-targeting side of this feature.
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
+  if (_isImpersonationTarget) {
+    // Must happen before signInWithCustomToken below — scopes this tab's
+    // session to sessionStorage (this tab only), so signing in here as
+    // the target admin can't overwrite the super admin's own session in
+    // their original tab, which uses the default, shared localStorage.
+    await setPersistence(auth, browserSessionPersistence).then(() => new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        window.removeEventListener('message', onToken);
+        reject(new Error('Did not receive an impersonation session in time. The admin tab that opened this one may have been closed.'));
+      }, 15000);
+      function onToken(event) {
+        if (event.source !== window.opener || event.origin !== window.location.origin) return;
+        if (event.data?.type !== 'impersonation_token') return;
+        clearTimeout(timeoutId);
+        window.removeEventListener('message', onToken);
+        signInWithCustomToken(auth, event.data.token).then(resolve).catch(reject);
+      }
+      window.addEventListener('message', onToken);
+      if (window.opener) window.opener.postMessage({ type: 'impersonation_ready' }, window.location.origin);
+      else { clearTimeout(timeoutId); reject(new Error('This page was not opened via "View As" — impersonation requires opening it that way.')); }
+    })).catch(err => {
+      alert('Could not start impersonation session: ' + err.message);
+      window.location.href = '/index.html';
+      throw err;
+    });
+  }
+
+  function showImpersonationBanner(byName) {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:sticky;top:0;z-index:9999;background:#7C2D12;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:13px;font-family:inherit;';
+    bar.innerHTML = `<span>🔍 Viewing as this admin — impersonated by ${byName}. This session is logged.</span>
+      <button id="end-impersonation-btn" style="background:#fff;color:#7C2D12;border:none;padding:4px 12px;border-radius:2px;font-size:12px;font-weight:600;cursor:pointer;">End impersonation</button>`;
+    document.body.prepend(bar);
+    document.getElementById('end-impersonation-btn').onclick = async () => {
+      await signOut(auth);
+      window.close();
+      window.location.href = '/index.html';
+    };
+  }
+
   onAuthStateChanged(auth, async user => {
-    if (!user) { window.location.href = '/index.html'; return; }
+    if (!user) {
+      // Legitimately empty during the brief handshake above — that
+      // promise has its own explicit redirect if it ultimately fails.
+      if (_isImpersonationTarget) return;
+      window.location.href = '/index.html'; return;
+    }
+    if (_isImpersonationTarget) {
+      try {
+        const idTokenResult = await user.getIdTokenResult();
+        if (idTokenResult.claims.impersonatedBy) {
+          showImpersonationBanner(idTokenResult.claims.impersonatedByName || idTokenResult.claims.impersonatedByEmail || 'an admin');
+        }
+      } catch (e) { console.warn('Could not read impersonation claims:', e); }
+    }
     const adminRef  = doc(db, 'admins', user.uid);
     const adminSnap = await getDoc(adminRef);
     if (!adminSnap.exists()) { window.location.href = '/index.html'; return; }
@@ -4197,6 +4270,7 @@
             <button onclick="openMoveInPhotosModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('moveOut.moveInPhotosTitle')}">📸 ${t('moveOut.moveInPhotos')}</button>
             ${status === 'active' ? `<button onclick="openMoveOutModal('${tn.id}')" class="btn btn-sm btn-outline" title="${t('moveOut.buttonTitle')}">🚪 ${t('moveOut.button')}</button>` : ''}
             ${tn.renewalRequest?.requested ? `<button onclick="acknowledgeRenewalRequest('${tn.id}')" class="btn btn-sm btn-outline" title="${t('tenants.acknowledgeRenewalTitle')}">✓ ${t('tenants.acknowledgeRenewal')}</button>` : ''}
+            ${!isRestrictedAdmin() && status === 'active' ? `<button onclick="startImpersonation('tenant','${tn.id}','${name.replace(/'/g,"\\'")}')" class="btn btn-sm btn-outline" title="${t('impersonation.viewAsTitle')}">🔍 ${t('impersonation.viewAs')}</button>` : ''}
           </div>
         </td>
       </tr>`;
@@ -5004,6 +5078,57 @@
       });
       await loadTenants();
     } catch(e) { alert('Could not update: ' + e.message); }
+  };
+
+  // ===== IMPERSONATION ("View As") =====
+  // Opens a genuine, signed-in session as the target tenant/admin in a new
+  // tab, so a super admin can see exactly what that person sees — real
+  // session, real Firestore rules enforcement, not a simulated view.
+  //
+  // The custom token is handed to the new tab via postMessage rather than
+  // a URL parameter, since URLs end up in browser history and can be
+  // logged server-side — postMessage never touches either. The listener
+  // below only accepts messages from the exact tab this function itself
+  // opened (checked via event.source), from this same origin (checked via
+  // event.origin) — a message from anywhere else is ignored outright.
+  window.startImpersonation = async (targetType, targetId, targetName) => {
+    if (!confirm(`View the portal as ${targetName}?\n\nThis opens a new tab, fully signed in as this ${targetType}. The action is permanently logged. Use "End impersonation" in that tab when finished.`)) return;
+
+    let token;
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/start-impersonation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ targetType, targetId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not start impersonation.');
+      token = data.token;
+    } catch (e) {
+      alert('Could not start impersonation: ' + e.message);
+      return;
+    }
+
+    const targetUrl = (targetType === 'tenant' ? '/tenant-portal.html' : '/admin.html') + '?impersonate=1';
+    const newWin = window.open(targetUrl, '_blank');
+    if (!newWin) {
+      alert('The new tab was blocked by your browser. Please allow pop-ups for this site and try again.');
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      window.removeEventListener('message', onReady);
+    }, 20000); // generous — covers a slow initial load, not meant to fire in normal use
+
+    function onReady(event) {
+      if (event.source !== newWin || event.origin !== window.location.origin) return;
+      if (event.data?.type !== 'impersonation_ready') return;
+      clearTimeout(timeoutId);
+      window.removeEventListener('message', onReady);
+      newWin.postMessage({ type: 'impersonation_token', token }, window.location.origin);
+    }
+    window.addEventListener('message', onReady);
   };
 
   // ===== MOVE-IN PHOTOS (AB 2801) =====
@@ -5863,7 +5988,24 @@
     document.getElementById('doc-edit-category').value = d.category||'Other';
     document.getElementById('doc-edit-scope').value = d.adminOnly?'admin':d.propertyWide?'property':'tenant';
     document.getElementById('doc-edit-alert').classList.add('hidden');
+    // Other tenants on the same property, excluding this document's own
+    // primary tenant (who already has access via tenantId) and excluding
+    // anyone without an active lease on that unit.
+    const shared = new Set(d.sharedTenantIds || []);
+    const otherTenants = allTenants.filter(t => t.propertyId === d.propertyId && t.id !== d.tenantId && t.status === 'active');
+    const listEl = document.getElementById('doc-edit-shared-tenants-list');
+    listEl.innerHTML = otherTenants.length
+      ? otherTenants.map(t => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+          <input type="checkbox" class="doc-edit-shared-tenant-cb" value="${t.id}" ${shared.has(t.id)?'checked':''} style="width:16px;height:16px;">
+          ${t.firstName} ${t.lastName}
+        </label>`).join('')
+      : `<p style="font-size:12px;color:var(--slate);margin:0;" data-i18n="documents.noOtherTenants">No other active tenants on this property.</p>`;
+    toggleDocEditSharedTenants();
     openModal('doc-edit-modal');
+  };
+  window.toggleDocEditSharedTenants = () => {
+    const scope = document.getElementById('doc-edit-scope').value;
+    document.getElementById('doc-edit-shared-tenants-wrap').classList.toggle('hidden', scope !== 'tenant');
   };
   window.saveDocEdit = async () => {
     const id = document.getElementById('doc-edit-id').value;
@@ -5871,8 +6013,14 @@
     const category = document.getElementById('doc-edit-category').value;
     const scope = document.getElementById('doc-edit-scope').value;
     if (!name) { showAlert('doc-edit-alert','Name is required.'); return; }
+    // Only meaningful for the 'tenant' scope — cleared otherwise so a
+    // document doesn't carry stale sharing from a prior scope it's since
+    // moved out of.
+    const sharedTenantIds = scope === 'tenant'
+      ? [...document.querySelectorAll('.doc-edit-shared-tenant-cb:checked')].map(cb => cb.value)
+      : [];
     try {
-      await updateDoc(doc(db,'documents',id),{name,category,adminOnly:scope==='admin',propertyWide:scope==='property',updatedAt:serverTimestamp()});
+      await updateDoc(doc(db,'documents',id),{name,category,adminOnly:scope==='admin',propertyWide:scope==='property',sharedTenantIds,updatedAt:serverTimestamp()});
       closeModal('doc-edit-modal'); await loadDocuments();
       if (_selectedDocId===id) document.getElementById('admin-doc-title').textContent=name;
     } catch(e) { showAlert('doc-edit-alert','Save failed: '+e.message); }
@@ -6865,7 +7013,7 @@
     property_country_set: 'audit.adminActionPropertyCountrySet', application_status_changed: 'audit.adminActionAppStatusChanged',
     tenant_approved: 'audit.adminActionTenantApproved', admin_invited: 'audit.adminActionAdminInvited', admin_role_updated: 'audit.adminActionRoleUpdated',
     admin_invite_resent: 'audit.adminActionInviteResent', admin_revoked: 'audit.adminActionRevoked', admin_reactivated: 'audit.adminActionReactivated',
-    tenant_email_sent: 'audit.adminActionTenantEmailSent',
+    tenant_email_sent: 'audit.adminActionTenantEmailSent', impersonation_started: 'audit.adminActionImpersonationStarted',
   };
   window.loadAdminAuditLog = async () => {
     if (isRestrictedAdmin()) return; // this specific card stays super_admin-only; rules would reject the query anyway
@@ -9461,6 +9609,7 @@
       if (a.status === 'invited') actions.push(`<button onclick="resendAdminInvite('${a.uid}')" class="btn btn-sm btn-outline">Resend</button>`);
       if (a.status !== 'revoked' && !isSelf) actions.push(`<button onclick="revokeAdminUser('${a.uid}')" class="btn btn-sm btn-danger">Revoke</button>`);
       if (a.status === 'revoked') actions.push(`<button onclick="reactivateAdminUser('${a.uid}')" class="btn btn-sm btn-success">Reactivate</button>`);
+      if (!isRestrictedAdmin() && !isSelf && a.status !== 'revoked') actions.push(`<button onclick="startImpersonation('admin','${a.uid}','${(a.email||a.uid).replace(/'/g,"\\'")}')" class="btn btn-sm btn-outline" title="${t('impersonation.viewAsTitle')}">🔍 ${t('impersonation.viewAs')}</button>`);
       return `<tr>
         <td>${a.email||'—'}${isSelf?' <span style="font-size:10px;color:var(--slate);">(you)</span>':''}</td>
         <td>${roleLabel(a)}</td>
