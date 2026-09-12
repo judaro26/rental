@@ -2371,6 +2371,44 @@
   const auth = getAuth(app);
   const db   = getFirestore(app);
 
+  // ===== IMPERSONATION (opened via this same page's "View As", targeting
+  // another admin) — see startImpersonation() and the identical handshake
+  // in tenant-portal.html for the tenant-targeting side of this feature.
+  //
+  // Positioned immediately after getAuth(app), before anything else —
+  // this matters. getAuth's default persistence is localStorage, shared
+  // across every tab on this origin, and the SDK begins trying to restore
+  // any existing session from it right away. Calling setPersistence here,
+  // first, changes this tab's persistence before that restoration has a
+  // chance to start and silently overwrite a freshly-signed-in
+  // impersonated session with the super admin's own restored one — which
+  // is exactly what happened when this block sat further down the file,
+  // right before onAuthStateChanged, with other code executing first.
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
+  if (_isImpersonationTarget) {
+    await setPersistence(auth, browserSessionPersistence).then(() => new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        window.removeEventListener('message', onToken);
+        reject(new Error('Did not receive an impersonation session in time. The admin tab that opened this one may have been closed.'));
+      }, 15000);
+      function onToken(event) {
+        if (event.source !== window.opener || event.origin !== window.location.origin) return;
+        if (event.data?.type !== 'impersonation_token') return;
+        clearTimeout(timeoutId);
+        window.removeEventListener('message', onToken);
+        signInWithCustomToken(auth, event.data.token).then(resolve).catch(reject);
+      }
+      window.addEventListener('message', onToken);
+      if (window.opener) window.opener.postMessage({ type: 'impersonation_ready' }, window.location.origin);
+      else { clearTimeout(timeoutId); reject(new Error('This page was not opened via "View As" — impersonation requires opening it that way.')); }
+    })).catch(err => {
+      alert('Could not start impersonation session: ' + err.message);
+      window.location.href = '/index.html';
+      throw err;
+    });
+  }
+
   let allTenants = [], allPayments = [], allMaintenance = [], allProperties = [], allDocuments = [],
       allAnnouncements = [], allInvites = [], allSupport = [], allOwnerMessages = [], allInvoices = [], allFinancials = [],
       allVendors = [], allConsents = [], allFeatures = [], allAuditLogs = [], allApplications = [];
@@ -3684,38 +3722,6 @@
       if (CURRENT_ADMIN) await updateDoc(doc(db,'admins',CURRENT_ADMIN.uid), { language: CURRENT_LANG, updatedAt: serverTimestamp() });
     } catch (e) { console.warn('Could not persist language preference:', e); }
   };
-
-  // ===== IMPERSONATION (opened via this same page's "View As", targeting
-  // another admin) — see startImpersonation() and the identical handshake
-  // in tenant-portal.html for the tenant-targeting side of this feature.
-  const _urlParams = new URLSearchParams(window.location.search);
-  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
-  if (_isImpersonationTarget) {
-    // Must happen before signInWithCustomToken below — scopes this tab's
-    // session to sessionStorage (this tab only), so signing in here as
-    // the target admin can't overwrite the super admin's own session in
-    // their original tab, which uses the default, shared localStorage.
-    await setPersistence(auth, browserSessionPersistence).then(() => new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        window.removeEventListener('message', onToken);
-        reject(new Error('Did not receive an impersonation session in time. The admin tab that opened this one may have been closed.'));
-      }, 15000);
-      function onToken(event) {
-        if (event.source !== window.opener || event.origin !== window.location.origin) return;
-        if (event.data?.type !== 'impersonation_token') return;
-        clearTimeout(timeoutId);
-        window.removeEventListener('message', onToken);
-        signInWithCustomToken(auth, event.data.token).then(resolve).catch(reject);
-      }
-      window.addEventListener('message', onToken);
-      if (window.opener) window.opener.postMessage({ type: 'impersonation_ready' }, window.location.origin);
-      else { clearTimeout(timeoutId); reject(new Error('This page was not opened via "View As" — impersonation requires opening it that way.')); }
-    })).catch(err => {
-      alert('Could not start impersonation session: ' + err.message);
-      window.location.href = '/index.html';
-      throw err;
-    });
-  }
 
   function showImpersonationBanner(byName) {
     const bar = document.createElement('div');
