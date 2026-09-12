@@ -51,11 +51,20 @@ jobs:
       - name: Deploy Firestore rules
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
-        run: firebase deploy --only firestore:rules
+        # --project is passed explicitly rather than relying on
+        # .firebaserc's "default" alias — that file has already been
+        # uploaded once without its required leading dot (as `firebaserc`
+        # instead of `.firebaserc`), which is invisible to the Firebase
+        # CLI and produces exactly the "No currently active project"
+        # error this flag sidesteps entirely. .firebaserc is still useful
+        # for anyone running the deploy command by hand from their own
+        # machine, but this workflow no longer depends on it existing or
+        # being named correctly.
+        run: firebase deploy --only firestore:rules --project rental-a0793
 
       - name: Clean up credentials file
         # Belt-and-suspenders — $RUNNER_TEMP is already wiped between jobs,
         # but there's no reason to leave a service account key sitting on
         # disk for the remainder of this job's run either.
         if: always()
-        run: rm -f "$RUNNER_TEMP/firebase-service-account.json" 
+        run: rm -f "$RUNNER_TEMP/firebase-service-account.json"
