@@ -1,0 +1,61 @@
+name: Deploy Firestore Rules
+
+# Runs only when firestore.rules (or its own Firebase config) actually
+# changes — not on every push — since re-deploying identical rules on
+# every unrelated commit would be pure noise. This is intentionally
+# separate from verify.yml: that one checks code quality on every push;
+# this one deploys a live security artifact, and only when it changes.
+#
+# This exists because committing firestore.rules to GitHub does NOT, by
+# itself, make it the live rules Firebase enforces — Netlify's build
+# process has no concept of Firestore rules at all, and until this
+# workflow existed, getting a rules change from "committed" to "actually
+# protecting the database" was a separate, easy-to-forget manual step
+# (`firebase deploy --only firestore:rules`, run by hand from someone's
+# own machine).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firestore.rules'
+      - 'firebase.json'
+      - '.firebaserc'
+      - '.github/workflows/deploy-firestore-rules.yml'
+
+jobs:
+  deploy-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Write service account credentials to a temp file
+        # Single-quoted so the shell treats the substituted JSON as a
+        # single literal string — GitHub Actions expands ${{ secrets.X }}
+        # before the shell ever sees this line, so this is safe as long as
+        # the JSON itself contains no literal single-quote characters,
+        # which a standard Firebase service account key never does (JSON
+        # strings use double quotes). $RUNNER_TEMP is GitHub's own
+        # per-job temp directory, wiped when the job ends.
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-service-account.json"
+
+      - name: Deploy Firestore rules
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+        run: firebase deploy --only firestore:rules
+
+      - name: Clean up credentials file
+        # Belt-and-suspenders — $RUNNER_TEMP is already wiped between jobs,
+        # but there's no reason to leave a service account key sitting on
+        # disk for the remainder of this job's run either.
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-service-account.json"
