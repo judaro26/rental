@@ -64,6 +64,41 @@ jobs:
         # per-job temp directory, wiped when the job ends.
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/firebase-service-account.json"
 
+      - name: Validate service account credentials (without exposing them)
+        # Added after pinning firebase-tools to a confirmed-working version
+        # didn't resolve "Failed to authenticate" — narrows down the actual
+        # cause instead of guessing again. Checks file size, that it's valid
+        # JSON, and that it's actually a service_account key, all without
+        # ever printing the credential's real values (only its project_id
+        # and client_email, which aren't secret — every service account's
+        # public identity, visible to anyone with read access on the key).
+        run: |
+          file="$RUNNER_TEMP/firebase-service-account.json"
+          size=$(wc -c < "$file" | tr -d ' ')
+          echo "Credential file size: $size bytes"
+          if [ "$size" -lt 50 ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT appears empty or missing (only $size bytes written) — confirm the secret is actually set under Settings -> Secrets and variables -> Actions, with that exact name."
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/validate-creds.mjs" << 'SCRIPTEOF'
+          import { readFileSync } from 'fs';
+          const path = process.argv[2];
+          let data;
+          try {
+            data = JSON.parse(readFileSync(path, 'utf8'));
+          } catch (err) {
+            console.error('::error::FIREBASE_SERVICE_ACCOUNT is not valid JSON: ' + err.message);
+            process.exit(1);
+          }
+          if (data.type !== 'service_account') {
+            console.error('::error::Expected a service account key (type service_account), got type: ' + JSON.stringify(data.type));
+            process.exit(1);
+          }
+          console.log('Looks structurally valid. project_id in the key file is: ' + data.project_id);
+          console.log('client_email is: ' + data.client_email);
+          SCRIPTEOF
+          node "$RUNNER_TEMP/validate-creds.mjs" "$file"
+
       - name: Deploy Firestore rules
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
