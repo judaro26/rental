@@ -629,6 +629,51 @@
   const auth = getAuth(app);
   const db   = getFirestore(app);
 
+  // ===== IMPERSONATION (opened via admin.html's "View As") =====
+  // ?impersonate=1 means this tab was opened specifically to receive a
+  // custom-token handoff from the admin tab that opened it, rather than a
+  // normal visit — see startImpersonation() in admin.html for the other
+  // side of this handshake.
+  //
+  // Positioned immediately after getAuth(app), before any other code —
+  // this matters. getAuth's default persistence is localStorage, shared
+  // across every tab on this origin, and the SDK begins trying to restore
+  // any existing session from it right away. If several other awaited
+  // operations (the site-name fetch, PublicI18N.init, the theme/flags
+  // fetch, all of which used to sit between getAuth and this block) ran
+  // first, that restoration had time to complete and silently overwrite
+  // this tab's freshly-signed-in impersonated session with the super
+  // admin's own — which is exactly what caused the tenant portal to show
+  // correctly for a moment, then bounce back to the admin's own account
+  // (and from there, index.html's own "already signed in as an admin"
+  // check sent it on to /admin.html, which is what that looked like).
+  // Calling setPersistence here, first, changes this tab's persistence
+  // before that restoration has a chance to start.
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
+  if (_isImpersonationTarget) {
+    await setPersistence(auth, browserSessionPersistence).then(() => new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        window.removeEventListener('message', onToken);
+        reject(new Error('Did not receive an impersonation session in time. The admin tab that opened this one may have been closed.'));
+      }, 15000);
+      function onToken(event) {
+        if (event.source !== window.opener || event.origin !== window.location.origin) return;
+        if (event.data?.type !== 'impersonation_token') return;
+        clearTimeout(timeoutId);
+        window.removeEventListener('message', onToken);
+        signInWithCustomToken(auth, event.data.token).then(resolve).catch(reject);
+      }
+      window.addEventListener('message', onToken);
+      if (window.opener) window.opener.postMessage({ type: 'impersonation_ready' }, window.location.origin);
+      else { clearTimeout(timeoutId); reject(new Error('This page was not opened from the admin portal — impersonation requires using the "View As" button there.')); }
+    })).catch(err => {
+      alert('Could not start impersonation session: ' + err.message);
+      window.location.href = '/index.html';
+      throw err; // keep the rejection so nothing below tries to proceed
+    });
+  }
+
   document.getElementById('sidebar-brand').textContent = SITE_NAME;
   // Load site name from Firestore settings
   try {
@@ -663,42 +708,6 @@
   let currentTenant = null; // alias kept in sync with tenantData for readability
   let stripeInstance = null;
   let stripeElements = null;
-
-  // ===== IMPERSONATION (opened via admin.html's "View As") =====
-  // ?impersonate=1 means this tab was opened specifically to receive a
-  // custom-token handoff from the admin tab that opened it, rather than a
-  // normal visit — see startImpersonation() in admin.html for the other
-  // side of this handshake.
-  const _urlParams = new URLSearchParams(window.location.search);
-  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
-  let _impersonationHandshake = null;
-  if (_isImpersonationTarget) {
-    // Must happen before signInWithCustomToken below — scopes this tab's
-    // session to sessionStorage (this tab only) rather than the default
-    // localStorage, which is shared across every tab on this origin.
-    // Without this, signing in here as the target could silently replace
-    // the super admin's own session in their original admin.html tab.
-    _impersonationHandshake = setPersistence(auth, browserSessionPersistence).then(() => new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        window.removeEventListener('message', onToken);
-        reject(new Error('Did not receive an impersonation session in time. The admin tab that opened this one may have been closed.'));
-      }, 15000);
-      function onToken(event) {
-        if (event.source !== window.opener || event.origin !== window.location.origin) return;
-        if (event.data?.type !== 'impersonation_token') return;
-        clearTimeout(timeoutId);
-        window.removeEventListener('message', onToken);
-        signInWithCustomToken(auth, event.data.token).then(resolve).catch(reject);
-      }
-      window.addEventListener('message', onToken);
-      if (window.opener) window.opener.postMessage({ type: 'impersonation_ready' }, window.location.origin);
-      else { clearTimeout(timeoutId); reject(new Error('This page was not opened from the admin portal — impersonation requires using the "View As" button there.')); }
-    })).catch(err => {
-      alert('Could not start impersonation session: ' + err.message);
-      window.location.href = '/index.html';
-      throw err; // keep the rejection so nothing below tries to proceed
-    });
-  }
 
   function showImpersonationBanner(byName) {
     const bar = document.createElement('div');
