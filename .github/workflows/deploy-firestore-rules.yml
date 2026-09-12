@@ -83,11 +83,19 @@ jobs:
           cat > "$RUNNER_TEMP/validate-creds.mjs" << 'SCRIPTEOF'
           import { readFileSync } from 'fs';
           const path = process.argv[2];
+          const raw = readFileSync(path, 'utf8');
           let data;
           try {
-            data = JSON.parse(readFileSync(path, 'utf8'));
+            data = JSON.parse(raw);
           } catch (err) {
             console.error('::error::FIREBASE_SERVICE_ACCOUNT is not valid JSON: ' + err.message);
+            // Structure only, never content — line lengths are enough to
+            // pinpoint what shape the problem has (e.g. a long first line
+            // followed by unexpected short ones) without ever printing the
+            // credential's actual values.
+            const lines = raw.split('\n');
+            console.error('Total lines in secret value: ' + lines.length);
+            lines.forEach((line, i) => console.error(`  Line ${i + 1}: ${line.length} chars`));
             process.exit(1);
           }
           if (data.type !== 'service_account') {
