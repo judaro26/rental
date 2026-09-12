@@ -1,0 +1,332 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper: check if current user is an admin ──────────────────────────
+    // Requires the admin not be revoked, so disabling someone in the Admin
+    // Users tab actually cuts off Firestore access, not just sign-in.
+    function callerAdmin() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+    }
+    function isAdmin() {
+      return request.auth != null
+          && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+          && (!('status' in callerAdmin()) || callerAdmin().status != 'revoked');
+    }
+
+    // ── Role helpers for country-scoped admins ──────────────────────────────
+    // Uses 'key in map' + direct field access instead of Map.get(key,default)
+    // — the same pattern already proven working in the admins bootstrap rule
+    // below, rather than a differently-shaped call.
+    // A doc with no `role` field (every admin doc that existed before this
+    // feature) is treated as super_admin — preserves, doesn't expand, what
+    // that doc already meant.
+    function isSuperAdmin() {
+      return isAdmin() && (!('role' in callerAdmin()) || callerAdmin().role == 'super_admin');
+    }
+    function isRestrictedAdmin() {
+      return isAdmin() && ('role' in callerAdmin()) && callerAdmin().role == 'restricted_admin';
+    }
+    function getAllowedCountry() {
+      return ('allowedCountry' in callerAdmin()) ? callerAdmin().allowedCountry : null;
+    }
+
+    // ── Properties ────────────────────────────────────────────────────────
+    match /properties/{propId} {
+      allow read: if true;
+      allow create: if isSuperAdmin()
+        || (isRestrictedAdmin() && request.resource.data.country == getAllowedCountry());
+      allow update: if isSuperAdmin()
+        || (isRestrictedAdmin()
+            && resource.data.country == getAllowedCountry()
+            && request.resource.data.country == getAllowedCountry());
+      allow delete: if isSuperAdmin()
+        || (isRestrictedAdmin() && resource.data.country == getAllowedCountry());
+    }
+
+    // ── Tenants ───────────────────────────────────────────────────────────
+    match /tenants/{tenantId} {
+      allow read:   if request.auth.uid == tenantId || isAdmin();
+      allow create: if request.auth.uid == tenantId;
+      allow update: if isAdmin()
+                    || (request.auth.uid == tenantId
+                        && !request.resource.data.diff(resource.data)
+                              .affectedKeys()
+                              .hasAny(['monthlyRent','leaseStart','leaseEnd','propertyId','propertyName'])
+                        && (
+                          request.resource.data.status == resource.data.status
+                          || (resource.data.status == 'invited' && request.resource.data.status == 'active')
+                        ));
+      allow delete: if isAdmin();
+    }
+
+    // ── Payments ──────────────────────────────────────────────────────────
+    match /payments/{paymentId} {
+      allow read:   if request.auth != null
+                    && (resource.data.tenantId == request.auth.uid || isAdmin());
+      allow write:  if isAdmin();
+    }
+
+    // ── Documents ─────────────────────────────────────────────────────────
+    match /documents/{docId} {
+      allow read: if request.auth != null && (
+        isAdmin() ||
+        resource.data.tenantId == request.auth.uid ||
+        resource.data.propertyWide == true
+      );
+      allow write: if isAdmin();
+    }
+
+    // ── Maintenance Requests ──────────────────────────────────────────────
+    match /maintenanceRequests/{reqId} {
+      allow read:   if request.auth != null
+                    && (resource.data.tenantId == request.auth.uid || isAdmin());
+      allow create: if request.auth != null
+                    && request.resource.data.tenantId == request.auth.uid;
+      allow update: if isAdmin()
+                    || (request.auth != null
+                        && resource.data.tenantId == request.auth.uid
+                        && request.resource.data.diff(resource.data)
+                              .affectedKeys()
+                              .hasOnly(['comments','updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    // ── Admins ────────────────────────────────────────────────────────────
+    match /admins/{adminId} {
+      allow read: if request.auth != null && (request.auth.uid == adminId || isSuperAdmin());
+
+      // One-time bootstrap: a pre-existing admin doc with no `role` field
+      // yet, OR a role value that isn't one of the two recognized enum
+      // members (e.g. a manual edit like "admin" instead of "super_admin"),
+      // may set itself to super_admin, own doc only. A genuine
+      // restricted_admin can never reach this branch, since 'restricted_admin'
+      // IS a recognized value — so this can't be used to self-escalate.
+      allow update: if request.auth.uid == adminId
+        && (!('role' in resource.data)
+            || (resource.data.role != 'super_admin' && resource.data.role != 'restricted_admin'))
+        && request.resource.data.role == 'super_admin'
+        && request.resource.data.allowedCountry == null;
+
+      // Self-service preferences only (language, dashboard layout) — cannot
+      // touch role, allowedCountry, or status. dashboardLayout is exactly
+      // the same kind of thing as language: a personal UI preference, never
+      // consulted by any authorization check anywhere in this app.
+      allow update: if request.auth.uid == adminId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['language', 'dashboardLayout', 'updatedAt']);
+
+      // First-login activation: invited → active, touching only status +
+      // activatedAt. Mirrors the equivalent tenant activation rule above.
+      // Missing this was the bug — admin.html tries this write on every
+      // brand-new admin's first login, and with no rule permitting it, it
+      // was thrown as an uncaught error that broke the rest of the page load.
+      allow update: if request.auth.uid == adminId
+        && ('status' in resource.data && resource.data.status == 'invited')
+        && request.resource.data.status == 'active'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'activatedAt']);
+    }
+
+    // ── Admin Invite Tokens ──────────────────────────────────────────────────
+    match /adminInviteTokens/{tokenId} {
+      allow read, write: if false;
+    }
+
+    // ── Cookie Consent Log ──────────────────────────────────────────────────
+    // Entirely server-managed (record-cookie-consent.js via the Admin
+    // SDK). No client ever needs to read or write these directly.
+    match /cookieConsents/{id} {
+      allow read, write: if false;
+    }
+
+    // ── Admin Activity Audit Log ─────────────────────────────────────────────
+    // Written by log-admin-action.js (Admin SDK, identity verified via
+    // ID token — never trusts a client-asserted admin identity). Read
+    // restricted to Super Admin, matching the existing (tenant) auditLogs
+    // pattern and the Audit Log tab being hidden entirely from Restricted
+    // Admins in admin.html.
+    match /adminAuditLogs/{id} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
+    // ── Integration Secrets (email/storage provider credentials) ────────────
+    // Deliberately allow read, write: if false — with ZERO exceptions,
+    // unlike every other collection in this file. The only way in or out is
+    // manage-integrations.js (Admin SDK, independently re-verifies Super
+    // Admin via ID token on every call). The client never reads this
+    // collection directly, not even to display current values — the admin
+    // UI only ever receives a masked status (provider name, last-4 of a
+    // key, last-updated time), never the actual secret. This is the
+    // trade-off explicitly chosen in place of environment variables: given
+    // that, this is the narrowest surface I can give it.
+    match /integrationSecrets/{id} {
+      allow read, write: if false;
+    }
+
+    // ── Property Payment Processor Secrets (Bold, etc.) ──────────────────────
+    // Also a hard `false` — same reasoning as integrationSecrets above.
+    // This one is property-scoped (a restricted admin manages only their
+    // own properties' credentials), but that scoping check happens inside
+    // manage-property-payments.js (Admin SDK looks up the caller's own role
+    // AND the target property's country, server-side) rather than as a
+    // Firestore rule — deliberately, since `properties` itself is publicly
+    // readable and these are real secrets, they can never live as a
+    // property field the way non-secret per-property config does.
+    match /propertyPaymentSecrets/{propertyId} {
+      allow read, write: if false;
+    }
+
+    // ── Announcements ─────────────────────────────────────────────────────
+    match /announcements/{announcementId} {
+      allow read:  if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ── Audit Logs ────────────────────────────────────────────────────────────
+    match /auditLogs/{logId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
+    // ── Rate Limiting ─────────────────────────────────────────────────────────
+    // Internal bookkeeping for _lib/rate-limit.js only — read and written
+    // exclusively via the Admin SDK, which bypasses these rules entirely.
+    // No client, including an admin, has any legitimate reason to read or
+    // write this data directly.
+    match /rateLimits/{docId} {
+      allow read:  if false;
+      allow write: if false;
+    }
+
+    // ── Payment Consents ─────────────────────────────────────────────────────
+    // CHANGED: create tightened from `if request.auth != null` to `if false`.
+    // Confirmed by reading record-consent.js directly: the only path that
+    // creates one of these goes through that function via the Admin SDK,
+    // which bypasses this rule regardless of what it says — and that
+    // function previously had no auth check of its own either, so this
+    // was a real, exploitable gap (a signed-in tenant could create a
+    // consent record — a legally-worded payment authorization — for a
+    // different tenant's UID directly via the client SDK). Fixed on both
+    // ends: record-consent.js now verifies the caller's ID token and
+    // requires it match the tenantId being recorded (or an admin acting on
+    // their behalf), and this rule closes the same door at the database
+    // level, since nothing legitimate ever needed it open.
+    match /paymentConsents/{id} {
+      allow read:   if isAdmin() || (request.auth != null && resource.data.tenantId == request.auth.uid);
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Feature Requests ──────────────────────────────────────────────────────
+    // CHANGED: create tightened from `if request.auth != null` to `if false`.
+    // Confirmed by reading submit-feature-request.js directly: creation goes
+    // through that function via the Admin SDK, bypassing this rule
+    // regardless of what it says. That function previously had no auth
+    // check either (fixed separately), so this was open to the same kind
+    // of tenantId-spoofing/email-relay abuse as paymentConsents was.
+    match /featureRequests/{id} {
+      allow read:   if request.auth != null && (isAdmin() || resource.data.tenantId == request.auth.uid);
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Financials ────────────────────────────────────────────────────────────
+    match /financials/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── Vendors ───────────────────────────────────────────────────────────────
+    match /vendors/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── Site Settings ──────────────────────────────────────────────────────
+    match /settings/{settingId} {
+      allow read:  if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // ── Support Messages ──────────────────────────────────────────────────────
+    // CHANGED: create tightened from `if request.auth != null` to `if false`.
+    // Confirmed by reading send-support.js directly: creation goes through
+    // that function via the Admin SDK, bypassing this rule regardless of
+    // what it says. That function previously had no auth check either
+    // (fixed separately, along with making tenantId actually required —
+    // it wasn't even that before), so this was open to the same kind of
+    // abuse as the other two collections in this batch.
+    match /supportMessages/{msgId} {
+      allow read:   if request.auth != null
+                    && (resource.data.tenantId == request.auth.uid || isAdmin());
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Owner Messages ────────────────────────────────────────────────────────
+    // Created exclusively by send-owner-message.js via the Admin SDK, same
+    // pattern as supportMessages above — client-side create is disabled,
+    // and an owner can only ever read their own messages back.
+    match /ownerMessages/{msgId} {
+      allow read:   if request.auth != null
+                    && (resource.data.ownerId == request.auth.uid || isAdmin());
+      allow create: if false;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Invoices & Receipts ───────────────────────────────────────────────────
+    match /invoices/{invoiceId} {
+      allow read:  if request.auth != null && (
+        isAdmin() || resource.data.tenantId == request.auth.uid
+      );
+      allow write: if isAdmin();
+    }
+
+    // ── Move-Out & Deposit Return ─────────────────────────────────────────────
+    // Written exclusively by generate-moveout-statement.js via the Admin SDK
+    // (which bypasses these rules entirely) — `allow write: if isAdmin()` here
+    // only covers a hypothetical direct client-side admin write, not the
+    // normal path. The statement itself is emailed to the tenant with its own
+    // unguessable link (see view-moveout-statement.js), so portal read access
+    // is a convenience, not the primary way this ever reaches them.
+    match /moveOuts/{moveOutId} {
+      allow read:  if request.auth != null && (
+        isAdmin() || resource.data.tenantId == request.auth.uid
+      );
+      allow write: if isAdmin();
+    }
+
+    // ── Applications ───────────────────────────────────────────────────
+    // CHANGED: create tightened from `if true` to `if false`. The only
+    // legitimate path that creates one is submit-application.js via the
+    // Admin SDK, which bypasses these rules entirely regardless of what
+    // this says — confirmed there's no client-side addDoc/setDoc to this
+    // collection anywhere in admin.html or apply.html that would need
+    // this open. Left as `if true`, anyone can currently write directly
+    // into this collection via the Firestore client SDK using the public
+    // Firebase config — bypassing apply.html, its honeypot, and every
+    // validation submit-application.js does — which is a real, exploitable
+    // gap for a collection holding applicant PII.
+    match /applications/{docId} {
+      allow read, update: if isAdmin();
+      allow create: if false;
+      allow delete: if false;
+    }
+
+    // ── audit log ───────────────────────────────────────────────────
+    match /applicationAuditLog/{docId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ── Invitations ────────────────────────────────────────────────────────────
+    match /invites/{inviteId} {
+      allow read:   if request.auth != null;
+      allow create: if isAdmin();
+      allow update: if request.auth != null;
+      allow delete: if isAdmin();
+    }
+  }
+}
