@@ -339,6 +339,19 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Chat Messages (two-way SMS/WhatsApp) ─────────────────────────────────
+    // Creates/full writes are admin-only via the Admin SDK — see the
+    // functions named in the comment on that rule below. The one
+    // exception: an admin can mark a message read directly from the
+    // client, since that's purely a per-admin viewing-state flag, not
+    // conversation content, and doesn't need a round trip through a
+    // dedicated function the way an actual send does.
+    match /chatMessages/{msgId} {
+      allow read: if isAdmin();
+      allow update: if isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
+    }
+
     // ── Invitations ────────────────────────────────────────────────────────────
     match /invites/{inviteId} {
       allow read:   if request.auth != null;
