@@ -156,6 +156,11 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       <span data-i18n="nav.support">Support</span>
     </button>
+    <button id="nav-chat-btn" class="nav-item" onclick="switchSection('chat',this)" style="position:relative;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      <span data-i18n="nav.chat">Chat</span>
+      <span id="chat-unread-badge" class="hidden" style="position:absolute;right:14px;background:#DC2626;color:#fff;font-size:10px;font-weight:600;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;">0</span>
+    </button>
     <button class="nav-item" onclick="switchSection('consents',this)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       <span data-i18n="nav.consents">Consents</span>
@@ -716,6 +721,45 @@
             <thead><tr><th data-i18n="common.date">Date</th><th data-i18n="support.colOwner">Owner</th><th data-i18n="common.property">Property</th><th data-i18n="support.colSubject">Subject</th><th data-i18n="common.description">Message</th><th data-i18n="common.status">Status</th><th data-i18n="common.actions">Actions</th></tr></thead>
             <tbody id="owner-messages-tbody"><tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;" data-i18n="common.loading">Loading...</td></tr></tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHAT (two-way SMS/WhatsApp) -->
+    <section id="section-chat" class="section">
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:280px 1fr;min-height:520px;">
+          <div style="border-right:1px solid var(--border);display:flex;flex-direction:column;">
+            <div style="padding:14px 16px;border-bottom:1px solid var(--border);">
+              <h3 style="font-size:1rem;font-weight:500;margin:0;" data-i18n="chat.title">💬 Chat</h3>
+            </div>
+            <div id="chat-conversation-list" style="flex:1;overflow-y:auto;">
+              <p style="padding:16px;font-size:13px;color:var(--slate);" data-i18n="common.loading">Loading...</p>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;">
+            <div id="chat-thread-empty" style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--slate);font-size:13px;">
+              <span data-i18n="chat.selectConversation">Select a conversation to view messages.</span>
+            </div>
+            <div id="chat-thread-active" class="hidden" style="display:none;flex-direction:column;flex:1;">
+              <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                  <div id="chat-thread-name" style="font-weight:500;font-size:14px;"></div>
+                  <div id="chat-thread-phone" style="font-size:11px;color:var(--slate);"></div>
+                </div>
+              </div>
+              <div id="chat-thread-messages" style="flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;max-height:400px;"></div>
+              <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:flex-end;">
+                <select id="chat-send-channel" class="form-input" style="width:120px;flex-shrink:0;">
+                  <option value="sms" data-i18n="chat.channelSms">SMS</option>
+                  <option value="whatsapp" data-i18n="chat.channelWhatsapp">WhatsApp</option>
+                </select>
+                <textarea id="chat-send-body" class="form-input" rows="1" style="flex:1;resize:none;" data-i18n-placeholder="chat.messagePlaceholder" placeholder="Type a message..."></textarea>
+                <button onclick="sendChatMessage()" class="btn btn-primary" id="chat-send-btn" data-i18n="chat.send">Send</button>
+              </div>
+              <div id="chat-send-alert" class="hidden alert" style="margin:0 16px 12px;"></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -2354,7 +2398,7 @@
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
   import { getAuth, onAuthStateChanged, signOut, signInWithCustomToken, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
-  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, startAfter, limit, serverTimestamp, Timestamp, writeBatch } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+  import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, startAfter, limit, serverTimestamp, Timestamp, writeBatch, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
   let _cfg;
   try {
@@ -2426,7 +2470,10 @@
 
   let allTenants = [], allPayments = [], allMaintenance = [], allProperties = [], allDocuments = [],
       allAnnouncements = [], allInvites = [], allSupport = [], allOwnerMessages = [], allInvoices = [], allFinancials = [],
-      allVendors = [], allConsents = [], allFeatures = [], allAuditLogs = [], allApplications = [];
+      allVendors = [], allConsents = [], allFeatures = [], allAuditLogs = [], allApplications = [], allChatMessages = [];
+  let chatListenerUnsubscribe = null, activeChatTenantId = null;
+  let _chatListenerFirstSnapshot = true;
+  const _originalPageTitle = document.title;
 
   // ===== ROLE / COUNTRY SCOPE =====
   // CURRENT_ADMIN.role is 'super_admin' (full access) or 'restricted_admin'
@@ -2503,7 +2550,12 @@
       'nav.dashboard':'Dashboard', 'nav.properties':'Properties', 'nav.tenants':'Tenants',
       'nav.applications':'Applications', 'nav.invitations':'Invitations', 'nav.payments':'Payments',
       'nav.documents':'Documents', 'nav.maintenance':'Maintenance', 'nav.announcements':'Announcements',
-      'nav.invoices':'Invoices', 'nav.audit':'Audit Log', 'nav.support':'Support', 'nav.consents':'Consents',
+      'nav.invoices':'Invoices', 'nav.audit':'Audit Log', 'nav.support':'Support', 'nav.chat':'Chat', 'nav.consents':'Consents',
+      'chat.title':'💬 Chat', 'chat.selectConversation':'Select a conversation to view messages.',
+      'chat.noConversations':'No conversations yet — replies to SMS or WhatsApp messages will show up here.',
+      'chat.unknownNumber':'Unknown number', 'chat.channelSms':'SMS', 'chat.channelWhatsapp':'WhatsApp',
+      'chat.messagePlaceholder':'Type a message...', 'chat.noTenantMatchHint':'This number does not match a tenant on file — replying is not available.',
+      'chat.send':'Send', 'chat.sending':'Sending...',
       'nav.features':'Feature Requests', 'nav.financials':'Financials', 'nav.vendors':'Vendors',
       'nav.settings':'Settings', 'nav.adminUsers':'Admin Users', 'nav.pagebuilder':'Page Builder',
       'dashboard.properties':'Properties', 'dashboard.activeTenants':'Active Tenants',
@@ -3104,7 +3156,12 @@
       'nav.dashboard':'Panel', 'nav.properties':'Propiedades', 'nav.tenants':'Inquilinos',
       'nav.applications':'Solicitudes', 'nav.invitations':'Invitaciones', 'nav.payments':'Pagos',
       'nav.documents':'Documentos', 'nav.maintenance':'Mantenimiento', 'nav.announcements':'Anuncios',
-      'nav.invoices':'Facturas', 'nav.audit':'Registro de Auditoría', 'nav.support':'Soporte', 'nav.consents':'Consentimientos',
+      'nav.invoices':'Facturas', 'nav.audit':'Registro de Auditoría', 'nav.support':'Soporte', 'nav.chat':'Chat', 'nav.consents':'Consentimientos',
+      'chat.title':'💬 Chat', 'chat.selectConversation':'Seleccione una conversación para ver los mensajes.',
+      'chat.noConversations':'Aún no hay conversaciones — las respuestas por SMS o WhatsApp aparecerán aquí.',
+      'chat.unknownNumber':'Número desconocido', 'chat.channelSms':'SMS', 'chat.channelWhatsapp':'WhatsApp',
+      'chat.messagePlaceholder':'Escriba un mensaje...', 'chat.noTenantMatchHint':'Este número no coincide con ningún inquilino registrado — no se puede responder.',
+      'chat.send':'Enviar', 'chat.sending':'Enviando...',
       'nav.features':'Solicitudes de Funciones', 'nav.financials':'Finanzas', 'nav.vendors':'Proveedores',
       'nav.settings':'Configuración', 'nav.adminUsers':'Usuarios Admin', 'nav.pagebuilder':'Constructor de Páginas',
       'dashboard.properties':'Propiedades', 'dashboard.activeTenants':'Inquilinos Activos',
@@ -3834,6 +3891,7 @@
       loadAnnouncements(), loadSettings(), loadInvites(), loadSupport(), loadOwnerMessages(), loadInvoices(),
       loadFinancials(), loadVendors(), loadConsents(), loadFeatures(), loadInvoiceReminders(), loadDisclosures()]);
     if (!isRestrictedAdmin()) await loadAdmins();
+    setupChatListener();
     updateDashboardStats();
   }
 
@@ -7113,6 +7171,197 @@
     a.href=url; a.download=`audit-log-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url);
   };
 
+  // ===== CHAT (two-way SMS/WhatsApp) =====
+  function setupChatListener() {
+    if (chatListenerUnsubscribe) return; // already set up — loadAll can run more than once in a session (e.g. after certain refresh flows), this shouldn't double-subscribe
+    // Also requests browser notification permission, if not already
+    // decided — done here (page load) rather than deferred to first use,
+    // since Chat's own unread badge already needs to be live from login,
+    // per the original ask for this feature. Browsers vary on whether a
+    // non-gesture-triggered request like this is honored or silently
+    // ignored; if ignored, the tab title + in-app badge still work
+    // regardless, so this is a pure addition, not something else depends on.
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+    const q = query(collection(db,'chatMessages'), orderBy('createdAt','desc'));
+    chatListenerUnsubscribe = onSnapshot(q, snap => {
+      allChatMessages = scopeByCountryViaTenant(snap.docs.map(d => ({ id:d.id, ...d.data() })));
+      renderChatConversationList();
+      updateChatUnreadBadge();
+      if (activeChatTenantId) renderChatThread(activeChatTenantId);
+
+      // docChanges() reports exactly what changed in *this* update, not
+      // the full result set — the correct way to tell "a message that
+      // just arrived" apart from "the listener re-delivering everything
+      // it already knew about" (which happens on every reconnect, not
+      // just the very first load). The isFirstSnapshot skip below still
+      // matters on top of this: the very first snapshot reports every
+      // existing message as "added" too, since nothing was known before it.
+      if (!_chatListenerFirstSnapshot) {
+        snap.docChanges().forEach(change => {
+          if (change.type !== 'added') return;
+          const m = { id: change.doc.id, ...change.doc.data() };
+          if (m.direction === 'inbound') notifyNewChatMessage(m);
+        });
+      }
+      _chatListenerFirstSnapshot = false;
+    }, err => console.error('Chat listener error:', err));
+  }
+
+  // Tab title + native browser notification — added because the in-app
+  // unread badge alone is easy to miss if the admin isn't currently
+  // looking at the nav sidebar (a different tab entirely, or focused on
+  // a different section of this same page). The title change is visible
+  // the moment attention returns to this browser tab at all; the
+  // Notification API additionally surfaces outside the browser window
+  // entirely, if the browser honored the permission request above.
+  function notifyNewChatMessage(m) {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      const channelLabel = m.channel === 'whatsapp' ? 'WhatsApp' : 'SMS';
+      try {
+        const notif = new Notification(`New ${channelLabel} message — ${m.tenantName || m.fromNumber || 'Unknown'}`, {
+          body: (m.body || '').slice(0, 120),
+          tag: 'rentbay-chat', // replaces any still-visible prior notification rather than stacking indefinitely
+        });
+        notif.onclick = () => { window.focus(); switchSection('chat', document.getElementById('nav-chat-btn')); notif.close(); };
+      } catch (e) { console.warn('Could not show chat notification:', e); }
+    }
+  }
+
+  // Groups by tenantId when known; falls back to grouping by the raw
+  // fromNumber when a message couldn't be matched to any tenant record
+  // (e.g. a tenant texting from a different phone than the one on file) —
+  // so an unmatched message is still visible as its own conversation
+  // rather than silently dropped from the list entirely.
+  function getChatConversations() {
+    const byKey = new Map();
+    for (const m of allChatMessages) {
+      const key = m.tenantId || `unknown:${m.fromNumber || m.toNumber || 'unknown'}`;
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(m);
+    }
+    return [...byKey.entries()].map(([key, msgs]) => ({
+      key,
+      tenantId: msgs[0].tenantId || null,
+      label: msgs[0].tenantName || msgs.find(m=>m.fromNumber)?.fromNumber || t('chat.unknownNumber'),
+      lastMessage: msgs[0], // already newest-first, since allChatMessages is ordered desc
+      unreadCount: msgs.filter(m => m.direction === 'inbound' && !m.read).length,
+    })).sort((a,b) => (b.lastMessage.createdAt?.toMillis?.()||0) - (a.lastMessage.createdAt?.toMillis?.()||0));
+  }
+
+  function renderChatConversationList() {
+    const el = document.getElementById('chat-conversation-list'); if (!el) return;
+    const conversations = getChatConversations();
+    if (!conversations.length) { el.innerHTML = `<p style="padding:16px;font-size:13px;color:var(--slate);">${t('chat.noConversations')}</p>`; return; }
+    el.innerHTML = conversations.map(c => {
+      const isActive = c.key === activeChatTenantId;
+      const channelIcon = c.lastMessage.channel === 'whatsapp' ? '💚' : '💬';
+      const preview = (c.lastMessage.body || '').slice(0, 40) + ((c.lastMessage.body||'').length > 40 ? '…' : '');
+      return `<div onclick="openChatThread('${c.key}')" style="padding:12px 16px;cursor:pointer;border-bottom:1px solid #F9FAFB;background:${isActive?'#FEF9F0':'transparent'};">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px;">${channelIcon} ${c.label}</span>
+          ${c.unreadCount ? `<span style="background:#DC2626;color:#fff;font-size:10px;font-weight:600;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;">${c.unreadCount}</span>` : ''}
+        </div>
+        <div style="font-size:11px;color:var(--slate);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${preview}</div>
+      </div>`;
+    }).join('');
+  }
+
+  window.openChatThread = async (key) => {
+    activeChatTenantId = key;
+    renderChatConversationList(); // re-render to reflect the new active highlight
+    renderChatThread(key);
+
+    // Mark unread inbound messages read — only meaningful for a matched
+    // tenant conversation; an "unknown number" key has no tenantId to
+    // write against differently, but its messages still get marked by id
+    // the same way below.
+    const conversations = getChatConversations();
+    const convo = conversations.find(c => c.key === key);
+    if (!convo) return;
+    const unread = allChatMessages.filter(m => (m.tenantId || `unknown:${m.fromNumber || m.toNumber || 'unknown'}`) === key && m.direction === 'inbound' && !m.read);
+    if (unread.length) {
+      try {
+        const batch = writeBatch(db);
+        unread.forEach(m => batch.update(doc(db,'chatMessages',m.id), { read: true }));
+        await batch.commit();
+      } catch (e) { console.warn('Could not mark messages read:', e); }
+    }
+  };
+
+  function renderChatThread(key) {
+    const emptyEl = document.getElementById('chat-thread-empty');
+    const activeEl = document.getElementById('chat-thread-active');
+    const convo = getChatConversations().find(c => c.key === key);
+    if (!convo) { emptyEl.style.display='flex'; activeEl.style.display='none'; return; }
+    emptyEl.style.display = 'none';
+    activeEl.style.display = 'flex';
+
+    document.getElementById('chat-thread-name').textContent = convo.label;
+    document.getElementById('chat-thread-phone').textContent = convo.lastMessage.fromNumber || convo.lastMessage.toNumber || '';
+
+    const msgs = allChatMessages.filter(m => (m.tenantId || `unknown:${m.fromNumber || m.toNumber || 'unknown'}`) === key).slice().reverse(); // oldest first for a chat thread
+    const msgsEl = document.getElementById('chat-thread-messages');
+    msgsEl.innerHTML = msgs.map(m => {
+      const isOut = m.direction === 'outbound';
+      const time = m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+      const channelTag = m.channel === 'whatsapp' ? '💚' : '💬';
+      return `<div style="align-self:${isOut?'flex-end':'flex-start'};max-width:75%;">
+        <div style="background:${isOut?'#1A1A2E':'#F3F4F6'};color:${isOut?'#fff':'#1A1A2E'};padding:8px 12px;border-radius:10px;font-size:13px;white-space:pre-wrap;word-break:break-word;">${(m.body||'').replace(/</g,'&lt;')}</div>
+        <div style="font-size:10px;color:var(--slate);margin-top:2px;${isOut?'text-align:right;':''}">${channelTag} ${time}</div>
+      </div>`;
+    }).join('');
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+
+    // No tenant record to send through — this app doesn't have a phone
+    // number to attach the outbound send to, so replying is disabled
+    // rather than guessing at one.
+    const canReply = !!convo.tenantId;
+    document.getElementById('chat-send-channel').disabled = !canReply;
+    document.getElementById('chat-send-body').disabled = !canReply;
+    document.getElementById('chat-send-btn').disabled = !canReply;
+    document.getElementById('chat-send-body').placeholder = canReply ? t('chat.messagePlaceholder') : t('chat.noTenantMatchHint');
+  }
+
+  window.sendChatMessage = async () => {
+    const convo = getChatConversations().find(c => c.key === activeChatTenantId);
+    if (!convo || !convo.tenantId) return;
+    const channel = document.getElementById('chat-send-channel').value;
+    const bodyEl = document.getElementById('chat-send-body');
+    const body = bodyEl.value.trim();
+    if (!body) return;
+    const btn = document.getElementById('chat-send-btn');
+    btn.disabled = true; btn.textContent = t('chat.sending');
+    document.getElementById('chat-send-alert').classList.add('hidden');
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      const res = await fetch('/api/send-chat-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${idToken}` },
+        body: JSON.stringify({ tenantId: convo.tenantId, channel, body }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Send failed.');
+      bodyEl.value = '';
+    } catch (e) {
+      showAlert('chat-send-alert', e.message);
+    }
+    btn.disabled = false; btn.textContent = t('chat.send');
+  };
+
+  function updateChatUnreadBadge() {
+    const total = getChatConversations().reduce((sum,c) => sum + c.unreadCount, 0);
+    const badge = document.getElementById('chat-unread-badge'); if (!badge) return;
+    badge.classList.toggle('hidden', total === 0);
+    badge.textContent = total > 99 ? '99+' : String(total);
+    // Visible the moment attention returns to this browser tab at all,
+    // even if it's not the focused one right now — unlike the in-app
+    // badge, which only helps if the admin happens to be looking at the
+    // nav sidebar already.
+    document.title = total > 0 ? `(${total > 99 ? '99+' : total}) ${_originalPageTitle}` : _originalPageTitle;
+  }
+
   // ===== SUPPORT MESSAGES =====
   async function loadSupport() {
     try {
@@ -10354,7 +10603,7 @@
     document.getElementById('section-'+id).classList.add('active');
     document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
     if(btn) btn.classList.add('active');
-    const titles={dashboard:'Dashboard',properties:'Properties',tenants:'Tenants',applications:'Applications',payments:'Payments',documents:'Documents',maintenance:'Maintenance',announcements:'Announcements',invitations:'Invitations',invoices:'Invoices & Receipts',consents:'Auto-Pay Consents',features:'Feature Requests',financials:'Financials',vendors:'Vendor Directory',audit:'Audit Log',support:'Support',settings:'Settings',adminusers:'Admin Users'};
+    const titles={dashboard:'Dashboard',properties:'Properties',tenants:'Tenants',applications:'Applications',payments:'Payments',documents:'Documents',maintenance:'Maintenance',announcements:'Announcements',invitations:'Invitations',invoices:'Invoices & Receipts',consents:'Auto-Pay Consents',features:'Feature Requests',financials:'Financials',vendors:'Vendor Directory',audit:'Audit Log',support:'Support',chat:'Chat',settings:'Settings',adminusers:'Admin Users'};
     document.getElementById('page-title').textContent=titles[id]||id;
     document.getElementById('sidebar').classList.remove('open');
     if(id==='audit'&&!allAuditLogs.length) loadAuditLog(true);
