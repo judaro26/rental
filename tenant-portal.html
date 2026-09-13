@@ -1001,11 +1001,17 @@
       // tenant on the same unit) — merged into one chronological list,
       // since both are "documents shared with me specifically", just via
       // two different fields.
+      //
+      // allSettled, not all — these are two independent queries against
+      // two different rule clauses; a problem with one (e.g. a rules
+      // deploy still in flight for sharedTenantIds) shouldn't take down
+      // the other and hide even this tenant's own, already-working
+      // documents. Each is logged and skipped on its own failure instead.
       const q1   = query(collection(db,'documents'), where('tenantId','==',currentUser.uid), orderBy('uploadedAt','desc'));
       const q3   = query(collection(db,'documents'), where('sharedTenantIds','array-contains',currentUser.uid), orderBy('uploadedAt','desc'));
-      const [snap1, snap3] = await Promise.all([getDocs(q1), getDocs(q3)]);
-      const ownDocs = snap1.docs.map(d => ({ id: d.id, ...d.data() }));
-      const sharedDocs = snap3.docs.map(d => ({ id: d.id, ...d.data() }));
+      const [result1, result3] = await Promise.allSettled([getDocs(q1), getDocs(q3)]);
+      const ownDocs = result1.status === 'fulfilled' ? result1.value.docs.map(d => ({ id: d.id, ...d.data() })) : (console.error('Own documents query failed:', result1.reason), []);
+      const sharedDocs = result3.status === 'fulfilled' ? result3.value.docs.map(d => ({ id: d.id, ...d.data() })) : (console.error('Shared documents query failed:', result3.reason), []);
       const seenIds = new Set(ownDocs.map(d => d.id));
       const combined = [...ownDocs, ...sharedDocs.filter(d => !seenIds.has(d.id))]
         .sort((a, b) => (b.uploadedAt?.toMillis?.() || 0) - (a.uploadedAt?.toMillis?.() || 0));
