@@ -711,10 +711,23 @@
 
   function showImpersonationBanner(byName) {
     const bar = document.createElement('div');
-    bar.style.cssText = 'position:sticky;top:0;z-index:9999;background:#7C2D12;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:13px;font-family:inherit;';
+    // Fixed, not sticky — this page's own <body> is display:flex (the
+    // sidebar/main-content layout), and a sticky element prepended into
+    // that flow becomes an unintended flex item itself, stretching to
+    // fill the full height as a new left-hand column rather than sitting
+    // as a thin strip across the top. Fixed positioning removes it from
+    // that flow entirely, regardless of what the parent's own layout mode
+    // is — safer for injecting an overlay into a page whose root layout
+    // this code doesn't control.
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#7C2D12;color:#fff;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:16px;font-size:13px;font-family:inherit;flex-wrap:wrap;text-align:center;';
     bar.innerHTML = `<span>🔍 Viewing as this tenant — impersonated by ${byName}. This session is logged.</span>
-      <button id="end-impersonation-btn" style="background:#fff;color:#7C2D12;border:none;padding:4px 12px;border-radius:2px;font-size:12px;font-weight:600;cursor:pointer;">End impersonation</button>`;
+      <button id="end-impersonation-btn" style="background:#fff;color:#7C2D12;border:none;padding:4px 12px;border-radius:2px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">End impersonation</button>`;
     document.body.prepend(bar);
+    // Fixed positioning takes the bar out of flow, so without this the
+    // page's real content would start underneath it. Measured after
+    // insertion rather than a hardcoded pixel value, since the bar's
+    // actual height varies (e.g. wrapping to two lines on a narrow window).
+    document.body.style.paddingTop = bar.offsetHeight + 'px';
     document.getElementById('end-impersonation-btn').onclick = async () => {
       await signOut(auth);
       window.close();
