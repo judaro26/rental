@@ -625,32 +625,40 @@
   const STRIPE_PK = _cfg.stripePk;
   // ─────────────────────────────────────────────────────────────────────────────
 
-  const app  = initializeApp(_cfg.firebase);
+  // ?impersonate=1 means this tab was opened specifically to receive a
+  // custom-token handoff from the admin tab that opened it — see
+  // startImpersonation() in admin.html for the other side of this
+  // handshake. Detected before initializeApp() below, since it decides
+  // which Firebase app instance this tab uses.
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
+
+  // A separately-named Firebase app instance for impersonation sessions —
+  // not just a different persistence mode on the default one. Firebase's
+  // own documentation confirms that calling setPersistence to switch a
+  // tab away from the default local persistence signs out every *other*
+  // tab sharing that same instance's storage — which is exactly what was
+  // happening to the super admin's own, original admin tab the moment
+  // this tab requested a session-scoped persistence. A distinctly-named
+  // app instance gets its own, isolated localStorage/IndexedDB keys from
+  // the very first call, so there's no shared state for a persistence
+  // change here to ever disrupt elsewhere.
+  const app  = _isImpersonationTarget ? initializeApp(_cfg.firebase, 'impersonation') : initializeApp(_cfg.firebase);
   const auth = getAuth(app);
   const db   = getFirestore(app);
 
-  // ===== IMPERSONATION (opened via admin.html's "View As") =====
-  // ?impersonate=1 means this tab was opened specifically to receive a
-  // custom-token handoff from the admin tab that opened it, rather than a
-  // normal visit — see startImpersonation() in admin.html for the other
-  // side of this handshake.
-  //
   // Positioned immediately after getAuth(app), before any other code —
-  // this matters. getAuth's default persistence is localStorage, shared
-  // across every tab on this origin, and the SDK begins trying to restore
-  // any existing session from it right away. If several other awaited
-  // operations (the site-name fetch, PublicI18N.init, the theme/flags
-  // fetch, all of which used to sit between getAuth and this block) ran
-  // first, that restoration had time to complete and silently overwrite
-  // this tab's freshly-signed-in impersonated session with the super
-  // admin's own — which is exactly what caused the tenant portal to show
-  // correctly for a moment, then bounce back to the admin's own account
-  // (and from there, index.html's own "already signed in as an admin"
-  // check sent it on to /admin.html, which is what that looked like).
-  // Calling setPersistence here, first, changes this tab's persistence
-  // before that restoration has a chance to start.
-  const _urlParams = new URLSearchParams(window.location.search);
-  const _isImpersonationTarget = _urlParams.get('impersonate') === '1';
+  // this matters for the same reason the app name above needs deciding
+  // early: any restoration/persistence work should happen before other
+  // awaited operations (the site-name fetch, PublicI18N.init, the
+  // theme/flags fetch) get a chance to run first.
+  //
+  // setPersistence itself is safe to call here now that this tab is on
+  // its own, separately-named app instance — with no other tab ever
+  // having used the 'impersonation' app name's storage before, there's
+  // nothing else for a persistence change to disrupt. It's kept as an
+  // extra safeguard so the impersonated session doesn't linger past this
+  // tab's own lifetime, not as the mechanism providing isolation itself.
   if (_isImpersonationTarget) {
     await setPersistence(auth, browserSessionPersistence).then(() => new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
