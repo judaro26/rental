@@ -72,7 +72,25 @@ service cloud.firestore {
       allow read: if request.auth != null && (
         isAdmin() ||
         resource.data.tenantId == request.auth.uid ||
-        resource.data.propertyWide == true
+        resource.data.propertyWide == true ||
+        // Additional, specific tenants a document has been explicitly
+        // shared with beyond its one primary tenantId — e.g. a lease
+        // co-signed by a second tenant on the same unit. Distinct from
+        // propertyWide, which is every tenant on the property, not a
+        // hand-picked subset.
+        //
+        // A direct expression, not wrapped in a compound && existence
+        // check — Firestore's query-validation needs to statically match
+        // this branch against a plain array-contains filter to allow the
+        // corresponding list query at all ("rules are not filters"; a
+        // query must structurally prove the rule condition, not just
+        // satisfy it document-by-document). The wrapped form caused
+        // exactly this: existing tenantId-based reads still worked, but
+        // the sharedTenantIds query itself failed outright with
+        // "missing or insufficient permissions". `in` against a missing
+        // field evaluates to false here rather than erroring, the same
+        // way any other single clause in this || falls through safely.
+        request.auth.uid in resource.data.sharedTenantIds
       );
       allow write: if isAdmin();
     }
