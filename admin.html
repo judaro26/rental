@@ -791,7 +791,7 @@
       </div>
     </section>
 
-        <!-- FINANCIALS -->
+    <!-- FINANCIALS -->
     <section id="section-financials" class="section">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
         <div class="card" style="padding:16px 20px;"><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--slate);margin-bottom:6px;" data-i18n="financials.totalIncome">Total Income</div><div id="fin-total-income" style="font-size:24px;font-weight:600;color:#16A34A;">$0.00</div></div>
@@ -2498,7 +2498,7 @@
   // state drives what the UI shows/locks, which matters for UX but is not
   // itself the security guarantee.
   let CURRENT_ADMIN = null;
-  
+
   function isRestrictedAdmin() { return CURRENT_ADMIN?.role === 'restricted_admin'; }
 
   // allProperties is filtered to the admin's country at load time (see
@@ -7810,30 +7810,41 @@
     renderFinancials();
   };
 
-  window.filterFinancials=()=>{
-    const prop=document.getElementById('fin-filter-prop')?.value||'',type=document.getElementById('fin-filter-type')?.value||'',year=document.getElementById('fin-filter-year')?.value||'',payer=document.getElementById('fin-filter-payer')?.value||'';
-    let filtered=allFinancials;
-    if(prop) filtered=filtered.filter(f=>f.propertyId===prop);
-    if(type) filtered=filtered.filter(f=>f.type===type);
-    if(year) filtered=filtered.filter(f=>f.date?.startsWith(year));
-    if(payer === '__unspecified__') filtered=filtered.filter(f=>!f.paidByOwner);
-    else if(payer) filtered=filtered.filter(f=>f.paidByOwner===payer);
+  window.filterFinancials = () => {
+    const prop = document.getElementById('fin-filter-prop')?.value || '';
+    const type = document.getElementById('fin-filter-type')?.value || '';
+    const year = document.getElementById('fin-filter-year')?.value || '';
+    const payer = document.getElementById('fin-filter-payer')?.value || '';
+
+    let filtered = allFinancials;
+    if (prop) filtered = filtered.filter(f => f.propertyId === prop);
+    if (type) filtered = filtered.filter(f => f.type === type);
+    if (year) filtered = filtered.filter(f => f.date?.startsWith(year));
+    if (payer === '__unspecified__') filtered = filtered.filter(f => !f.paidByOwner);
+    else if (payer) filtered = filtered.filter(f => f.paidByOwner === payer);
+
     finCurrentPage = 1;
     renderFinancials(filtered);
   };
+
   function formatFinAmount(amount, currency) {
     const n = parseFloat(amount) || 0;
     if (currency === 'COP') return `$${Math.round(n).toLocaleString('es-CO')} COP`;
     return `$${n.toFixed(2)}`;
   }
-  function renderFinancials(items = currentFilteredFinancials) {
-    currentFilteredFinancials = items;
-    const tbody=document.getElementById('financials-tbody'); if(!tbody) return;
+
+  function renderFinancials(items) {
+    if (items) currentFilteredFinancials = items;
+    items = currentFilteredFinancials || [];
+
+    const tbody = document.getElementById('financials-tbody');
+    if (!tbody) return;
+
     items = applySort(items, 'financials', FINANCIALS_SORT_ACCESSORS);
 
     const currencies = [...new Set(items.map(i => i.currency || 'USD'))];
     const summarize = (type) => currencies.map(cur => {
-      const total = items.filter(i => i.type === type && (i.currency||'USD') === cur).reduce((s,i)=>s+parseFloat(i.amount||0),0);
+      const total = items.filter(i => i.type === type && (i.currency || 'USD') === cur).reduce((s, i) => s + parseFloat(i.amount || 0), 0);
       return total ? formatFinAmount(total, cur) : null;
     }).filter(Boolean).join(' + ') || (formatFinAmount(0, currencies[0] || 'USD'));
 
@@ -7842,18 +7853,18 @@
     if (incEl) incEl.textContent = summarize('income');
     if (expEl) expEl.textContent = summarize('expense');
 
-    const netEl=document.getElementById('fin-net');
+    const netEl = document.getElementById('fin-net');
     if (netEl) {
       if (currencies.length > 1) {
         netEl.textContent = t('financials.mixedCurrencies');
         netEl.style.cssText = 'font-size:13px;font-weight:400;color:var(--slate);';
       } else {
         const cur = currencies[0] || 'USD';
-        const income = items.filter(i=>i.type==='income').reduce((s,i)=>s+parseFloat(i.amount||0),0);
-        const expense = items.filter(i=>i.type==='expense').reduce((s,i)=>s+parseFloat(i.amount||0),0);
+        const income = items.filter(i => i.type === 'income').reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+        const expense = items.filter(i => i.type === 'expense').reduce((s, i) => s + parseFloat(i.amount || 0), 0);
         const net = income - expense;
-        netEl.textContent = (net>=0?'+':'-') + formatFinAmount(Math.abs(net), cur);
-        netEl.style.cssText = `font-size:24px;font-weight:600;color:${net>=0?'#16A34A':'#DC2626'};`;
+        netEl.textContent = (net >= 0 ? '+' : '-') + formatFinAmount(Math.abs(net), cur);
+        netEl.style.cssText = `font-size:24px;font-weight:600;color:${net >= 0 ? '#16A34A' : '#DC2626'};`;
       }
     }
 
@@ -7861,6 +7872,7 @@
     renderOwnerSpendBreakdown(items);
     renderCatchupTracker();
 
+    // Slices items for active page view
     const pageSize = parseInt(document.getElementById('fin-page-size')?.value || 20, 10);
     const totalItems = items.length;
     const totalPages = Math.ceil(totalItems / pageSize) || 1;
@@ -7872,24 +7884,25 @@
     const endIdx = Math.min(startIdx + pageSize, totalItems);
     const pagedItems = items.slice(startIdx, endIdx);
 
-    if(!totalItems){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">${t('financials.noTransactionsFound')}</td></tr>`;}
-    else {
-      tbody.innerHTML=pagedItems.map(f=>{
-        const prop=allProperties.find(p=>p.id===f.propertyId),isInc=f.type==='income';
+    if (!totalItems) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">${t('financials.noTransactionsFound')}</td></tr>`;
+    } else {
+      tbody.innerHTML = pagedItems.map(f => {
+        const prop = allProperties.find(p => p.id === f.propertyId), isInc = f.type === 'income';
         const cur = f.currency || 'USD';
         const netSign = (isInc ? 1 : -1) * (parseFloat(f.amount) < 0 ? -1 : 1);
         const amountDisplay = (netSign >= 0 ? '+' : '-') + formatFinAmount(Math.abs(parseFloat(f.amount) || 0), cur);
         return `<tr>
-          <td style="font-size:12px;">${f.date||'—'}</td>
-          <td style="font-size:12px;">${prop?.name||f.propertyName||'—'}</td>
-          <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${isInc?'#F0FDF4':'#FEF2F2'};color:${isInc?'#16A34A':'#DC2626'};font-weight:500;">${isInc?t('financials.income'):t('financials.expense')}</span></td>
-          <td style="font-size:12px;">${f.category||'—'}</td>
-          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.description||''}">${f.description||'—'}${f.vendor?`<div style="font-size:11px;color:var(--slate);">${f.vendor}</div>`:''}</td>
-          <td style="font-weight:600;color:${isInc?'#16A34A':'#DC2626'};">${amountDisplay}</td>
-          <td>${f.receiptUrl?`<a href="${f.receiptUrl}" target="_blank" title="${t('financials.viewReceipt')}">📎</a>`:'<span style="color:#D1D5DB;">—</span>'}</td>
+          <td style="font-size:12px;">${f.date || '—'}</td>
+          <td style="font-size:12px;">${prop?.name || f.propertyName || '—'}</td>
+          <td><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${isInc ? '#F0FDF4' : '#FEF2F2'};color:${isInc ? '#16A34A' : '#DC2626'};font-weight:500;">${isInc ? t('financials.income') : t('financials.expense')}</span></td>
+          <td style="font-size:12px;">${f.category || '—'}</td>
+          <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${f.description || ''}">${f.description || '—'}${f.vendor ? `<div style="font-size:11px;color:var(--slate);">${f.vendor}</div>` : ''}</td>
+          <td style="font-weight:600;color:${isInc ? '#16A34A' : '#DC2626'};">${amountDisplay}</td>
+          <td>${f.receiptUrl ? `<a href="${f.receiptUrl}" target="_blank" title="${t('financials.viewReceipt')}">📎</a>` : '<span style="color:#D1D5DB;">—</span>'}</td>
           <td>
             <button onclick="editFinancial('${f.id}')" class="btn btn-sm btn-outline" style="margin-right:4px;">${t('common.edit')}</button>
-            <button onclick="deleteFinancial('${f.id}')" class="btn btn-sm btn-danger">${t('common.delete')}</button>
+            <button onclick="deleteFinancial('${f.id}')" class="btn btn-sm btn-danger">×</button>
           </td>
         </tr>`;
       }).join('');
@@ -7906,6 +7919,719 @@
     }
     if (prevBtn) prevBtn.disabled = finCurrentPage <= 1;
     if (nextBtn) nextBtn.disabled = finCurrentPage >= totalPages;
+  }
+
+  function renderFinCategoryBreakdown(items) {
+    const container = document.getElementById('fin-category-breakdown');
+    if (!container) return;
+    const expenses = items.filter(i => i.type === 'expense');
+    if (!expenses.length) { container.innerHTML = `<p style="font-size:12px;color:var(--slate);margin:0;">${t('financials.noExpensesToBreakdown')}</p>`; return; }
+    const groups = {};
+    for (const e of expenses) {
+      const cur = e.currency || 'USD';
+      const key = `${e.category || 'Other'}|||${cur}`;
+      groups[key] = (groups[key] || 0) + parseFloat(e.amount || 0);
+    }
+    const rows = Object.entries(groups)
+      .map(([key, total]) => { const [category, cur] = key.split('|||'); return { category, cur, total }; })
+      .sort((a, b) => b.total - a.total);
+    container.innerHTML = `
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">📊 ${t('financials.categoryBreakdownTitle')}</h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 20px;">
+        ${rows.map(r => `<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid #F3F4F6;"><span>${r.category}</span><strong>${formatFinAmount(r.total, r.cur)}</strong></div>`).join('')}
+      </div>
+      <p style="font-size:10px;color:var(--slate);margin:10px 0 0;">${t('financials.notTaxAdvice')}</p>`;
+  }
+  // Who spent how much, regardless of category — only meaningful scoped
+  // to a single property (ownership % is per-property), so this only
+  // renders when the property filter is set to one specific property.
+  // Reflects whatever's currently filtered, so filtering to a year first
+  // gives a year-specific reconciliation.
+  function renderOwnerSpendBreakdown(items) {
+    const container = document.getElementById('fin-owner-breakdown');
+    if (!container) return;
+    const propId = document.getElementById('fin-filter-prop').value;
+    if (!propId) { container.innerHTML = ''; return; }
+    const prop = allProperties.find(p => p.id === propId);
+    const owners = Array.isArray(prop?.owners) ? prop.owners : [];
+    const expenses = items.filter(i => i.type === 'expense');
+    if (!expenses.length) { container.innerHTML = ''; return; }
+
+    const currencies = [...new Set(expenses.map(e => e.currency || 'USD'))];
+    if (currencies.length > 1) {
+      container.innerHTML = `<p style="font-size:11px;color:var(--slate);margin:0;">${t('financials.mixedCurrencyExplanation')}</p>`;
+      return;
+    }
+    const cur = currencies[0];
+    const grandTotal = expenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+    const spentByOwner = {};
+    for (const e of expenses) {
+      const key = e.paidByOwner || '__unspecified__';
+      spentByOwner[key] = (spentByOwner[key] || 0) + parseFloat(e.amount || 0);
+    }
+
+    const rows = Object.entries(spentByOwner).map(([key, spent]) => {
+      const isUnspecified = key === '__unspecified__';
+      const name = isUnspecified ? t('financials.unspecified') : key;
+      const ownerRecord = owners.find(o => o.name === key);
+      const pct = spent / grandTotal * 100;
+      const fairShare = ownerRecord ? grandTotal * ownerRecord.percentage / 100 : null;
+      const delta = fairShare != null ? spent - fairShare : null;
+      return { key, name, isUnspecified, spent, pct, ownershipPct: ownerRecord?.percentage ?? null, delta };
+    }).sort((a, b) => b.spent - a.spent);
+
+    container.innerHTML = `
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">👥 ${t('financials.ownerBreakdownTitle').replace('{prop}', prop?.name || '')}</h4>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        ${rows.map(r => `
+          <div ${r.isUnspecified ? `onclick="jumpToUnspecifiedPayer()" style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #F3F4F6;cursor:pointer;" title="${t('financials.clickToFindThese')}" onmouseover="this.style.background='#FDFBF8'" onmouseout="this.style.background=''"` : `style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid #F3F4F6;"`}>
+            <span>${r.name}${r.isUnspecified ? ' 🔍' : ''}${r.ownershipPct!=null ? ` <span style="color:var(--slate);">${t('financials.ownsPct').replace('{pct}', r.ownershipPct)}</span>` : ''}</span>
+            <span style="display:flex;gap:14px;align-items:center;">
+              <strong>${formatFinAmount(r.spent, cur)}</strong>
+              <span style="color:var(--slate);">${t('financials.pctOfSpend').replace('{pct}', r.pct.toFixed(1))}</span>
+              ${r.delta != null ? `<span style="font-weight:500;color:${r.delta>=0?'#16A34A':'#DC2626'};">${r.delta>=0?t('financials.owedBack'):t('financials.owes')} ${formatFinAmount(Math.abs(r.delta), cur)}</span>` : ''}
+            </span>
+          </div>`).join('')}
+      </div>
+      <p style="font-size:10px;color:var(--slate);margin:10px 0 0;">${owners.length ? t('financials.reconciliationHint') : t('financials.setOwnershipHint')}</p>`;
+  }
+  window.jumpToUnspecifiedPayer = () => {
+    document.getElementById('fin-filter-payer').value = '__unspecified__';
+    filterFinancials();
+    document.getElementById('financials-tbody')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  window.openSettlementReportModal = () => {
+    const propSel = document.getElementById('settlement-prop');
+    // Only properties with 2+ owners actually have anything to settle —
+    // matches the same gate the inline owner breakdown and catch-up
+    // tracker already use elsewhere in this section.
+    const eligible = allProperties.filter(p => Array.isArray(p.owners) && p.owners.length >= 2);
+    propSel.innerHTML = eligible.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    if (!eligible.length) { propSel.innerHTML = `<option value="">${t('settlement.noEligibleProperties')}</option>`; }
+    // Default to whatever's already selected in the main Financials property
+    // filter, if it's one of the eligible ones — saves a redundant re-pick
+    // for the common case of "I was just looking at this property's financials."
+    const currentFinProp = document.getElementById('fin-filter-prop').value;
+    if (eligible.some(p => p.id === currentFinProp)) propSel.value = currentFinProp;
+    openModal('settlement-report-modal');
+    renderSettlementReport();
+  };
+
+  function computeSettlementReport(propertyId, year) {
+    const prop = allProperties.find(p => p.id === propertyId);
+    const owners = Array.isArray(prop?.owners) ? prop.owners : [];
+    let items = allFinancials.filter(f => f.propertyId === propertyId);
+    if (year) items = items.filter(f => (f.date || '').startsWith(year));
+
+    const currencies = [...new Set(items.map(i => i.currency || 'USD'))];
+    const income = items.filter(i => i.type === 'income');
+    const expenses = items.filter(i => i.type === 'expense');
+    const totalIncome = income.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+    const totalExpenses = expenses.reduce((s, i) => s + parseFloat(i.amount || 0), 0);
+    const netOperating = totalIncome - totalExpenses;
+
+    const spentByOwner = {};
+    for (const e of expenses) {
+      const key = e.paidByOwner || '__unspecified__';
+      spentByOwner[key] = (spentByOwner[key] || 0) + parseFloat(e.amount || 0);
+    }
+    const unspecifiedExpenses = spentByOwner['__unspecified__'] || 0;
+
+    const ownerRows = owners.map(o => {
+      const fronted = spentByOwner[o.name] || 0;
+      const fairShareOfExpenses = totalExpenses * o.percentage / 100;
+      const fairShareOfNet = netOperating * o.percentage / 100;
+      return { name: o.name, percentage: o.percentage, fronted, fairShareOfExpenses, expenseSettlement: fronted - fairShareOfExpenses, fairShareOfNet };
+    });
+
+    return {
+      propertyName: prop?.name || '', hasMultipleCurrencies: currencies.length > 1, currency: currencies[0] || 'USD',
+      totalIncome, totalExpenses, netOperating, ownerRows, unspecifiedExpenses,
+    };
+  }
+
+  window.renderSettlementReport = () => {
+    const propId = document.getElementById('settlement-prop').value;
+    const body = document.getElementById('settlement-report-body');
+    if (!propId) { body.innerHTML = ''; return; }
+
+    const yearSel = document.getElementById('settlement-year');
+    const propYears = [...new Set(allFinancials.filter(f => f.propertyId === propId).map(f => (f.date || '').substring(0, 4)).filter(Boolean))].sort().reverse();
+    const prevYear = yearSel.value;
+    yearSel.innerHTML = `<option value="">${t('financials.allYears')}</option>` + propYears.map(y => `<option value="${y}">${y}</option>`).join('');
+    if (propYears.includes(prevYear)) yearSel.value = prevYear;
+
+    const r = computeSettlementReport(propId, yearSel.value);
+    if (r.hasMultipleCurrencies) {
+      body.innerHTML = `<p style="font-size:12px;color:var(--slate);">${t('financials.mixedCurrencyExplanation')}</p>`;
+      return;
+    }
+    const periodLabel = yearSel.value || t('settlement.allTime');
+    const fmt = v => formatFinAmount(v, r.currency);
+    body.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:3px;padding:16px;margin-bottom:16px;">
+        <h4 style="font-size:1.1rem;font-weight:500;margin:0 0 4px;">${r.propertyName} — ${periodLabel}</h4>
+        <div style="display:flex;gap:24px;margin-top:12px;font-size:13px;">
+          <div><span style="color:var(--slate);">${t('settlement.totalIncome')}</span><br><strong>${fmt(r.totalIncome)}</strong></div>
+          <div><span style="color:var(--slate);">${t('settlement.totalExpenses')}</span><br><strong>${fmt(r.totalExpenses)}</strong></div>
+          <div><span style="color:var(--slate);">${t('settlement.netOperating')}</span><br><strong style="color:${r.netOperating>=0?'#16A34A':'#DC2626'};">${fmt(r.netOperating)}</strong></div>
+        </div>
+      </div>
+      <table class="data-table" style="margin-bottom:14px;">
+        <thead><tr>
+          <th>${t('settlement.colOwner')}</th><th>${t('settlement.colOwnership')}</th>
+          <th>${t('settlement.colFairShareNet')}</th><th>${t('settlement.colFronted')}</th>
+          <th>${t('settlement.colFairShareExpenses')}</th><th>${t('settlement.colExpenseSettlement')}</th>
+        </tr></thead>
+        <tbody>
+          ${r.ownerRows.map(o => `<tr>
+            <td>${o.name}</td><td>${o.percentage}%</td>
+            <td>${fmt(o.fairShareOfNet)}</td><td>${fmt(o.fronted)}</td>
+            <td>${fmt(o.fairShareOfExpenses)}</td>
+            <td style="font-weight:500;color:${o.expenseSettlement>=0?'#16A34A':'#DC2626'};">${o.expenseSettlement>=0?t('financials.owedBack'):t('financials.owes')} ${fmt(Math.abs(o.expenseSettlement))}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      ${r.unspecifiedExpenses ? `<p style="font-size:11px;color:#92400E;background:#FFFBEB;border:1px solid #FDE68A;border-radius:3px;padding:8px 12px;margin-bottom:14px;">⚠️ ${t('settlement.unspecifiedWarning').replace('{amount}', fmt(r.unspecifiedExpenses))}</p>` : ''}
+      <p style="font-size:11px;color:var(--slate);line-height:1.6;">
+        <strong>${t('settlement.colFairShareNet')}:</strong> ${t('settlement.explainFairShareNet')}<br>
+        <strong>${t('settlement.colExpenseSettlement')}:</strong> ${t('settlement.explainExpenseSettlement')}
+      </p>
+      <p style="font-size:10px;color:var(--slate);margin-top:10px;">${t('settlement.notLegalAdvice')}</p>`;
+  };
+
+  // Maps a property's own transaction categories onto the full, ordered
+  // category list for its country — starting from the predefined list
+  // (for correct order and to show unused lines at $0, matching the blank
+  // lines an accountant would see on the actual form) and appending any
+  // category found in the data that isn't in that list. The append step
+  // matters: without it, a legacy or mistyped category would silently
+  // vanish from a tax-relevant total instead of just showing up oddly
+  // placed — losing track of money is the worse failure mode here.
+  function buildCategoryRows(predefinedList, byCategory) {
+    const rows = predefinedList.map(c => ({ category: c, amount: byCategory[c] || 0 }));
+    const known = new Set(predefinedList);
+    for (const extra of Object.keys(byCategory)) {
+      if (!known.has(extra)) rows.push({ category: extra, amount: byCategory[extra] });
+    }
+    return rows;
+  }
+
+  function computeTaxPackage(year) {
+    const byProperty = {};
+    for (const f of allFinancials) {
+      if (!(f.date || '').startsWith(year) || !f.propertyId) continue;
+      (byProperty[f.propertyId] ||= []).push(f);
+    }
+    const propertyReports = Object.entries(byProperty).map(([pid, items]) => {
+      const prop = allProperties.find(p => p.id === pid);
+      const country = prop?.country === 'CO' ? 'CO' : 'US';
+      const currencies = [...new Set(items.map(i => i.currency || 'USD'))];
+      const incomeByCategory = {}, expenseByCategory = {};
+      let totalIncome = 0, totalExpenses = 0;
+      for (const f of items) {
+        const amt = parseFloat(f.amount || 0);
+        if (f.type === 'income') { incomeByCategory[f.category || 'Other Income'] = (incomeByCategory[f.category || 'Other Income'] || 0) + amt; totalIncome += amt; }
+        else if (f.type === 'expense') { expenseByCategory[f.category || 'Other'] = (expenseByCategory[f.category || 'Other'] || 0) + amt; totalExpenses += amt; }
+      }
+      return {
+        propertyName: prop?.name || t('taxPackage.unknownProperty'), country,
+        currency: currencies[0] || 'USD', hasMultipleCurrencies: currencies.length > 1,
+        incomeRows: buildCategoryRows(FIN_INCOME_CATEGORIES, incomeByCategory),
+        expenseRows: buildCategoryRows(FIN_EXPENSE_CATEGORIES[country], expenseByCategory),
+        totalIncome, totalExpenses, net: totalIncome - totalExpenses,
+      };
+    }).sort((a, b) => a.propertyName.localeCompare(b.propertyName));
+
+    // Grand totals grouped by currency, not blindly summed across all
+    // properties — a US and a Colombia property's totals aren't the same
+    // unit of value, so combining them into one number would be meaningless
+    // (and properties flagged with mixed currency internally are excluded
+    // here, since they're shown as a warning rather than a usable total).
+    const grandTotals = {};
+    for (const r of propertyReports) {
+      if (r.hasMultipleCurrencies) continue;
+      grandTotals[r.currency] ||= { income: 0, expenses: 0 };
+      grandTotals[r.currency].income += r.totalIncome;
+      grandTotals[r.currency].expenses += r.totalExpenses;
+    }
+    return { propertyReports, grandTotals };
+  }
+
+  window.openTaxPackageModal = () => {
+    const yearSel = document.getElementById('tax-package-year');
+    const years = [...new Set(allFinancials.map(f => (f.date || '').substring(0, 4)).filter(Boolean))].sort().reverse();
+    const defaultYear = years[0] || String(new Date().getFullYear());
+    yearSel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('') || `<option value="${defaultYear}">${defaultYear}</option>`;
+    yearSel.value = defaultYear;
+    openModal('tax-package-modal');
+    renderTaxPackage();
+  };
+
+  window.renderTaxPackage = () => {
+    const year = document.getElementById('tax-package-year').value;
+    const body = document.getElementById('tax-package-body');
+    const { propertyReports, grandTotals } = computeTaxPackage(year);
+    if (!propertyReports.length) { body.innerHTML = `<p style="font-size:13px;color:var(--slate);">${t('taxPackage.noActivity')}</p>`; return; }
+
+    const renderCategoryTable = (rows, cur) => `
+      <table class="data-table" style="margin-bottom:10px;">
+        <tbody>${rows.map(r => `<tr><td style="font-size:12px;">${r.category}</td><td style="text-align:right;font-size:12px;">${formatFinAmount(r.amount, cur)}</td></tr>`).join('')}</tbody>
+      </table>`;
+
+    body.innerHTML = propertyReports.map(r => r.hasMultipleCurrencies ? `
+      <div style="border:1px solid #FDE68A;background:#FFFBEB;border-radius:3px;padding:14px 16px;margin-bottom:16px;">
+        <h4 style="font-size:1rem;font-weight:500;margin:0 0 6px;">${r.propertyName}</h4>
+        <p style="font-size:12px;color:#92400E;margin:0;">${t('taxPackage.mixedCurrencyWarning')}</p>
+      </div>` : `
+      <div style="border:1px solid var(--border);border-radius:3px;padding:16px;margin-bottom:16px;page-break-inside:avoid;">
+        <h4 style="font-size:1.15rem;font-weight:500;margin:0 0 12px;">${r.propertyName} <span style="font-size:11px;color:var(--slate);font-weight:400;">(${r.country})</span></h4>
+        <h5 style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin:0 0 6px;">${t('taxPackage.incomeHeading')}</h5>
+        ${renderCategoryTable(r.incomeRows, r.currency)}
+        <h5 style="font-size:11px;text-transform:uppercase;letter-spacing:0.06em;color:var(--slate);margin:14px 0 6px;">${t('taxPackage.expensesHeading')}</h5>
+        ${renderCategoryTable(r.expenseRows, r.currency)}
+        <div style="display:flex;gap:24px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:13px;">
+          <div><span style="color:var(--slate);">${t('settlement.totalIncome')}</span><br><strong>${formatFinAmount(r.totalIncome, r.currency)}</strong></div>
+          <div><span style="color:var(--slate);">${t('settlement.totalExpenses')}</span><br><strong>${formatFinAmount(r.totalExpenses, r.currency)}</strong></div>
+          <div><span style="color:var(--slate);">${t('settlement.netOperating')}</span><br><strong style="color:${r.net>=0?'#16A34A':'#DC2626'};">${formatFinAmount(r.net, r.currency)}</strong></div>
+        </div>
+      </div>`).join('')
+      + Object.entries(grandTotals).map(([cur, g]) => `
+        <div style="border:2px solid #1A1A2E;border-radius:3px;padding:14px 16px;margin-top:8px;">
+          <h4 style="font-size:0.95rem;font-weight:600;margin:0 0 8px;">${t('taxPackage.grandTotal').replace('{currency}', cur)}</h4>
+          <div style="display:flex;gap:24px;font-size:13px;">
+            <div><span style="color:var(--slate);">${t('settlement.totalIncome')}</span><br><strong>${formatFinAmount(g.income, cur)}</strong></div>
+            <div><span style="color:var(--slate);">${t('settlement.totalExpenses')}</span><br><strong>${formatFinAmount(g.expenses, cur)}</strong></div>
+            <div><span style="color:var(--slate);">${t('settlement.netOperating')}</span><br><strong style="color:${(g.income-g.expenses)>=0?'#16A34A':'#DC2626'};">${formatFinAmount(g.income-g.expenses, cur)}</strong></div>
+          </div>
+        </div>`).join('')
+      + `<p style="font-size:10px;color:var(--slate);margin-top:14px;">${t('taxPackage.notTaxAdvice')}</p>`;
+  };
+
+  // Purchase catch-up tracker: independent of whatever year/type filter is
+  // currently active in Financials, by design. The target is always tied
+  // to a fixed historical year (typically the purchase year), and
+  // progress is always the catching-up owner's cumulative total since
+  // then - neither should shift just because someone filtered the table
+  // to look at a different year.
+  function renderCatchupTracker() {
+    const container = document.getElementById('fin-catchup-tracker');
+    if (!container) return;
+    const propId = document.getElementById('fin-filter-prop').value;
+    const prop = allProperties.find(p => p.id === propId);
+    const agreement = prop?.catchUpAgreement;
+    if (!propId || !agreement?.enabled) { container.innerHTML = ''; return; }
+
+    const propExpenses = allFinancials.filter(f => f.propertyId === propId && f.type === 'expense');
+    const currencies = [...new Set(propExpenses.map(e => e.currency || 'USD'))];
+    if (currencies.length > 1) {
+      container.innerHTML = `<p style="font-size:11px;color:var(--slate);margin:0;">${t('financials.mixedCurrencyExplanation')}</p>`;
+      return;
+    }
+    const cur = currencies[0] || 'USD';
+
+    const otherOwnerNames = [...new Set(propExpenses.map(f => f.paidByOwner).filter(n => n && n !== agreement.catchingUpOwnerName))];
+    const targets = otherOwnerNames.map(name => {
+      const total = propExpenses.filter(f => f.paidByOwner === name && f.date?.startsWith(String(agreement.targetYear))).reduce((s, f) => s + parseFloat(f.amount || 0), 0);
+      return { name, total };
+    }).filter(tgt => tgt.total > 0); // an owner with nothing recorded in the target year has no target to show
+
+    const progress = propExpenses.filter(f => f.paidByOwner === agreement.catchingUpOwnerName).reduce((s, f) => s + parseFloat(f.amount || 0), 0);
+
+    if (!targets.length) {
+      container.innerHTML = `
+        <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">⏳ ${t('financials.catchupTrackerTitle')}</h4>
+        <p style="font-size:11px;color:var(--slate);margin:0;">${t('financials.catchupNoTargetData').replace('{year}', agreement.targetYear)}</p>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--slate);margin:0 0 10px;">⏳ ${t('financials.catchupTrackerTitle')}</h4>
+      <p style="font-size:11px;color:var(--slate);margin:0 0 10px;">${t('financials.catchupExplainer').replace('{owner}', agreement.catchingUpOwnerName).replace('{progress}', formatFinAmount(progress, cur))}</p>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${targets.map(target => {
+          const pct = Math.min(100, (progress / target.total) * 100);
+          const met = progress >= target.total;
+          const barColor = met ? '#16A34A' : 'var(--amber)';
+          return `
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+              <span>${t('financials.catchupVsOwner').replace('{owner}', target.name).replace('{year}', agreement.targetYear)}</span>
+              <span style="font-weight:500;color:${met?'#16A34A':'inherit'};">${met ? t('financials.catchupMatched') : t('financials.catchupRemaining').replace('{amount}', formatFinAmount(target.total - progress, cur))}</span>
+            </div>
+            <div style="background:#F3F4F6;border-radius:10px;height:8px;overflow:hidden;">
+              <div style="background:${barColor};height:100%;width:${pct}%;transition:width 0.3s;"></div>
+            </div>
+            <div style="font-size:10px;color:var(--slate);margin-top:2px;">${formatFinAmount(progress, cur)} / ${formatFinAmount(target.total, cur)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      ${agreement.note ? `<p style="font-size:10px;color:var(--slate);margin:10px 0 0;font-style:italic;">"${escapeHtml(agreement.note)}"</p>` : ''}`;
+  }
+  window.exportFinancialsCsv = () => {
+    const prop=document.getElementById('fin-filter-prop').value,type=document.getElementById('fin-filter-type').value,year=document.getElementById('fin-filter-year').value;
+    let items = allFinancials;
+    if(prop) items=items.filter(f=>f.propertyId===prop);
+    if(type) items=items.filter(f=>f.type===type);
+    if(year) items=items.filter(f=>f.date?.startsWith(year));
+    if (!items.length) { alert('Nothing to export in the current filter.'); return; }
+    const escapeCsv = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+    const header = ['Date','Property','Type','Category','Description','Vendor','Amount','Currency','Receipt URL','Notes'];
+    const rows = items.map(f => [f.date, f.propertyName, f.type, f.category, f.description, f.vendor, f.amount, f.currency||'USD', f.receiptUrl||'', f.notes].map(escapeCsv).join(','));
+    const csv = [header.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const labelParts = [prop ? allProperties.find(p=>p.id===prop)?.name : 'all-properties', type || 'all-types', year || 'all-years'];
+    a.href = url;
+    a.download = `financials_${labelParts.join('_').replace(/\s+/g,'-')}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Pulls confirmed payments (status 'paid') into Financials as income
+  // entries, so rent actually received doesn't need separate manual
+  // re-entry. Deliberately sources from `payments` only, not `invoices`
+  // too — the two can represent the same underlying transaction (an
+  // invoice gets marked paid because a payment came in), and pulling from
+  // both without very careful de-duplication would risk double-counting
+  // the same rent as income twice. Idempotent via syncedFromPaymentId, so
+  // clicking this repeatedly is always safe — already-synced payments are
+  // skipped, not duplicated.
+  window.syncIncomeFromPayments = async () => {
+    const btn = document.getElementById('fin-sync-income-btn');
+    btn.disabled = true; const original = btn.textContent; btn.textContent = t('financials.syncingEllipsis');
+    try {
+      const alreadySynced = new Set(allFinancials.filter(f => f.syncedFromPaymentId).map(f => f.syncedFromPaymentId));
+      const snap = await getDocs(query(collection(db, 'payments'), where('status', '==', 'paid')));
+      const paidPayments = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(p => !alreadySynced.has(p.id));
+
+      if (!paidPayments.length) { alert(t('financials.nothingNewToSync')); btn.disabled = false; btn.textContent = original; return; }
+
+      const CHUNK_SIZE = 400;
+      let synced = 0, skippedNoProperty = 0;
+      for (let i = 0; i < paidPayments.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        for (const p of paidPayments.slice(i, i + CHUNK_SIZE)) {
+          if (!p.propertyId) { skippedNoProperty++; continue; } // can't attribute income to a property without one
+          const prop = allProperties.find(pr => pr.id === p.propertyId);
+          const tenant = allTenants.find(t => t.id === p.tenantId);
+          const dateObj = p.paidAt?.toDate ? p.paidAt.toDate() : (p.createdAt?.toDate ? p.createdAt.toDate() : (p.manualDate ? new Date(p.manualDate) : new Date()));
+          const ref = doc(collection(db, 'financials'));
+          batch.set(ref, {
+            type: 'income', propertyId: p.propertyId, propertyName: prop?.name || '',
+            currency: prop?.country === 'CO' ? 'COP' : 'USD',
+            date: dateObj.toISOString().split('T')[0], category: 'Rent',
+            amount: Number(p.amount) || 0,
+            description: p.description || (t('financials.syncedPaymentDesc') + (tenant ? ' - ' + tenant.firstName + ' ' + tenant.lastName : '')),
+            vendor: '', notes: p.method ? t('financials.syncedFromMethod').replace('{method}', p.method) : t('financials.syncedFromPayment'),
+            syncedFromPaymentId: p.id,
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          });
+          synced++;
+        }
+        await batch.commit();
+      }
+      logAdminAction('financials_income_synced', 'financials', null, null, `${synced} payment(s) synced`);
+      await loadFinancials();
+      alert(t('financials.syncedCount').replace('{n}', synced) + (skippedNoProperty ? ' ' + t('financials.skippedNoProperty').replace('{n}', skippedNoProperty) : ''));
+    } catch (e) {
+      alert(t('financials.syncFailed') + e.message);
+    }
+    btn.disabled = false; btn.textContent = original;
+  };
+
+  // ===== IMPORT CSV (financials) =====
+  // State for the multi-step wizard. importRawRows is every row PapaParse
+  // returned, unfiltered — the header-row offset is applied fresh each
+  // time it's needed, since the person can go back and change it.
+  let importRawRows = [];
+  let importHeaders = [];
+  let importColumnMap = {}; // { date: colIndex, category: colIndex, amount: colIndex, description: colIndex|null, vendor: colIndex|null, paidBy: colIndex|null, notes: colIndex|null }
+  let importCategoryMap = {}; // { sourceValue: targetCategory | '__exclude__' }
+  let importComputedRows = []; // the final, mapped rows as of the last time step 4 was built
+
+  function parseImportDate(raw, format) {
+    if (!raw || !String(raw).trim()) return null;
+    const parts = String(raw).trim().split(/[-\/]/);
+    if (parts.length !== 3) return null;
+    let y, m, d;
+    if (format === 'YMD') { [y, m, d] = parts; }
+    else if (format === 'DMY') { [d, m, y] = parts; }
+    else { [m, d, y] = parts; }
+    y = parseInt(y, 10); m = parseInt(m, 10); d = parseInt(d, 10);
+    if (y < 100) y += 2000;
+    if (!y || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const iso = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const test = new Date(iso + 'T00:00:00Z');
+    if (isNaN(test.getTime()) || test.getUTCFullYear() !== y || test.getUTCMonth()+1 !== m || test.getUTCDate() !== d) return null;
+    return iso;
+  }
+  function parseImportAmount(raw) {
+    if (raw == null) return null;
+    const cleaned = String(raw).replace(/[^0-9.\-]/g, '');
+    const n = parseFloat(cleaned);
+    return isNaN(n) ? null : n;
+  }
+
+  window.openImportCsvModal = () => {
+    importRawRows = []; importHeaders = []; importColumnMap = {}; importCategoryMap = {}; importComputedRows = [];
+    document.getElementById('import-csv-file').value = '';
+    document.getElementById('import-header-row').value = '1';
+    document.getElementById('import-raw-preview').style.display = 'none';
+    document.getElementById('import-csv-alert').classList.add('hidden');
+    const psel = document.getElementById('import-csv-property');
+    psel.innerHTML = `<option value="">${t('financials.selectProperty')}</option>` + allProperties.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    goToImportStep(1);
+    openModal('import-csv-modal');
+  };
+
+  window.handleImportFileSelect = (files) => {
+    const file = files?.[0]; if (!file) return;
+    Papa.parse(file, {
+      skipEmptyLines: false,
+      complete: (result) => {
+        importRawRows = result.data;
+        renderImportPreviewRaw();
+      },
+      error: (err) => showAlert('import-csv-alert', t('importCsv.couldNotReadFile') + err.message),
+    });
+  };
+  window.renderImportPreviewRaw = () => {
+    const container = document.getElementById('import-raw-preview');
+    if (!importRawRows.length) { container.style.display = 'none'; return; }
+    container.style.display = '';
+    const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+    container.innerHTML = importRawRows.slice(0, 6).map((row, i) => {
+      const rowNum = i + 1;
+      const isHeader = rowNum === headerRowNum;
+      return `<div style="${isHeader ? 'font-weight:600;color:var(--amber);' : ''}">${isHeader ? '→ ' : ''}${t('importCsv.rowLabel').replace('{n}', rowNum)}: ${row.join(' | ')}</div>`;
+    }).join('');
+  };
+
+  function importFieldOptions() {
+    return [
+      { value: '', label: t('importCsv.skipColumn') },
+      { value: 'date', label: t('importCsv.fieldDate') },
+      { value: 'category', label: t('importCsv.fieldCategory') },
+      { value: 'amount', label: t('importCsv.fieldAmount') },
+      { value: 'description', label: t('common.description') },
+      { value: 'vendor', label: t('common.vendor') },
+      { value: 'paidBy', label: t('importCsv.fieldPaidBy') },
+      { value: 'notes', label: t('importCsv.fieldNotes') },
+    ];
+  }
+  // Best-guess default mapping from common header names (English and
+  // Spanish, given this app serves both US and Colombia properties) - the
+  // person can always override any of these.
+  function guessFieldForHeader(header) {
+    const h = (header || '').toLowerCase().trim();
+    if (/fecha|^date$/.test(h)) return 'date';
+    if (/categor/.test(h)) return 'category';
+    if (/monto|amount|total/.test(h)) return 'amount';
+    if (/descripcion|description|memo/.test(h)) return 'description';
+    if (/vendor|payee|merchant/.test(h)) return 'vendor';
+    if (/gasto de|paid by|owner|who/.test(h)) return 'paidBy';
+    if (/cuenta|account|notes|note/.test(h)) return 'notes';
+    return '';
+  }
+
+  window.goToImportStep = (step) => {
+    if (step === 2) {
+      if (!importRawRows.length) { showAlert('import-csv-alert', t('importCsv.chooseFileFirst')); return; }
+      if (!document.getElementById('import-csv-property').value) { showAlert('import-csv-alert', t('importCsv.selectPropertyFirst')); return; }
+      const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+      importHeaders = importRawRows[headerRowNum - 1] || [];
+      if (!importHeaders.length || importHeaders.every(h => !h.trim())) { showAlert('import-csv-alert', t('importCsv.rowLooksEmpty').replace('{n}', headerRowNum)); return; }
+      renderImportColumnMapping();
+    }
+    if (step === 3) {
+      importColumnMap = {};
+      document.querySelectorAll('.import-col-select').forEach(sel => {
+        if (sel.value) importColumnMap[sel.value] = parseInt(sel.dataset.colIndex);
+      });
+      if (importColumnMap.date == null || importColumnMap.category == null || importColumnMap.amount == null) {
+        showAlert('import-csv-alert', t('importCsv.mustMapRequired')); return;
+      }
+      renderImportCategoryMapping();
+    }
+    if (step === 4) {
+      importCategoryMap = {};
+      document.querySelectorAll('.import-cat-select').forEach(sel => { importCategoryMap[sel.dataset.sourceValue] = sel.value; });
+      renderImportPreview();
+    }
+    document.getElementById('import-csv-alert').classList.add('hidden');
+    [1,2,3,4].forEach(s => document.getElementById(`import-step-${s}`).classList.toggle('hidden', s !== step));
+  };
+
+  function renderImportColumnMapping() {
+    const container = document.getElementById('import-column-mapping');
+    container.innerHTML = importHeaders.map((header, idx) => {
+      const guess = guessFieldForHeader(header);
+      return `<div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;font-size:13px;font-weight:500;">${header || `(column ${idx+1})`}</div>
+        <select class="form-input import-col-select" data-col-index="${idx}" style="flex:1;">
+          ${importFieldOptions().map(o => `<option value="${o.value}" ${o.value===guess?'selected':''}>${o.label}</option>`).join('')}
+        </select>
+      </div>`;
+    }).join('');
+  }
+
+  function renderImportCategoryMapping() {
+    const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+    const dataRows = importRawRows.slice(headerRowNum);
+    const catIdx = importColumnMap.category;
+    const counts = {};
+    dataRows.forEach(row => {
+      const val = (row[catIdx] || '').trim();
+      if (val) counts[val] = (counts[val] || 0) + 1;
+    });
+    const propId = document.getElementById('import-csv-property').value;
+    const country = allProperties.find(p => p.id === propId)?.country === 'CO' ? 'CO' : 'US';
+    const targetOptions = [...FIN_INCOME_CATEGORIES, ...FIN_EXPENSE_CATEGORIES[country]];
+    const container = document.getElementById('import-category-mapping');
+    const sourceValues = Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+    if (!sourceValues.length) { container.innerHTML = `<p style="font-size:12px;color:var(--slate);">${t('importCsv.noCategoryValues')}</p>`; return; }
+    container.innerHTML = sourceValues.map(val => `
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;font-size:13px;">${val} <span style="color:var(--slate);font-size:11px;">(${t('importCsv.rowCount').replace('{n}', counts[val])})</span></div>
+        <select class="form-input import-cat-select" data-source-value="${val.replace(/"/g,'&quot;')}" style="flex:1;">
+          <option value="__exclude__">${t('importCsv.excludeRows')}</option>
+          ${targetOptions.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>`).join('');
+  }
+
+  function computeImportRows() {
+    const headerRowNum = parseInt(document.getElementById('import-header-row').value) || 1;
+    const dateFormat = document.getElementById('import-date-format').value;
+    const dataRows = importRawRows.slice(headerRowNum);
+    const propId = document.getElementById('import-csv-property').value;
+    const prop = allProperties.find(p => p.id === propId);
+    const currency = prop?.country === 'CO' ? 'COP' : 'USD';
+    const get = (row, field) => importColumnMap[field] != null ? (row[importColumnMap[field]] || '').trim() : '';
+
+    const results = { valid: [], skippedNoDate: [], skippedExcluded: [], skippedBadAmount: [] };
+    for (const row of dataRows) {
+      if (!row.some(c => c && c.trim())) continue; // fully blank row (e.g. the separator row)
+      const dateRaw = get(row, 'date');
+      const isoDate = parseImportDate(dateRaw, dateFormat);
+      if (!isoDate) { results.skippedNoDate.push(row); continue; } // catches blank + "total" summary rows automatically
+      const sourceCategory = get(row, 'category');
+      const targetCategory = importCategoryMap[sourceCategory];
+      if (!targetCategory || targetCategory === '__exclude__') { results.skippedExcluded.push(row); continue; }
+      const rawAmount = get(row, 'amount');
+      const amount = parseImportAmount(rawAmount);
+      if (amount == null) { results.skippedBadAmount.push(row); continue; }
+      const isIncomeCategory = FIN_INCOME_CATEGORIES.includes(targetCategory);
+      results.valid.push({
+        type: isIncomeCategory ? 'income' : 'expense',
+        propertyId: propId, propertyName: prop?.name || '', currency,
+        date: isoDate, category: targetCategory, amount: Math.abs(amount),
+        description: get(row, 'description') || sourceCategory,
+        vendor: get(row, 'vendor'),
+        paidByOwner: get(row, 'paidBy') || null,
+        notes: get(row, 'notes'),
+      });
+    }
+    return results;
+  }
+
+  function renderImportPreview() {
+    const results = computeImportRows();
+    importComputedRows = results.valid;
+    const total = results.valid.reduce((s, r) => s + r.amount, 0);
+    const currency = importComputedRows[0]?.currency || 'USD';
+    document.getElementById('import-summary').innerHTML = `
+      <strong>${results.valid.length}</strong> ${t('importCsv.rowsWillImport').replace('{total}', formatFinAmount(total, currency))}<br>
+      ${results.skippedExcluded.length ? `${t('importCsv.rowsExcludedByCategory').replace('{n}', results.skippedExcluded.length)}<br>` : ''}
+      ${results.skippedNoDate.length ? `${t('importCsv.rowsSkippedNoDate').replace('{n}', results.skippedNoDate.length)}<br>` : ''}
+      ${results.skippedBadAmount.length ? t('importCsv.rowsSkippedBadAmount').replace('{n}', results.skippedBadAmount.length) : ''}
+    `;
+    const tbody = document.getElementById('import-preview-tbody');
+    if (!importComputedRows.length) { tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--slate);padding:16px;">${t('importCsv.nothingToImport')}</td></tr>`; return; }
+    tbody.innerHTML = importComputedRows.map(r => `<tr>
+      <td>${r.date}</td><td>${r.category}</td><td>${formatFinAmount(r.amount, r.currency)}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.description||'—'}</td>
+      <td>${r.paidByOwner||'—'}</td>
+    </tr>`).join('');
+  }
+
+  window.confirmImportCsv = async () => {
+    if (!importComputedRows.length) { showAlert('import-csv-alert', t('importCsv.nothingToImport')); return; }
+    const btn = document.getElementById('import-confirm-btn'); btn.disabled = true; btn.textContent = t('importCsv.importingEllipsis');
+    try {
+      // Chunked writeBatch calls - Firestore caps a single batch at 500
+      // operations, so this stays correct even for larger files than this
+      // one, not just the ~70-row case in front of us right now.
+      const CHUNK_SIZE = 400;
+      for (let i = 0; i < importComputedRows.length; i += CHUNK_SIZE) {
+        const batch = writeBatch(db);
+        importComputedRows.slice(i, i + CHUNK_SIZE).forEach(row => {
+          const ref = doc(collection(db, 'financials'));
+          batch.set(ref, { ...row, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        });
+        await batch.commit();
+      }
+      logAdminAction('financials_csv_imported', 'property', document.getElementById('import-csv-property').value, allProperties.find(p=>p.id===document.getElementById('import-csv-property').value)?.name, `${importComputedRows.length} row(s)`);
+      closeModal('import-csv-modal');
+      await loadFinancials();
+      alert(t('importCsv.importedCount').replace('{n}', importComputedRows.length));
+    } catch (e) {
+      showAlert('import-csv-alert', t('importCsv.importFailed') + e.message);
+    }
+    btn.disabled = false; btn.textContent = t('importCsv.importNow');
+  };
+  window.openFinancialModal=()=>{
+    document.getElementById('fin-edit-id').value='';
+    document.getElementById('fin-modal-title').textContent=t('financials.addTransaction');
+    document.getElementById('fin-alert').classList.add('hidden');
+    document.getElementById('fin-date').value=new Date().toISOString().split('T')[0];
+    document.getElementById('fin-amount').value='';
+    document.getElementById('fin-description').value='';
+    document.getElementById('fin-vendor').value='';
+    document.getElementById('fin-notes').value='';
+    document.getElementById('fin-receiptUrl').value='';
+    document.getElementById('fin-receipt-preview').textContent=t('financials.noneAttached');
+    document.getElementById('fin-paidby').value='';
+    const psel=document.getElementById('fin-property');
+    psel.innerHTML=`<option value="">${t('financials.selectProperty')}</option>`+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    setFinType('income'); updateFinCategoryOptions(); openModal('financial-modal');
+  };
+  window.editFinancial=(id)=>{
+    const f=allFinancials.find(x=>x.id===id); if(!f) return;
+    document.getElementById('fin-edit-id').value=id;
+    document.getElementById('fin-modal-title').textContent=t('financials.editTransaction');
+    document.getElementById('fin-date').value=f.date||'';
+    document.getElementById('fin-amount').value=f.amount||'';
+    document.getElementById('fin-description').value=f.description||'';
+    document.getElementById('fin-vendor').value=f.vendor||'';
+    document.getElementById('fin-notes').value=f.notes||'';
+    document.getElementById('fin-receiptUrl').value=f.receiptUrl||'';
+    document.getElementById('fin-receipt-preview').innerHTML=f.receiptUrl?`<a href="${f.receiptUrl}" target="_blank" style="color:var(--amber);font-size:12px;">📎 ${t('financials.viewCurrentReceipt')}</a>`:t('financials.noneAttached');
+    const psel=document.getElementById('fin-property');
+    psel.innerHTML=`<option value="">${t('financials.selectProperty')}</option>`+allProperties.map(p=>`<option value="${p.id}">${p.name}</option>`).join('');
+    psel.value=f.propertyId||'';
+    setFinType(f.type||'income');
+    updateFinCategoryOptions(f.category);
+    document.getElementById('fin-paidby').value = f.paidByOwner || '';
+    document.getElementById('fin-alert').classList.add('hidden');
+    openModal('financial-modal');
+  };
+  window.handleFinReceiptUpload = async (fileList) => {
+    const file = fileList?.[0]; if (!file) return;
+    const preview = document.getElementById('fin-receipt-preview');
+    preview.textContent = t('financials.uploadingEllipsis');
+    try {
+      const propId = document.getElementById('fin-property').value || 'unassigned';
+      const url = await uploadFile(file, `properties/${propId}`);
+      document.getElementById('fin-receiptUrl').value = url;
+      preview.innerHTML = `<a href="${url}" target="_blank" style="color:var(--amber);font-size:12px;">📎 ${file.name}</a>`;
+    } catch (e) {
+      preview.textContent = t('financials.noneAttached');
+      alert(t('financials.receiptUploadFailed') + e.message);
+    }
   };
   window.saveFinancial=async()=>{
     const id=document.getElementById('fin-edit-id').value,propId=document.getElementById('fin-property').value,date=document.getElementById('fin-date').value,amount=parseFloat(document.getElementById('fin-amount').value),cat=document.getElementById('fin-category').value;
