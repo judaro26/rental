@@ -2496,60 +2496,6 @@
   // state drives what the UI shows/locks, which matters for UX but is not
   // itself the security guarantee.
   let CURRENT_ADMIN = null;
-
-
-  // Global pagination state
-  let finCurrentPage = 1;
-  
-  window.changeFinPage = function(delta) {
-    finCurrentPage += delta;
-    renderFinancials();
-  };
-  
-  window.filterFinancials = function() {
-    finCurrentPage = 1; // Reset to page 1 whenever filters change
-    renderFinancials();
-  };
-  
-  function renderFinancials() {
-    const tbody = document.getElementById('financials-tbody');
-    const infoEl = document.getElementById('fin-page-info');
-    const prevBtn = document.getElementById('fin-prev-btn');
-    const nextBtn = document.getElementById('fin-next-btn');
-    const pageSize = parseInt(document.getElementById('fin-page-size')?.value || 20, 10);
-  
-    // 1. Get filtered entries from your existing dataset
-    const filtered = getFilteredFinancials(); // Array of filtered financial records
-    const totalItems = filtered.length;
-    const totalPages = Math.ceil(totalItems / pageSize) || 1;
-  
-    // Keep page index within valid bounds
-    if (finCurrentPage < 1) finCurrentPage = 1;
-    if (finCurrentPage > totalPages) finCurrentPage = totalPages;
-  
-    // 2. Slice items for current page
-    const startIdx = (finCurrentPage - 1) * pageSize;
-    const endIdx = Math.min(startIdx + pageSize, totalItems);
-    const pageItems = filtered.slice(startIdx, endIdx);
-  
-    // 3. Render table rows for pageItems
-    if (pageItems.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px;">No transactions found.</td></tr>`;
-    } else {
-      tbody.innerHTML = pageItems.map(item => createFinancialRowHtml(item)).join('');
-    }
-  
-    // 4. Update pagination controls
-    if (infoEl) {
-      infoEl.textContent = totalItems > 0 
-        ? `Showing ${startIdx + 1}–${endIdx} of ${totalItems}` 
-        : `Showing 0 of 0`;
-    }
-    if (prevBtn) prevBtn.disabled = finCurrentPage <= 1;
-    if (nextBtn) nextBtn.disabled = finCurrentPage >= totalPages;
-  }
-
-
   
   function isRestrictedAdmin() { return CURRENT_ADMIN?.role === 'restricted_admin'; }
 
