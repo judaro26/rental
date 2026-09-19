@@ -838,7 +838,7 @@
         <div id="fin-pagination" style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-top:1px solid var(--border);background:#FDFAF5;flex-wrap:wrap;gap:10px;">
           <span id="fin-page-info" style="font-size:12px;color:var(--slate);">Showing 0 of 0</span>
           <div style="display:flex;gap:8px;align-items:center;">
-            <select id="fin-page-size" class="form-input" style="width:120px;font-size:12px;padding:4px 8px;" onchange="finCurrentPage=1;renderFinancials();">
+            <select id="fin-page-size" class="form-input" style="width:120px;font-size:12px;padding:4px 8px;" onchange="onFinPageSizeChange()">
               <option value="10">10 / page</option>
               <option value="20" selected>20 / page</option>
               <option value="50">50 / page</option>
@@ -7810,6 +7810,11 @@
     renderFinancials();
   };
 
+  window.onFinPageSizeChange = function() {
+    finCurrentPage = 1;
+    renderFinancials();
+  };
+
   window.filterFinancials = () => {
     const prop = document.getElementById('fin-filter-prop')?.value || '';
     const type = document.getElementById('fin-filter-type')?.value || '';
@@ -7833,10 +7838,8 @@
     return `$${n.toFixed(2)}`;
   }
 
-  function renderFinancials(items) {
-    if (items) currentFilteredFinancials = items;
-    items = currentFilteredFinancials || [];
-
+  function renderFinancials(items = currentFilteredFinancials) {
+    currentFilteredFinancials = items || [];
     const tbody = document.getElementById('financials-tbody');
     if (!tbody) return;
 
@@ -7872,7 +7875,6 @@
     renderOwnerSpendBreakdown(items);
     renderCatchupTracker();
 
-    // Slices items for active page view
     const pageSize = parseInt(document.getElementById('fin-page-size')?.value || 20, 10);
     const totalItems = items.length;
     const totalPages = Math.ceil(totalItems / pageSize) || 1;
@@ -7920,6 +7922,7 @@
     if (prevBtn) prevBtn.disabled = finCurrentPage <= 1;
     if (nextBtn) nextBtn.disabled = finCurrentPage >= totalPages;
   }
+  window.renderFinancials = renderFinancials;
 
   function renderFinCategoryBreakdown(items) {
     const container = document.getElementById('fin-category-breakdown');
