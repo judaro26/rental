@@ -2411,6 +2411,14 @@
 <script src="/shared/upload.js"></script>
 <!-- FIREBASE + ADMIN LOGIC -->
 <script type="module">
+  // Intercept and ignore third-party browser extension noise (e.g., M_ID errors off WebChannel streams)
+  window.addEventListener('unhandledrejection', event => {
+    const msg = event.reason?.message || '';
+    const stack = event.reason?.stack || '';
+    if (msg.includes('M_ID') || stack.includes('200.js') || stack.includes('fetchxmlhttpfactory')) {
+      event.preventDefault();
+    }
+  });
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
   import { getAuth, onAuthStateChanged, signOut, signInWithCustomToken, setPersistence, browserSessionPersistence } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
   import { getFirestore, collection, doc, getDoc, getDocs, addDoc, setDoc, updateDoc, deleteDoc, query, where, orderBy, startAfter, limit, serverTimestamp, Timestamp, writeBatch, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
@@ -2420,6 +2428,9 @@
     const res = await fetch('/api/config');
     if (!res.ok) throw new Error(`Config fetch failed: ${res.status}`);
     _cfg = await res.json();
+    if (_cfg && _cfg.firebase) {
+      _cfg.firebase.measurementId = _cfg.firebase.measurementId || '';
+    }
   } catch (err) {
     console.error('Failed to load app config:', err);
     document.body.innerHTML = '<p style="text-align:center;padding:4rem;font-family:sans-serif">Failed to load site configuration. Please try again later.</p>';
@@ -3829,10 +3840,8 @@
     };
   }
 
-  onAuthStateChanged(auth, async user => {
+    onAuthStateChanged(auth, async user => {
     if (!user) {
-      // Legitimately empty during the brief handshake above — that
-      // promise has its own explicit redirect if it ultimately fails.
       if (_isImpersonationTarget) return;
       window.location.href = '/index.html'; return;
     }
@@ -3844,50 +3853,43 @@
         }
       } catch (e) { console.warn('Could not read impersonation claims:', e); }
     }
-    const adminRef  = doc(db, 'admins', user.uid);
-    const adminSnap = await getDoc(adminRef);
-    if (!adminSnap.exists()) { window.location.href = '/index.html'; return; }
-    let adminData = adminSnap.data();
+    try {
+      const adminRef  = doc(db, 'admins', user.uid);
+      const adminSnap = await getDoc(adminRef);
+      if (!adminSnap.exists()) { window.location.href = '/index.html'; return; }
+      let adminData = adminSnap.data();
 
-    if (adminData.status === 'revoked') { await signOut(auth); window.location.href = '/index.html'; return; }
+      if (adminData.status === 'revoked') { await signOut(auth); window.location.href = '/index.html'; return; }
 
-    // Legacy admin docs created before roles existed have no `role` field.
-    // Treat as Super Admin — this preserves, not expands, their existing
-    // unrestricted access — and silently backfill the field going forward.
-    // Treat a missing role AND an unrecognized role value (e.g. a manual
-    // edit that doesn't match either enum member) as needing the same
-    // one-time repair back to super_admin. A genuine restricted_admin has
-    // no client-side path to reach this branch — see firestore.rules.
-    // Wrapped in try/catch: if this write is ever rejected for some reason
-    // (e.g. a rules mismatch), the session should still load with
-    // best-effort local state rather than taking down the whole page.
-    if (!['super_admin', 'restricted_admin'].includes(adminData.role)) {
-      try {
-        await updateDoc(adminRef, { role: 'super_admin', allowedCountry: null });
-        adminData = { ...adminData, role: 'super_admin', allowedCountry: null };
-      } catch (e) { console.warn('Could not self-heal admin role:', e); }
+      if (!['super_admin', 'restricted_admin'].includes(adminData.role)) {
+        try {
+          await updateDoc(adminRef, { role: 'super_admin', allowedCountry: null });
+          adminData = { ...adminData, role: 'super_admin', allowedCountry: null };
+        } catch (e) { console.warn('Could not self-heal admin role:', e); }
+      }
+      if (adminData.status === 'invited') {
+        try {
+          await updateDoc(adminRef, { status: 'active', activatedAt: serverTimestamp() });
+          adminData = { ...adminData, status: 'active' };
+        } catch (e) { console.warn('Could not activate admin on first login:', e); }
+      }
+
+      CURRENT_ADMIN = {
+        uid: user.uid, email: user.email,
+        role: adminData.role, allowedCountry: adminData.allowedCountry || null,
+        language: adminData.language || null,
+        dashboardLayoutRaw: Array.isArray(adminData.dashboardLayout) ? adminData.dashboardLayout : null,
+      };
+
+      document.getElementById('admin-email-label').textContent = user.email;
+      applyAdminRoleUI();
+      await initLanguage();
+      resetInactivityTimer();
+      await loadAll();
+      await loadDashboardLayout();
+    } catch (err) {
+      console.error('Error fetching admin user document:', err);
     }
-    // First-login activation, mirroring the tenant invite flow.
-    if (adminData.status === 'invited') {
-      try {
-        await updateDoc(adminRef, { status: 'active', activatedAt: serverTimestamp() });
-        adminData = { ...adminData, status: 'active' };
-      } catch (e) { console.warn('Could not activate admin on first login:', e); }
-    }
-
-    CURRENT_ADMIN = {
-      uid: user.uid, email: user.email,
-      role: adminData.role, allowedCountry: adminData.allowedCountry || null,
-      language: adminData.language || null,
-      dashboardLayoutRaw: Array.isArray(adminData.dashboardLayout) ? adminData.dashboardLayout : null,
-    };
-
-    document.getElementById('admin-email-label').textContent = user.email;
-    applyAdminRoleUI();
-    await initLanguage();
-    resetInactivityTimer();
-    await loadAll();
-    await loadDashboardLayout();
   });
 
   async function loadAll() {
