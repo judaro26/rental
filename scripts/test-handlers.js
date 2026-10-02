@@ -90,15 +90,35 @@ const dbFor = id => { if (!_dbs.has(id)) _dbs.set(id, makeFakeDb(id)); return _d
 
 const FieldValue = { serverTimestamp: () => 'TS', arrayUnion: (...a) => ({ arrayUnion: a }), arrayRemove: (...a) => ({ arrayRemove: a }), increment: n => ({ inc: n }), delete: () => 'DEL' };
 const Timestamp = { now: () => ({ toDate: () => new Date(), toMillis: () => Date.now() }), fromDate: d => ({ toDate: () => d, toMillis: () => d.getTime() }), fromMillis: ms => ({ toDate: () => new Date(ms), toMillis: () => ms }) };
-const AUTH = { uid: null };   // null = no valid session; otherwise verifyIdToken succeeds as this uid
+// The session the caller presents: who they are, and which pool (tenant) their token was issued in.
+// tenant null = the project-level pool, i.e. no tenant claim in the token.
+const AUTH = { uid: null, tenant: null };
+const authCalls = [];      // every Auth call: which pool answered, and which workspace it was made for
+function makeFakeAuth(tenantId) {
+  const rec = method => authCalls.push({ method, pool: tenantId, ws: W && W.currentWorkspace() });
+  return {
+    // Mirrors the REAL SDK (verified in firebase-admin's source): the tenant-aware Auth rejects a token from any
+    // other pool, but the project-level Auth accepts a token from ANY pool. Our getAuth() wrapper has to cover that.
+    verifyIdToken: async () => {
+      rec('verifyIdToken');
+      if (!AUTH.uid) { const e = new Error('invalid token'); e.code = 'auth/argument-error'; throw e; }
+      const decoded = { uid: AUTH.uid, email: `${AUTH.uid}@example.com`, firebase: { sign_in_provider: 'password', ...(AUTH.tenant ? { tenant: AUTH.tenant } : {}) } };
+      if (tenantId !== null && decoded.firebase.tenant !== tenantId) { const e = new Error('mismatching tenant'); e.code = 'auth/mismatching-tenant-id'; throw e; }
+      return decoded;
+    },
+    getUser: async () => { rec('getUser'); throw new Error('no user'); },
+    getUserByEmail: async () => { rec('getUserByEmail'); throw new Error('no user'); },
+    createCustomToken: async () => { rec('createCustomToken'); return 'custom'; },
+    createUser: async () => { rec('createUser'); return { uid: 'u' }; },
+    setCustomUserClaims: async () => { rec('setCustomUserClaims'); },
+    updateUser: async () => { rec('updateUser'); return {}; },
+    generatePasswordResetLink: async () => { rec('generatePasswordResetLink'); return 'https://example.test/reset'; },
+  };
+}
 const fakeAdmin = {
   apps: [{}], initializeApp() {}, credential: { cert: () => ({}) }, app: () => ({}),
   firestore: Object.assign(() => dbFor('(default)'), { FieldValue, Timestamp }),
-  auth: () => ({
-    verifyIdToken: async () => { if (AUTH.uid) return { uid: AUTH.uid, email: `${AUTH.uid}@example.com` }; const e = new Error('invalid token'); e.code = 'auth/argument-error'; throw e; },
-    getUser: async () => { throw new Error('no user'); }, getUserByEmail: async () => { throw new Error('no user'); },
-    createCustomToken: async () => 'custom', createUser: async () => ({ uid: 'u' }), setCustomUserClaims: async () => {}, updateUser: async () => ({}),
-  }),
+  auth: () => Object.assign(makeFakeAuth(null), { tenantManager: () => ({ authForTenant: id => makeFakeAuth(id) }) }),
 };
 
 const origLoad = Module._load;
@@ -120,7 +140,7 @@ function check(name, cond, detail) {
   if (cond) { passed++; console.log(`\x1b[32m✓\x1b[0m ${name}`); }
   else { failed++; console.log(`\x1b[31m✗ ${name}\x1b[0m${detail ? '\n  ' + String(detail).split('\n').join('\n  ') : ''}`); }
 }
-const ACME = { id: 'acme', name: 'Acme Rentals', databaseId: 'ws-acme', status: 'active', domains: ['portal.acme.com'] };
+const ACME = { id: 'acme', name: 'Acme Rentals', databaseId: 'ws-acme', authTenantId: 'acme-t1abc', status: 'active', domains: ['portal.acme.com'] };
 const ACME_SECRETS = { STRIPE_SECRET_KEY: 'sk_acme', STRIPE_WEBHOOK_SECRET: 'whsec_acme', STRIPE_PUBLISHABLE_KEY: 'pk_acme', ADMIN_NOTIFY_EMAIL: 'ops@acme.example', SITE_NAME: 'Acme Rentals' };
 W._testing.setRegistry({
   async loadSecrets(id) { return id === 'acme' ? ACME_SECRETS : {}; },
@@ -241,52 +261,73 @@ const SEAM_ERROR = /no workspace context|is not defined|getDb is not a function|
     check('process.env\'s SMTP_* were never modified by any of it', JSON.stringify(['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].map(k => process.env[k])) === envBefore);
   }
 
-  // ── G. authenticated: handlers get past login, isolation still holds ────
+  // ── G. sign-in: every workspace has its own pool, in both directions ────
   {
-    SEEDS['(default)'] = { admins: { 'admin-default': { role: 'super_admin' } } };
-    SEEDS['ws-acme']   = { admins: { 'admin-acme':    { role: 'super_admin' } } };
-    violations.length = 0; const io0 = ioCount; const problems = [];
+    const TENANT = 'acme-t1abc';
+    const session = (uid, tenant) => { AUTH.uid = uid; AUTH.tenant = tenant; };
+    const noSession = () => { AUTH.uid = null; AUTH.tenant = null; };
+    SEEDS['(default)'] = { admins: { 'admin-default': { role: 'super_admin' } }, tenants: { t1: { firstName: 'Dee', email: 'dee@default.example' } } };
+    SEEDS['ws-acme']   = { admins: { 'admin-acme':    { role: 'super_admin' } }, tenants: { t1: { firstName: 'Acme', email: 'a@acme.example' } },
+                           integrationSecrets: { _active: { email: 'e1' }, e1: { host: 'smtp.acme.example', user: 'u', pass: 'p' } } };
+
+    // G1. signed in with a token from the RIGHT pool: handlers get past login and stay in their workspace
+    violations.length = 0; authCalls.length = 0; const io0 = ioCount; const problems = [];
     for (const n of http) {
-      for (const [label, host, uid] of [['default', HOSTS.default, 'admin-default'], ['acme', HOSTS.acme, 'admin-acme']]) {
+      for (const [label, host, uid, tenant] of [['default', HOSTS.default, 'admin-default', null], ['acme', HOSTS.acme, 'admin-acme', TENANT]]) {
         for (const method of ['GET', 'POST']) {
-          AUTH.uid = uid;
+          session(uid, tenant);
           const { result, logs } = await silence(() => withTimeout(handlers[n](mkEvent(host, method), {}).catch(e => ({ __threw: e })), 3000));
-          AUTH.uid = null;
+          noSession();
           if (result && result.__timeout) continue;
           const text = [...logs, result && result.__threw ? result.__threw.message : '', result && result.body ? String(result.body) : ''].join('\n');
           if (SEAM_ERROR.test(text)) problems.push(`${n} [${label} ${method}]: ${(text.match(SEAM_ERROR) || [''])[0]}`);
         }
       }
     }
-    check(`authenticated pass over all ${http.length} handlers: no wiring errors (${ioCount - io0} more database calls exercised)`, problems.length === 0, problems.slice(0, 8).join('\n'));
+    check(`signed in to the right pool, all ${http.length} handlers: no wiring errors (${ioCount - io0} more database calls exercised)`, problems.length === 0, problems.slice(0, 8).join('\n'));
     check('...and still no cross-workspace database access', violations.length === 0, [...new Set(violations)].slice(0, 8).join('\n'));
+    const wrongPool = authCalls.filter(c => c.ws && c.pool !== (c.ws.isDefault ? null : c.ws.authTenantId));
+    const acmeAuth = authCalls.filter(c => c.ws && c.ws.id === 'acme');
+    check(`every Auth call (${authCalls.length}; ${acmeAuth.length} for acme) was answered by that workspace's own pool — acme by tenant "${TENANT}", default by the project-level pool`, wrongPool.length === 0 && acmeAuth.length > 0, wrongPool.slice(0, 5).map(c => `${c.method} for ${c.ws.id} went to pool ${c.pool}`).join('\n'));
 
-    // The key security property: an admin of workspace A is not an admin of workspace B.
-    // Handlers validate input / check mail config BEFORE the admin check, so drive each one
-    // with a superset body (and a mail provider for acme, which does not inherit the
-    // deployment's) until it actually reaches verifyAdmin — then judge what it answered.
-    SEEDS['ws-acme'].integrationSecrets = { _active: { email: 'e1' }, e1: { host: 'smtp.acme.example', user: 'u', pass: 'p' } };
+    // G2. the pool matrix, for every admin-gated handler. Handlers validate input / mail config BEFORE
+    // the admin check, so drive each with a superset body until it really reaches verifyAdmin.
     const FULL_BODY = JSON.stringify({ title: 't', message: 'm', consentId: 'c', docId: 'd', documentGroupId: 'g', tenantId: 't1', moveOutDate: '2026-01-01',
       channel: 'sms', targetType: 'tenant', targetId: 'x', applicationId: 'a1', to: 'x@example.com', email: 'x@example.com', tenantEmail: 'x@example.com',
       subject: 's', body: 'b', invoiceId: 'i1', status: 'pending', adminNotes: 'n', requestedDocs: ['photo_id'], propertyId: 'p1', unit: '1', lineItems: [{ description: 'r', quantity: 1, unitPrice: 1, amount: 1 }] });
     const adminGated = http.filter(n => /verifyAdmin\(/.test(fs.readFileSync(path.join(FN_DIR, n + '.js'), 'utf8')));
-    const REFUSED = /Caller is not an admin/, PRE_AUTH = /Missing Authorization|Invalid or expired/;
-    const leaks = [], ownBlocked = [], unreachable = [];
+    const WRONG_POOL = /Invalid or expired session/, NOT_ADMIN = /Caller is not an admin/, ANY_REFUSAL = /Caller is not an admin|Invalid or expired|Missing Authorization/;
+    const cases = [
+      { id: 'A', host: HOSTS.default, uid: 'admin-default', tenant: null,   want: 'accepted', what: 'the default workspace\'s admin on the default workspace' },
+      { id: 'B', host: HOSTS.acme,    uid: 'admin-default', tenant: null,   want: WRONG_POOL, what: 'a default-pool token presented to acme' },
+      { id: 'C', host: HOSTS.acme,    uid: 'admin-acme',    tenant: TENANT, want: 'accepted', what: 'acme\'s admin on acme' },
+      { id: 'D', host: HOSTS.default, uid: 'admin-acme',    tenant: TENANT, want: WRONG_POOL, what: 'an acme-pool token presented to the DEFAULT workspace (the project-level Auth accepts any tenant\'s token — the wrapper must not)' },
+      { id: 'E', host: HOSTS.acme,    uid: 'not-an-admin',  tenant: TENANT, want: NOT_ADMIN, what: 'a valid acme user who is not an acme admin' },
+    ];
+    const results = {}; for (const c of cases) results[c.id] = [];
     for (const n of adminGated) {
-      const call = async host => { AUTH.uid = 'admin-default'; const ev = mkEvent(host, 'POST'); ev.body = FULL_BODY;
-        const r = (await silence(() => withTimeout(handlers[n](ev, {}), 3000))).result; AUTH.uid = null; return r; };
-      const onOwn = await call(HOSTS.default), onOther = await call(HOSTS.acme);
-      const body = r => (r && r.body) || '';
-      if (REFUSED.test(body(onOwn)) || PRE_AUTH.test(body(onOwn))) ownBlocked.push(`${n}: refused on their OWN workspace: ${body(onOwn).slice(0, 70)}`);
-      if (REFUSED.test(body(onOther))) continue;                      // reached the admin check and was refused: correct
-      // Only a SUCCESS response to the other workspace's admin is a leak. Anything else that
-      // is not the explicit refusal means the handler stopped earlier: reported below so it cannot hide.
-      if (!onOther || onOther.statusCode >= 400) { unreachable.push(`${n}: ${onOther && onOther.statusCode} ${body(onOther).slice(0, 70)}`); continue; }
-      leaks.push(`${n}: default-workspace admin on acme's host got ${onOther && onOther.statusCode} ${body(onOther).slice(0, 70)}`);
+      for (const c of cases) {
+        session(c.uid, c.tenant); const ev = mkEvent(c.host, 'POST'); ev.body = FULL_BODY;
+        const r = (await silence(() => withTimeout(handlers[n](ev, {}), 3000))).result; noSession();
+        const body = (r && r.body) || '';
+        if (c.want === 'accepted') { if (ANY_REFUSAL.test(body)) results[c.id].push(`${n}: wrongly refused: ${body.slice(0, 70)}`); }
+        else if (!c.want.test(body)) results[c.id].push(r && r.statusCode < 400 ? `${n}: LET THROUGH (${r.statusCode})` : `${n}: stopped before the admin check (${r && r.statusCode} ${body.slice(0, 60)})`);
+      }
     }
-    check(`admin-gated handlers that reach the admin check (${adminGated.length - unreachable.length} of ${adminGated.length}): a default-workspace admin is REFUSED on another workspace's host`, leaks.length === 0, leaks.join('\n'));
-    check('...and an admin is accepted on their own workspace (the refusal is about the workspace, not a broken fake)', ownBlocked.length === 0, ownBlocked.join('\n'));
-    check('every admin-gated handler could be driven to its admin check', unreachable.length === 0, unreachable.join('\n'));
+    for (const c of cases) check(`${c.id}. ${adminGated.length} admin-gated handlers — ${c.what}: ${c.want === 'accepted' ? 'accepted' : 'refused'}`, results[c.id].length === 0, results[c.id].join('\n'));
+    check('...and at least 10 handlers were exercised (the matrix is not vacuous)', adminGated.length >= 10);
+
+    // G3. impersonation mints its custom token in the workspace's own pool
+    authCalls.length = 0; const imp = {};
+    for (const [label, host, uid, tenant] of [['default', HOSTS.default, 'admin-default', null], ['acme', HOSTS.acme, 'admin-acme', TENANT]]) {
+      session(uid, tenant); const ev = mkEvent(host, 'POST'); ev.body = JSON.stringify({ targetType: 'tenant', targetId: 't1' });
+      imp[label] = (await silence(() => withTimeout(handlers['start-impersonation'](ev, {}), 3000))).result; noSession();
+    }
+    const minted = authCalls.filter(c => c.method === 'createCustomToken');
+    check('impersonation: a session token is minted for acme in acme\'s pool, and for the default workspace in the project-level pool',
+      imp.acme && imp.acme.statusCode === 200 && imp.default && imp.default.statusCode === 200 && minted.length === 2 &&
+      minted.find(c => c.ws.id === 'acme').pool === TENANT && minted.find(c => c.ws.isDefault).pool === null, JSON.stringify({ acme: imp.acme && imp.acme.statusCode, def: imp.default && imp.default.statusCode, minted: minted.map(c => `${c.ws.id}:${c.pool}`) }));
+
     SEEDS['(default)'] = {}; SEEDS['ws-acme'] = {};
   }
 
@@ -311,9 +352,9 @@ const SEAM_ERROR = /no workspace context|is not defined|getDb is not a function|
     const cfg = handlers.config;
     const call = async (host, headers = {}) => (await silence(() => cfg({ httpMethod: 'GET', headers: { host, ...headers }, queryStringParameters: {} }))).result;
     let r = await call(HOSTS.default, { origin: 'https://rentbay.netlify.app' });
-    check('default workspace: config says database "(default)" (browser behaviour unchanged)', r.statusCode === 200 && JSON.parse(r.body).firestoreDatabaseId === '(default)');
+    check('default workspace: config says database "(default)" and NO tenant (browser behaviour unchanged)', r.statusCode === 200 && JSON.parse(r.body).firestoreDatabaseId === '(default)' && JSON.parse(r.body).authTenantId === null);
     r = await call(HOSTS.acme, { origin: 'https://portal.acme.com' });
-    check('acme: config says database "ws-acme"', r.statusCode === 200 && JSON.parse(r.body).firestoreDatabaseId === 'ws-acme');
+    check('acme: config says database "ws-acme" AND its own sign-in pool "acme-t1abc"', r.statusCode === 200 && JSON.parse(r.body).firestoreDatabaseId === 'ws-acme' && JSON.parse(r.body).authTenantId === 'acme-t1abc');
     r = await call(HOSTS.acme, { referer: 'https://portal.acme.com/tenant-portal' });
     check('acme: same-origin request carrying only a Referer is accepted', r.statusCode === 200);
     for (const [label, hdr] of [['the default workspace\'s origin', { origin: 'https://rentbay.netlify.app' }], ['a look-alike domain', { origin: 'https://portal.acme.com.evil.example' }], ['no origin at all', {}]]) {

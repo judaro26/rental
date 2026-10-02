@@ -48,10 +48,10 @@ function makeRegistry(workspaces, { failLookup = false, failList = false } = {})
     } };
   return reg;
 }
-const ACME  = { id: 'acme',  name: 'Acme Rentals', databaseId: 'ws-acme',  status: 'active',       domains: ['portal.acme.com', 'acme.rentbay.app'] };
-const BETA  = { id: 'beta',  name: 'Beta PM',      databaseId: 'ws-beta',  status: 'active',       domains: ['beta.rentbay.app'] };
-const GONE  = { id: 'gamma', name: 'Gamma',        databaseId: 'ws-gamma', status: 'suspended',    domains: ['gamma.rentbay.app'] };
-const NEW   = { id: 'delta', name: 'Delta',        databaseId: 'ws-delta', status: 'provisioning', domains: ['delta.rentbay.app'] };
+const ACME  = { id: 'acme',  name: 'Acme Rentals', databaseId: 'ws-acme',  authTenantId: 'acme-t1abc', status: 'active',       domains: ['portal.acme.com', 'acme.rentbay.app'] };
+const BETA  = { id: 'beta',  name: 'Beta PM',      databaseId: 'ws-beta',  authTenantId: 'beta-t2def', status: 'active',       domains: ['beta.rentbay.app'] };
+const GONE  = { id: 'gamma', name: 'Gamma',        databaseId: 'ws-gamma', authTenantId: 'gamma-t5mno', status: 'suspended',    domains: ['gamma.rentbay.app'] };
+const NEW   = { id: 'delta', name: 'Delta',        databaseId: 'ws-delta', authTenantId: 'delta-t6pqr', status: 'provisioning', domains: ['delta.rentbay.app'] };
 const ev = host => ({ headers: { host } });
 const dbName = db => db.formattedName;
 

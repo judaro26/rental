@@ -12,7 +12,7 @@
 //   SMTP_PASS                  — app password / SMTP password
 //   SMTP_FROM                  — "My Properties <noreply@yourcompany.com>"
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -145,7 +145,7 @@ exports.handler = async (event) => {
     // ── 1. Create Firebase Auth user (random password — they'll reset it) ───
     let uid;
     try {
-      const user = await a.auth().createUser({
+      const user = await getAuth().createUser({
         email,
         password:    crypto.randomUUID(),
         displayName: `${firstName} ${lastName || ''}`.trim(),
@@ -154,7 +154,7 @@ exports.handler = async (event) => {
     } catch (err) {
       // If user already exists, fetch their UID and re-send
       if (err.code === 'auth/email-already-exists') {
-        const existing = await a.auth().getUserByEmail(email);
+        const existing = await getAuth().getUserByEmail(email);
         uid = existing.uid;
       } else { throw err; }
     }
@@ -173,7 +173,7 @@ exports.handler = async (event) => {
 
     // ── 3. Generate activation link (Firebase password-reset flow) ──────────
     const continueUrl = `${siteUrl}/tenant-portal.html`;
-    const activationUrl = await a.auth().generatePasswordResetLink(email, { url: continueUrl, handleCodeInApp: false });
+    const activationUrl = await getAuth().generatePasswordResetLink(email, { url: continueUrl, handleCodeInApp: false });
 
     // ── 4. Log invite to Firestore ──────────────────────────────────────────
     const inviteRef = await db.collection('invites').add({

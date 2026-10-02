@@ -108,6 +108,8 @@ exports.handler = async (event) => {
     body: JSON.stringify({
       // Which Firestore database this workspace lives in ('(default)' for the original install).
       firestoreDatabaseId: ws.databaseId,
+      // Which sign-in pool (Identity Platform tenant) this workspace uses; null = the project-level pool.
+      authTenantId: ws.authTenantId || null,
       firebase: {
         apiKey:            process.env.FIREBASE_API_KEY,
         authDomain:        `${projectId}.firebaseapp.com`,

@@ -34,6 +34,12 @@
 //   unreadable -> 503. It never falls back to the default workspace, because
 //   that would show one client the wrong client's data.
 //
+// PER-WORKSPACE SIGN-IN
+//   Every non-default workspace has its own Identity Platform tenant (a separate pool of
+//   users). Server code reaches Auth only through getAuth(), which returns that pool and
+//   rejects tokens from any other; browsers set auth.tenantId from /api/config; and the
+//   security rules (scripts/build-rules.js) refuse a token from another tenant.
+//
 // PER-WORKSPACE SETTINGS
 //   Anything that differs per client (Stripe, mail, site URL, notification address, API
 //   keys) is read with getConfig('KEY'), never process.env. The default workspace gets the
@@ -44,7 +50,6 @@
 //
 // KNOWN LIMITS (docs/MULTI-WORKSPACE.md has the full list; do not enable a second
 // workspace until they are closed)
-//   - Sign-in is not yet per-workspace (Firebase Identity Platform tenants).
 //   - Security rules are deployed to one database only; every workspace database and the
 //     platform database (which now holds client settings) need them.
 //   - No automated provisioning, and no per-database backups.
@@ -89,6 +94,7 @@ const CLIENT_KEY_SET = new Set(CLIENT_CONFIG_KEYS);
 
 const WORKSPACE_ID_RE = /^[a-z][a-z0-9-]{2,28}[a-z0-9]$/;        // 4-30 chars
 const DATABASE_ID_RE  = /^[a-z][a-z0-9-]{2,61}[a-z0-9]$/;        // 4-63 chars (Firestore)
+const AUTH_TENANT_RE  = /^[A-Za-z0-9_-]{4,64}$/;                 // Identity Platform tenant id (it is also written into security rules, so keep it strict)
 const RESERVED_IDS = new Set(['default', 'platform', 'admin', 'api', 'www', 'app', 'system', 'netlify']);
 
 class WorkspaceError extends Error {
@@ -124,6 +130,7 @@ function defaultWorkspace() {
     isDefault: true,
     name: process.env.SITE_NAME || null,
     databaseId: '(default)',
+    authTenantId: null,          // the project-level sign-in pool, as before
     storePrefix: '',
     status: 'active',
     domains: Object.freeze([]),
@@ -152,13 +159,24 @@ function normalizeWorkspace(id, data) {
   }
   const domains = (Array.isArray(data.domains) ? data.domains : []).map(normalizeHost).filter(Boolean);
   const primary = normalizeHost(data.primaryDomain) || domains[0] || null;
+  const status = data.status || 'provisioning';
+  const authTenantId = data.authTenantId == null || data.authTenantId === '' ? null : String(data.authTenantId);
+  if (authTenantId !== null && !AUTH_TENANT_RE.test(authTenantId)) {
+    throw new WorkspaceError(500, 'invalid_workspace_config', `invalid authTenantId for workspace "${id}"`);
+  }
+  // Every active workspace has its OWN sign-in pool. Without one it would share the platform's
+  // login system with every other client, which is exactly what must never happen.
+  if (status === 'active' && !authTenantId) {
+    throw new WorkspaceError(500, 'invalid_workspace_config', `workspace "${id}" is active but has no authTenantId (it needs its own sign-in pool)`);
+  }
   return Object.freeze({
     id,
     isDefault: false,
     name: data.name || id,
     databaseId,
+    authTenantId,
     storePrefix: `ws-${id}-`,
-    status: data.status || 'provisioning',
+    status,
     domains: Object.freeze(domains),
     siteUrl: primary ? `https://${primary}` : null,
   });
@@ -336,6 +354,47 @@ function getWorkspaceStore(opts) {
   return getStore({ ...opts, name: getWorkspace().storePrefix + opts.name });
 }
 
+// ── sign-in ──────────────────────────────────────────────────────────────────
+// The Admin-SDK Auth for the current workspace — the ONLY way server code reaches Auth.
+//   default workspace   -> the project-level pool, exactly as before
+//   any other workspace -> ITS OWN pool (an Identity Platform tenant), so users it creates
+//                          and tokens it mints live only there
+//
+// verifyIdToken additionally checks the token's tenant in BOTH directions. The tenant-aware
+// Auth already rejects a token from another tenant, but the project-level Auth accepts a
+// token from ANY tenant — so without this check, a user of one client could present their
+// token to the default workspace. A token must come from this workspace's pool, and from
+// no other. (It is also checked here rather than trusted from the browser: a custom token
+// can be exchanged for a session in a pool the client chooses, so the claim in the token
+// is the only thing that can be relied on.)
+function getAuth() {
+  const ws = getWorkspace();
+  const base = adminNamespace().auth();
+  let scoped = base;
+  if (!ws.isDefault) {
+    if (!ws.authTenantId) throw new Error(`workspace "${ws.id}" has no sign-in pool (authTenantId)`);
+    scoped = base.tenantManager().authForTenant(ws.authTenantId);
+  }
+  const expected = ws.isDefault ? null : ws.authTenantId;
+  const verifyIdToken = async (idToken, checkRevoked) => {
+    const decoded = await scoped.verifyIdToken(idToken, checkRevoked);
+    const tenant = (decoded && decoded.firebase && decoded.firebase.tenant) || null;
+    if (tenant !== expected) {
+      const err = new Error('ID token belongs to a different workspace');
+      err.code = 'auth/mismatching-tenant-id';
+      throw err;
+    }
+    return decoded;
+  };
+  return new Proxy(scoped, {
+    get(target, prop) {
+      if (prop === 'verifyIdToken') return verifyIdToken;
+      const v = target[prop];
+      return typeof v === 'function' ? v.bind(target) : v;
+    },
+  });
+}
+
 // ── handler wrappers ─────────────────────────────────────────────────────────
 function errorResponse(err) {
   if (err instanceof WorkspaceError) {
@@ -412,7 +471,7 @@ const withoutWorkspace = handler => handler;
 module.exports = {
   withWorkspace, withEachWorkspace, withoutWorkspace,
   getWorkspace, currentWorkspace, runWithWorkspace,
-  getDb, getWorkspaceStore, getPlatformDb,
+  getDb, getAuth, getWorkspaceStore, getPlatformDb,
   getConfig, setMailOverride, loadWorkspaceConfig, CLIENT_CONFIG_KEYS, MAIL_KEYS, SECRET_KEYS,
   resolveWorkspace, listActiveWorkspaces, hostFromEvent,
   WorkspaceError,

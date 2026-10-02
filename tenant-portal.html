@@ -645,6 +645,9 @@
   // change here to ever disrupt elsewhere.
   const app  = _isImpersonationTarget ? initializeApp(_cfg.firebase, 'impersonation') : initializeApp(_cfg.firebase);
   const auth = getAuth(app);
+  // Every sign-in, sign-up, password reset and custom-token sign-in below happens in THIS workspace's own
+  // user pool. Must be set before any of them, so it sits right here (null = the platform's own pool).
+  auth.tenantId = _cfg.authTenantId || null;
   const db   = getFirestore(app, _cfg.firestoreDatabaseId || '(default)');
 
   // Positioned immediately after getAuth(app), before any other code —

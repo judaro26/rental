@@ -13,13 +13,14 @@
 //   if (authResult.error) return authResult.error; // a ready-to-return {statusCode, body}
 //   const { ownerData, decoded } = authResult;
 
+const { getAuth } = require('./workspace');
 async function verifyOwner(event, db, a) {
   const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
   const match = authHeader.match(/^Bearer (.+)$/i);
   if (!match) return { error: { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) } };
 
   let decoded;
-  try { decoded = await a.auth().verifyIdToken(match[1]); }
+  try { decoded = await getAuth().verifyIdToken(match[1]); }
   catch { return { error: { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) } }; }
 
   const ownerSnap = await db.collection('ownerUsers').doc(decoded.uid).get();

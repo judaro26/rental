@@ -6,7 +6,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SITE_URL
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -138,7 +138,7 @@ exports.handler = async (event) => {
 
     // Token is valid — generate a fresh Firebase password-reset link (1-hr window)
     const continueUrl   = `${siteUrl}/tenant-portal.html`;
-    const activationUrl = await a.auth().generatePasswordResetLink(
+    const activationUrl = await getAuth().generatePasswordResetLink(
       tokenData.email,
       { url: continueUrl, handleCodeInApp: false }
     );

@@ -5,7 +5,7 @@
 // POST body: { tenantId, tenantEmail, tenantName, methodType? ('card' | 'us_bank_account') }
 // Required env vars: STRIPE_SECRET_KEY, FIREBASE_SERVICE_ACCOUNT
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getDb, withWorkspace } = require('./_lib/workspace');
 const { getStripe } = require('./_lib/stripe-client');
 
 let admin;
@@ -52,7 +52,7 @@ exports.handler = async (event) => {
   if (!bearerMatch) return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) };
 
   let decoded;
-  try { decoded = await fb.auth().verifyIdToken(bearerMatch[1]); }
+  try { decoded = await getAuth().verifyIdToken(bearerMatch[1]); }
   catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
 
   const isOwnSetup = decoded.uid === tenantId;

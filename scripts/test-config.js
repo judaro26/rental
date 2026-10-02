@@ -35,11 +35,11 @@ const tick = ms => new Promise(r => setTimeout(r, ms));
 
 // ── a registry whose operator settings we control ───────────────────────────
 const WS = {
-  acme: { id: 'acme', name: 'Acme Rentals', databaseId: 'ws-acme', status: 'active', domains: ['portal.acme.com'] },
-  beta: { id: 'beta', name: 'Beta PM',      databaseId: 'ws-beta', status: 'active', domains: ['beta.example.org'] },
-  bare: { id: 'bare', name: 'Bare Co',      databaseId: 'ws-bare', status: 'active', domains: ['bare.example.net'] },
+  acme: { id: 'acme', name: 'Acme Rentals', databaseId: 'ws-acme', authTenantId: 'acme-t1abc', status: 'active', domains: ['portal.acme.com'] },
+  beta: { id: 'beta', name: 'Beta PM',      databaseId: 'ws-beta', authTenantId: 'beta-t2def', status: 'active', domains: ['beta.example.org'] },
+  bare: { id: 'bare', name: 'Bare Co',      databaseId: 'ws-bare', authTenantId: 'bare-t3ghi', status: 'active', domains: ['bare.example.net'] },
   // Reachable through a workspaceDomains record, but its own domain list is empty: it has NO site URL to derive.
-  nodom: { id: 'nodom', name: 'No Domain Co', databaseId: 'ws-nodom', status: 'active', domains: [] },
+  nodom: { id: 'nodom', name: 'No Domain Co', databaseId: 'ws-nodom', authTenantId: 'nodom-t4jkl', status: 'active', domains: [] },
 };
 const ALIASES = { 'nodom.example.net': 'nodom' };
 const SECRETS = {
