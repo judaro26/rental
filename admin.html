@@ -10244,9 +10244,20 @@
     renderReminderRows(currentReminders);
   };
 
-  window.removeReminderRow = (idx) => {
-    currentReminders.splice(idx, 1);
-    renderReminderRows(currentReminders);
+  window.removeReminderRow = async (idx) => {
+    const r = currentReminders[idx];
+    if (!r) return;
+    if (!confirm(`Delete reminder "${r.label || 'Untitled'}"?`)) return;
+    const propertyId = document.getElementById('prop-id').value;
+    const next = currentReminders.filter((_, i) => i !== idx);
+    try {
+      await updateDoc(doc(db,'properties',propertyId), { reminders: next, updatedAt: serverTimestamp() });
+      logAdminAction('property_reminder_deleted', 'property', propertyId, allProperties.find(p=>p.id===propertyId)?.name, r.label);
+      const pi = allProperties.findIndex(p => p.id === propertyId);
+      if (pi !== -1) allProperties[pi].reminders = next;
+      renderReminderRows(next);
+      renderUpcomingBills();
+    } catch (e) { showAlert('prop-reminders-alert', e.message); }
   };
 
   window.savePropertyReminders = async () => {
