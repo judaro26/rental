@@ -167,6 +167,9 @@
   }
   const app = initializeApp(_cfg.firebase);
   const auth = getAuth(app);
+  // Every sign-in, sign-up, password reset and custom-token sign-in below happens in THIS workspace's own
+  // user pool. Must be set before any of them, so it sits right here (null = the platform's own pool).
+  auth.tenantId = _cfg.authTenantId || null;
 
   function showAlert(id, message, type = 'error') {
     const el = document.getElementById(id);

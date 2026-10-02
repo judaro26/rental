@@ -40,7 +40,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, plus NETLIFY_SITE_ID/SITE_ID
 // and NETLIFY_API_TOKEN as before.
 
-const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -80,7 +80,7 @@ exports.handler = async (event) => {
       if (!bearerMatch) return { statusCode: 401, body: 'Missing Authorization bearer token.' };
 
       let decoded;
-      try { decoded = await a.auth().verifyIdToken(bearerMatch[1]); }
+      try { decoded = await getAuth().verifyIdToken(bearerMatch[1]); }
       catch { return { statusCode: 401, body: 'Invalid or expired session.' }; }
 
       const isOwner = docData.tenantId === decoded.uid;
@@ -122,7 +122,7 @@ exports.handler = async (event) => {
         const bearerMatch = authHeader.match(/^Bearer (.+)$/i);
         if (bearerMatch) {
           try {
-            const decoded = await a.auth().verifyIdToken(bearerMatch[1]);
+            const decoded = await getAuth().verifyIdToken(bearerMatch[1]);
             const adminSnap = await db.collection('admins').doc(decoded.uid).get();
             if (adminSnap.exists && adminSnap.data().status !== 'revoked') authorized = true;
           } catch { /* invalid token just means this path didn't authorize, not a hard error */ }

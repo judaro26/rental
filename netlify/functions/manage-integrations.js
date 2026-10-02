@@ -30,7 +30,7 @@
 // Body: { action: 'list_providers' | 'add_provider' | 'update_provider'
 //               | 'remove_provider' | 'set_active_provider' | 'test_email', ... }
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -55,7 +55,7 @@ async function requireSuperAdmin(event, a, db) {
   const match = authHeader.match(/^Bearer (.+)$/i);
   if (!match) { const e = new Error('Missing Authorization bearer token.'); e.statusCode = 401; throw e; }
   let decoded;
-  try { decoded = await a.auth().verifyIdToken(match[1]); }
+  try { decoded = await getAuth().verifyIdToken(match[1]); }
   catch { const e = new Error('Invalid or expired session.'); e.statusCode = 401; throw e; }
   const snap = await db.collection('admins').doc(decoded.uid).get();
   if (!snap.exists) { const e = new Error('Caller is not an admin.'); e.statusCode = 403; throw e; }

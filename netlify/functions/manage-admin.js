@@ -14,7 +14,7 @@
 // Required Netlify env vars (all already used by the tenant invite flow):
 //   FIREBASE_SERVICE_ACCOUNT, SITE_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -119,7 +119,7 @@ async function requireSuperAdmin(event, a, db) {
   }
   let decoded;
   try {
-    decoded = await a.auth().verifyIdToken(match[1]);
+    decoded = await getAuth().verifyIdToken(match[1]);
   } catch {
     const err = new Error('Invalid or expired session. Please sign in again.');
     err.statusCode = 401;
@@ -197,11 +197,11 @@ exports.handler = async (event) => {
 
       let uid;
       try {
-        const user = await a.auth().createUser({ email, password: crypto.randomUUID(), displayName: displayName || '' });
+        const user = await getAuth().createUser({ email, password: crypto.randomUUID(), displayName: displayName || '' });
         uid = user.uid;
       } catch (err) {
         if (err.code === 'auth/email-already-exists') {
-          uid = (await a.auth().getUserByEmail(email)).uid;
+          uid = (await getAuth().getUserByEmail(email)).uid;
         } else { throw err; }
       }
 
@@ -314,7 +314,7 @@ exports.handler = async (event) => {
           return { statusCode: 400, body: JSON.stringify({ error: 'Cannot revoke the only Super Admin.' }) };
         }
       }
-      await a.auth().updateUser(uid, { disabled: true }).catch(() => {});
+      await getAuth().updateUser(uid, { disabled: true }).catch(() => {});
       await snap.ref.update({ status: 'revoked', revokedAt: a.firestore.FieldValue.serverTimestamp(), revokedBy: caller.email });
       return { statusCode: 200, body: JSON.stringify({ success: true }) };
     }
@@ -325,7 +325,7 @@ exports.handler = async (event) => {
       if (!uid) return { statusCode: 400, body: JSON.stringify({ error: 'uid is required' }) };
       const snap = await db.collection('admins').doc(uid).get();
       if (!snap.exists) return { statusCode: 404, body: JSON.stringify({ error: 'Admin not found.' }) };
-      await a.auth().updateUser(uid, { disabled: false }).catch(() => {});
+      await getAuth().updateUser(uid, { disabled: false }).catch(() => {});
       await snap.ref.update({ status: 'active', reactivatedAt: a.firestore.FieldValue.serverTimestamp(), reactivatedBy: caller.email });
       return { statusCode: 200, body: JSON.stringify({ success: true }) };
     }

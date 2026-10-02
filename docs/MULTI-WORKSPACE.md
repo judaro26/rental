@@ -4,9 +4,10 @@ RentBay can serve many clients — each a **workspace** — from **one deploymen
 Firebase project**. This document is the source of truth for how that works, what is done,
 and what must be finished before a second client is switched on.
 
-> **Status: isolation of data and settings is done. Nothing here changes how the current install
-> behaves, and a second workspace still must not be activated** — sign-in, rules deployment and
-> provisioning are open. See [Blockers](#blockers-before-a-second-workspace-is-enabled).
+> **Status: data, settings and sign-in are isolated in code. Nothing here changes how the current
+> install behaves, and a second workspace still must not be activated** until the
+> [first-client runbook](#first-client-runbook) has been done — it needs steps in the Firebase console
+> and a rules deployment that cannot be automated yet.
 
 ## The model
 
@@ -51,6 +52,9 @@ to thread through, and calling them outside a request **throws** rather than gue
 5. **Never create a Stripe client yourself**, and never write to `process.env`. Use `getStripe()`;
    put per-request values in the workspace context.
 
+6. **Never reach Firebase Auth yourself.** Use `getAuth()`; a project-level `admin.auth()` accepts a token
+   from *any* tenant and would create users in the wrong pool. Pages set `auth.tenantId` from `/api/config`.
+
 `scripts/verify.js` fails the build if any rule is broken, and `scripts/test-handlers.js`
 loads every function and checks that every database call and blob store lands in the caller's
 workspace.
@@ -71,6 +75,7 @@ Registry documents (in the `platform` database):
 workspaces/{id}            id: 4–30 chars, [a-z0-9-], not reserved
   name: "Acme Rentals"
   databaseId: "ws-acme"    (defaults to ws-<id>)
+  authTenantId: "acme-x1y2z"   (the workspace's Identity Platform tenant — REQUIRED once status is "active")
   status: "active" | "provisioning" | "suspended"
   domains: ["portal.acme.com"]
   primaryDomain: "portal.acme.com"      (optional; used to build links)
@@ -125,34 +130,94 @@ Values are cached for 60 s. If they cannot be read, requests for that workspace 
 The platform-level settings every workspace shares are read directly from the environment:
 `FIREBASE_*`, `NETLIFY_*`, `SITE_ID` and the switches in the table above.
 
-## Blockers before a second workspace is enabled
+## Sign-in: one user pool per workspace
 
-Data and settings are now isolated. These are still open, and each must be closed before
-`ALLOW_MULTI_WORKSPACE` is turned on:
+Every non-default workspace has its own **Identity Platform tenant** — a separate pool of users inside
+the same Firebase project. An active workspace without one is rejected outright.
 
-1. **Sign-in is not per workspace — a security blocker, not a nicety.** The server-side admin
-   checks already hold (an admin is only an admin where their `admins` document lives; tested for
-   all 17 admin endpoints). But the Firestore rules also run in the browser, and some trust *any*
-   signed-in user: `announcements` (read) and `invites` (read **and update**). With one shared
-   sign-in pool, anyone signed in to one client's portal could point the browser SDK at another
-   client's database and read or modify those collections. Fix: Firebase Identity Platform
-   tenants (one user pool per client), the browser setting its tenant before sign-in, rules and
-   servers rejecting a token from another tenant, and tenant-aware impersonation tokens.
-   (Admin-SDK support exists.) **Do not enable a second workspace before this.**
-2. **Security rules are deployed to one database only** (`firebase.json`). Every workspace
-   database and the `platform` database need rules deployed, automatically. *The `platform`
-   database holds secrets; do not create it without deny-all rules.*
-3. **Backups.** Firestore export per database on a schedule; Netlify Blobs has none built in.
-4. **Provisioning is manual.** Creating a database, deploying rules, writing the registry
-   documents and `workspaceSecrets`, seeding the first admin and attaching the domain should be
-   one command.
-5. **Card payments are not hidden for a client without Stripe.** `/api/config` returns
-   `stripePk: null`, but the tenant portal still offers card payment and will error when used.
-   Needs per-workspace feature flags (with branding).
+* **Server:** all Auth access goes through `getAuth()`. For the default workspace that is the
+  project-level pool; for any other it is that workspace's tenant. Users created, tokens minted
+  (including impersonation sessions) and links generated all live in the right pool.
+* **Tokens are checked in both directions.** The Admin SDK's tenant-aware `verifyIdToken` rejects a
+  token from another tenant, but the **project-level** `verifyIdToken` accepts a token from *any*
+  tenant — so, unchecked, a client's user could present their token to the default workspace. `getAuth()`
+  closes that: a token is accepted only by the workspace whose pool issued it. `scripts/test-auth.js`
+  pins both SDK behaviours against the real SDK classes, so a future SDK change that alters either is
+  noticed.
+* **Browser:** `/api/config` returns `authTenantId`; each page sets `auth.tenantId` right after creating
+  its auth instance, before any sign-in, sign-up, password reset or custom-token sign-in.
+* **Security rules:** the tenant is checked from the token, never trusted from the browser (a custom
+  token can be exchanged for a session in a pool the client picks, so only the claim inside the token
+  can be relied on). See below.
+* Supported in tenants and used by this app: email/password and custom tokens. The app uses no
+  anonymous, phone or popup sign-in. Tenants cannot disable sign-up from the console (API only), and
+  this app needs sign-up open (invites, applications), exactly as today.
 
-**Closed:** per-client credentials and settings (`getConfig`, `workspaceSecrets`); per-request
-Stripe clients; links and notification addresses (`SITE_URL`, `ADMIN_NOTIFY_EMAIL`); mail
-isolation, including the one function that skipped it; scheduled runs that are parallel-safe.
+### Per-workspace security rules
+
+The rules run in the browser, and several trust *any signed-in user* (`announcements` read; `invites`
+read **and update**; `isAdmin()` and others begin with `request.auth != null`). `scripts/build-rules.js`
+produces a copy of `firestore.rules` for one workspace, replacing every `request.auth != null` with
+`inThisWorkspace()`:
+
+```
+npm run build-rules -- --tenant acme-x1y2z --out acme.rules   # that workspace's database
+npm run build-rules -- --default --out default.rules            # the default workspace's database
+```
+
+* `--tenant`: signed in **and** `request.auth.token.firebase.tenant == '<id>'`.
+* `--default`: signed in **and** the token has **no** tenant. Once any tenant exists its users must not
+  be able to reach the default database either — they are signed in too.
+
+`firestore.rules` itself is deliberately **not** changed: merging a change to it deploys it to the live
+database (`deploy-firestore-rules.yml`). `verify.js` enforces that the committed file is the plain source.
+The generator proves its output differs from the input only by the helper and the substitutions, and
+refuses a malformed tenant id (it is written into rules text).
+
+> ⚠️ The generated rules have **not** been evaluated by the Firebase rules engine (the emulator is not
+> available in CI). Try them in the Firebase Emulator Suite — signed-in user of tenant A against database
+> B, and the reverse — before deploying them anywhere.
+
+## First-client runbook
+
+Until provisioning is automated, bringing up the first client is manual, **in this order** (the order
+matters: step 3 protects your own database before any client user exists):
+
+1. **Upgrade the Firebase project to Identity Platform** (Console → Authentication → Settings). Review
+   the pricing first; on the Blaze plan a free tier of monthly active users applies, and the free Spark
+   plan is limited after upgrading. Treat the upgrade as one-way until you have checked.
+2. **Enable multi-tenancy** (Identity Platform → Settings → Security → *Allow tenants*).
+3. **Protect the default database first.** Build `--default` rules, try them in the emulator, then deploy
+   them to the `(default)` database. Do this *before* creating any tenant, while no client user exists.
+4. **Create the `platform` database** (production mode, deny-all rules; it holds client secrets) and
+   the client's database `ws-<id>` (production mode). Build `--tenant <id>` rules, try them in the
+   emulator, deploy them to the client's database.
+5. **Create the tenant** (Identity Platform → Tenants), enable *Email/Password*, note its id.
+6. **Write the registry** in the `platform` database: `workspaces/<id>` (with `authTenantId`, status
+   `provisioning`), `workspaceDomains/<host>`, and `workspaceSecrets/<id>` (Stripe etc.).
+7. **Attach the domain**: add it to the Netlify site and to Firebase Authentication's *Authorized
+   domains* (password-reset and invite links return to it).
+8. **Create the first admin** in the client's tenant, and its `admins/<uid>` document in the client's
+   database.
+9. Set the workspace `status` to `active`, and only then set `ALLOW_MULTI_WORKSPACE=true`.
+
+Check each of: sign in as the client's admin on the client's domain; confirm the same login is refused on
+your own domain; send a test invoice; send a password-reset email and follow the link.
+
+## Still open before a second workspace is enabled
+
+1. **The runbook above is manual** — creating the tenant and databases, deploying the scoped rules to
+   every database, writing the registry, adding the domain, seeding the first admin. Provisioning script
+   (Patch 4). **Generated rules must be tried in the Firebase Emulator before being deployed.**
+2. **Backups.** Firestore export per database on a schedule; Netlify Blobs has none built in.
+3. **Card payments are not hidden for a client without Stripe.** `/api/config` returns `stripePk: null`,
+   but the tenant portal still offers card payment and will error when used. Needs per-workspace feature
+   flags (with branding).
+
+**Closed:** data isolation (a database per workspace); per-client credentials and settings
+(`getConfig`, `workspaceSecrets`); per-request Stripe clients; links and notification addresses; mail
+isolation; parallel-safe scheduled runs; **per-workspace sign-in** (a pool per workspace, tokens checked
+in both directions, rules scoped per workspace, impersonation tokens minted in the right pool).
 
 ## Roadmap
 
@@ -160,8 +225,8 @@ isolation, including the one function that skipped it; scheduled runs that are p
 |---|---|
 | 1 ✅ | Workspace seam, mail isolation, `/api/config` database, enforcement + tests, CI fix |
 | 2 ✅ | Workspace-scoped settings and credentials, per-request Stripe, parallel-safe sweeps |
-| 3 | Per-workspace sign-in (Identity Platform tenants) |
-| 4 | Provisioning script, rules + backups per database, suspension |
+| 3 ✅ | Per-workspace sign-in (Identity Platform tenants), tenant-scoped rules generator |
+| 4 | Provisioning script (tenant, databases, rules, registry, domain, first admin), backups, suspension |
 | 5 | White-label branding and per-workspace feature flags |
 | 6 | SaaS billing and client onboarding |
 
@@ -169,5 +234,5 @@ isolation, including the one function that skipped it; scheduled runs that are p
 
 ```
 npm run verify   # static rules, incl. the three above
-npm test         # behaviour: isolation, settings, mail, receipts, invoice payment info, rent coverage
+npm test         # behaviour: isolation, settings, sign-in, rules generator, mail, receipts, invoice payment info, rent coverage
 ```

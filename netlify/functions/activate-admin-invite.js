@@ -8,7 +8,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SITE_URL
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -97,7 +97,7 @@ exports.handler = async (event) => {
     }
 
     const continueUrl = `${siteUrl}/admin.html`;
-    const activationUrl = await a.auth().generatePasswordResetLink(tokenData.email, { url: continueUrl, handleCodeInApp: false });
+    const activationUrl = await getAuth().generatePasswordResetLink(tokenData.email, { url: continueUrl, handleCodeInApp: false });
 
     await tokenDoc.ref.update({
       used: true,

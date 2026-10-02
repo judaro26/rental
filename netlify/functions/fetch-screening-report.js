@@ -6,7 +6,7 @@
 // link from whenever the webhook first fired. Also useful as a manual
 // "check status now" for admins who don't want to wait for a webhook.
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -33,7 +33,7 @@ exports.handler = async (event) => {
   const db = getDb();
 
   let decoded;
-  try { decoded = await a.auth().verifyIdToken(match[1]); }
+  try { decoded = await getAuth().verifyIdToken(match[1]); }
   catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
 
   const adminSnap = await db.collection('admins').doc(decoded.uid).get();

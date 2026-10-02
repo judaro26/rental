@@ -20,13 +20,14 @@
 //   if (authResult.error) return authResult.error;
 //   const { decoded } = authResult;
 
+const { getAuth } = require('./workspace');
 async function verifyAuthenticated(event, a) {
   const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
   const match = authHeader.match(/^Bearer (.+)$/i);
   if (!match) return { error: { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) } };
 
   let decoded;
-  try { decoded = await a.auth().verifyIdToken(match[1]); }
+  try { decoded = await getAuth().verifyIdToken(match[1]); }
   catch { return { error: { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) } }; }
 
   return { decoded };

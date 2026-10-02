@@ -11,7 +11,7 @@
 // not a choice made here. Applications tied to a non-US property are
 // rejected before any request is sent.
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -48,7 +48,7 @@ exports.handler = async (event) => {
   const db = getDb();
 
   let decoded;
-  try { decoded = await a.auth().verifyIdToken(match[1]); }
+  try { decoded = await getAuth().verifyIdToken(match[1]); }
   catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
 
   const adminSnap = await db.collection('admins').doc(decoded.uid).get();

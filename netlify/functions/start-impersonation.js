@@ -25,7 +25,7 @@
 // POST body: { targetType: 'tenant' | 'admin', targetId }
 // Header: Authorization: Bearer <Firebase ID token, from the super admin>
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -114,7 +114,7 @@ exports.handler = async (event) => {
 
   let customToken;
   try {
-    customToken = await a.auth().createCustomToken(targetId, {
+    customToken = await getAuth().createCustomToken(targetId, {
       impersonatedBy: decoded.uid,
       impersonatedByEmail: decoded.email || '',
       impersonatedByName: adminData.name || decoded.email || '',

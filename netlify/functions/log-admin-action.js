@@ -10,7 +10,7 @@
 // Header: Authorization: Bearer <Firebase ID token>
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -46,7 +46,7 @@ exports.handler = async (event) => {
   const a = getAdmin();
   let decoded;
   try {
-    decoded = await a.auth().verifyIdToken(match[1]);
+    decoded = await getAuth().verifyIdToken(match[1]);
   } catch {
     return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) };
   }

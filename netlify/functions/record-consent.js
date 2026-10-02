@@ -4,7 +4,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, ADMIN_NOTIFY_EMAIL
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -56,7 +56,7 @@ exports.handler = async (event) => {
   const db = getDb();
 
   let decoded;
-  try { decoded = await a.auth().verifyIdToken(bearerMatch[1]); }
+  try { decoded = await getAuth().verifyIdToken(bearerMatch[1]); }
   catch { return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) }; }
 
   const isOwnConsent = decoded.uid === tenantId;

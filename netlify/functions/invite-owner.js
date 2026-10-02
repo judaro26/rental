@@ -17,7 +17,7 @@
 //   SITE_URL (or falls back to the request's own host)
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 
-const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getAuth, getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -138,11 +138,11 @@ exports.handler = async (event) => {
     // ── 1. Create or find the Firebase Auth account ─────────────────────────
     let uid;
     try {
-      const user = await a.auth().createUser({ email, password: crypto.randomUUID(), displayName: name });
+      const user = await getAuth().createUser({ email, password: crypto.randomUUID(), displayName: name });
       uid = user.uid;
     } catch (err) {
       if (err.code === 'auth/email-already-exists') {
-        const existing = await a.auth().getUserByEmail(email);
+        const existing = await getAuth().getUserByEmail(email);
         uid = existing.uid;
       } else { throw err; }
     }
@@ -169,7 +169,7 @@ exports.handler = async (event) => {
 
     // ── 3. Generate activation link (Firebase's own password-reset flow) ────
     const continueUrl = `${siteUrl}/owner-portal.html`;
-    const activationUrl = await a.auth().generatePasswordResetLink(email, { url: continueUrl, handleCodeInApp: false });
+    const activationUrl = await getAuth().generatePasswordResetLink(email, { url: continueUrl, handleCodeInApp: false });
 
     // ── 4. Send invitation email ──────────────────────────────────────────
     await sendEmail({
