@@ -99,6 +99,9 @@ const reset = () => stores.clear();
     await up({ method: 'zelle', file: PNG('ZELLE2') });
     check('...and re-uploading Zelle leaves the Cash App QR alone', bytesOf(await see('cashapp')).includes('CASHAPP') && bytesOf(await see('zelle')).includes('ZELLE2'));
     check('the content type travels with the image', z.headers['Content-Type'] === 'image/png');
+    const cc = String(z.headers['Cache-Control'] || '');
+    check('the QR is NEVER shared-cached or held for a day: Cache-Control is private + no-cache (a corrected QR must show at once, not after 24 h)', /private/.test(cc) && /no-cache/.test(cc) && !/public/.test(cc) && !/max-age=[1-9]/.test(cc) && !/s-maxage/.test(cc), cc);
+    check('...for BOTH QR codes, so one cannot be served for the other from a shared cache entry', String(c.headers['Cache-Control'] || '') === cc);
   }
 
   // ── other ways of naming the type ────────────────────────────────────────

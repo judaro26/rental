@@ -21,7 +21,10 @@ exports.handler = async (event) => {
     const contentType = blob.metadata?.contentType || 'image/png';
     return {
       statusCode:      200,
-      headers: { 'Content-Type': contentType, 'Cache-Control': 'public, max-age=86400' },
+      // NEVER cached by a shared cache (the CDN) or held for a day by a browser. This is a PAYMENT QR code: after
+      // an admin uploads a corrected one, every tenant must see the new one straight away, not the old one for up to
+      // 24 hours. It is a few KB and rarely requested, so revalidating each time costs nothing.
+      headers: { 'Content-Type': contentType, 'Cache-Control': 'private, no-cache, must-revalidate' },
       body:            Buffer.from(blob.data).toString('base64'),
       isBase64Encoded: true,
     };
