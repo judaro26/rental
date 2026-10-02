@@ -81,7 +81,7 @@ exports.handler = async (event) => {
 
     const { findNextDueDate, computeCycle, utcMidnightToday } = require('./_lib/reminder-cycle');
     const { createInvoice } = require('./_lib/create-invoice');
-    const { isRentAlreadyCoveredForCycle } = require('./_lib/check-rent-paid');
+    const { isRentAlreadyCoveredForCycle, coverageWindowStartMs } = require('./_lib/check-rent-paid');
 
     // If a rent due day is configured, invoice for the next upcoming
     // occurrence of it (so this lines up with what the automatic system
@@ -105,7 +105,7 @@ exports.handler = async (event) => {
       const prevCycle = computeCycle(tenant.rentDueDay, 0, upcomingDue.getUTCFullYear(), upcomingDue.getUTCMonth() - 1);
       const rentCovered = await isRentAlreadyCoveredForCycle({
         db, tenantId, monthlyRent: tenant.monthlyRent,
-        cycleStartMs: prevCycle.dueMs, cycleEndMs: upcomingDueMs,
+        cycleStartMs: coverageWindowStartMs(prevCycle.dueMs, upcomingDueMs), cycleEndMs: upcomingDueMs,
       });
       if (rentCovered) {
         return { statusCode: 409, body: JSON.stringify({ error: 'ALREADY_PAID', message: 'This tenant appears to have already paid rent for this period. Generate the invoice anyway?' }) };

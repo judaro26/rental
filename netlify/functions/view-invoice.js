@@ -37,19 +37,79 @@ exports.handler = async (event) => {
     const blob  = await store.getWithMetadata(key, { type: 'arrayBuffer' });
     if (!blob) return { statusCode: 404, body: notFoundHtml(key) };
 
+    let html = Buffer.from(blob.data).toString('utf8');
+
+    // Invoices created after the "how to pay" feature carry RB: markers. Fill
+    // them in NOW (live PAID status + current payment details) rather than
+    // trusting what was true when the invoice was created. Older invoices have
+    // no markers and are served exactly as stored. This must never stop a
+    // tenant from seeing their invoice, so any failure falls back to the page
+    // with the markers simply removed.
+    const dynamic = /<!--\/?RB:(PAY|STAMP|STATUS)-->/.test(html);
+    if (dynamic) {
+      try { html = await personalizeInvoice(html, key); }
+      catch (err) {
+        console.warn('view-invoice: could not personalize, serving without live sections:', err.message);
+        html = stripMarkers(html);
+      }
+    }
+
     return {
       statusCode: 200,
       headers: {
         'Content-Type':  'text/html; charset=utf-8',
-        'Cache-Control': 'private, max-age=3600',
+        // Live content must not be served stale; static pages keep the old caching.
+        'Cache-Control': dynamic ? 'private, no-store' : 'private, max-age=3600',
       },
-      body: Buffer.from(blob.data).toString('utf8'),
+      body: html,
     };
   } catch (err) {
     console.error('view-invoice error:', err);
     return { statusCode: 500, body: err.message };
   }
 };
+
+// ── Live sections ──────────────────────────────────────────────────────────
+let _admin;
+function getAdmin() {
+  if (!_admin) {
+    _admin = require('firebase-admin');
+    if (!_admin.apps.length) {
+      _admin.initializeApp({ credential: _admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)) });
+    }
+  }
+  return _admin;
+}
+
+function stripMarkers(html) {
+  return html
+    .replace(/<!--RB:PAY-->/g, '')
+    .replace(/<!--RB:STAMP-->/g, '')
+    .replace(/<!--\/?RB:STATUS-->/g, '');
+}
+
+async function personalizeInvoice(html, blobKey) {
+  const { statusPillHtml, paidStampHtml } = require('./_lib/create-invoice');
+  const { getPaymentInfo, renderPaymentSectionHtml } = require('./_lib/payment-info');
+  const db = getAdmin().firestore();
+
+  const snap = await db.collection('invoices').where('blobKey', '==', blobKey).limit(1).get();
+  if (snap.empty) return stripMarkers(html); // can't tell its state: show the page as created
+  const inv = snap.docs[0].data();
+  const paid = inv.status === 'paid';
+
+  if (paid) {
+    html = html
+      .replace(/<!--RB:STATUS-->[\s\S]*?<!--\/RB:STATUS-->/, statusPillHtml(true))
+      .replace('<!--RB:STAMP-->', paidStampHtml())
+      .replace('<!--RB:PAY-->', ''); // nothing left to pay
+    return html;
+  }
+
+  const info = await getPaymentInfo(db, inv.propertyId || null);
+  html = html.replace('<!--RB:PAY-->', renderPaymentSectionHtml(info, { invoiceNumber: inv.invoiceNumber }));
+  return stripMarkers(html); // pending: keep the original pill, drop the markers
+}
 
 function notFoundHtml(key) {
   return `<!DOCTYPE html>

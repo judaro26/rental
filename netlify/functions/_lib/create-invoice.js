@@ -12,6 +12,7 @@
 
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { getPaymentInfo, renderPaymentEmailBlock } = require('./payment-info');
 
 function getStore() {
   const { getStore: _gs } = require('@netlify/blobs');
@@ -33,6 +34,18 @@ async function nextInvoiceNumber(db, type) {
 }
 
 // ── HTML template ────────────────────────────────────────────────────────────
+// Markup for the status pill and the diagonal PAID stamp, defined once so the
+// page written at creation time and the live version served by view-invoice.js
+// (which swaps them in when an invoice has since been paid) cannot drift apart.
+function statusPillHtml(paid) {
+  return `<div style="font-size:12px;font-weight:600;padding:2px 10px;border-radius:10px;display:inline-block;background:${paid?'#F0FDF4':'#FEF3C7'};color:${paid?'#16A34A':'#92400E'};">
+          ${paid ? 'PAID' : 'PENDING'}
+        </div>`;
+}
+function paidStampHtml() {
+  return `<div style="position:absolute;top:32px;right:32px;border:4px solid #16A34A;border-radius:4px;padding:8px 20px;transform:rotate(15deg);color:#16A34A;font-size:28px;font-weight:900;letter-spacing:0.15em;opacity:0.7;">PAID</div>`;
+}
+
 function buildHtml({ type, invoiceNumber, date, dueDate, paidDate, siteName, siteUrl,
   tenantName, tenantEmail, unit, propertyName, lineItems, subtotal, taxRate, taxAmount,
   total, notes, isPaid }) {
@@ -40,9 +53,9 @@ function buildHtml({ type, invoiceNumber, date, dueDate, paidDate, siteName, sit
   const isReceipt    = type === 'receipt';
   const accentColor  = '#C9903A';
   const darkColor    = '#1A1A2E';
-  const statusBanner = isPaid || isReceipt
-    ? `<div style="position:absolute;top:32px;right:32px;border:4px solid #16A34A;border-radius:4px;padding:8px 20px;transform:rotate(15deg);color:#16A34A;font-size:28px;font-weight:900;letter-spacing:0.15em;opacity:0.7;">PAID</div>`
-    : '';
+  // Open invoices carry markers that view-invoice.js fills in at view time
+  // (live PAID status, current payment details). Receipts are final: no markers.
+  const statusBanner = isPaid || isReceipt ? paidStampHtml() : '<!--RB:STAMP-->';
 
   const rows = lineItems.map(item => `
     <tr>
@@ -89,9 +102,7 @@ function buildHtml({ type, invoiceNumber, date, dueDate, paidDate, siteName, sit
       ${!isReceipt && dueDate ? `<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#9CA3AF;margin-bottom:3px;">Due Date</div><div style="font-size:13px;font-weight:500;${!isPaid?'color:#DC2626;':''}">${dueDate}</div></div>` : ''}
       ${(isReceipt || isPaid) && paidDate ? `<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#9CA3AF;margin-bottom:3px;">Paid Date</div><div style="font-size:13px;font-weight:500;color:#16A34A;">${paidDate}</div></div>` : ''}
       <div><div style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:#9CA3AF;margin-bottom:3px;">Status</div>
-        <div style="font-size:12px;font-weight:600;padding:2px 10px;border-radius:10px;display:inline-block;background:${isPaid||isReceipt?'#F0FDF4':'#FEF3C7'};color:${isPaid||isReceipt?'#16A34A':'#92400E'};">
-          ${isPaid||isReceipt ? 'PAID' : 'PENDING'}
-        </div>
+        ${isReceipt ? '' : '<!--RB:STATUS-->'}${statusPillHtml(isPaid || isReceipt)}${isReceipt ? '' : '<!--/RB:STATUS-->'}
       </div>
     </div>
 
@@ -153,6 +164,8 @@ function buildHtml({ type, invoiceNumber, date, dueDate, paidDate, siteName, sit
 
     ${notes ? `<div style="background:#FFFBEB;border-left:3px solid ${accentColor};padding:12px 16px;border-radius:0 3px 3px 0;margin-bottom:24px;font-size:13px;color:#374151;"><strong>Notes:</strong> ${notes}</div>` : ''}
 
+    ${isReceipt ? '' : '<!--RB:PAY-->'}
+
     <!-- Footer -->
     <div style="border-top:1px solid #F3F4F6;padding-top:20px;text-align:center;">
       <p style="font-size:12px;color:#9CA3AF;">Thank you for your business. Please contact us with any questions.</p>
@@ -169,7 +182,7 @@ function buildHtml({ type, invoiceNumber, date, dueDate, paidDate, siteName, sit
 }
 
 // ── Email template ───────────────────────────────────────────────────────────
-function buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invoiceUrl, siteName }) {
+function buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invoiceUrl, siteName, paymentHtml = '' }) {
   const label = isReceipt ? 'Receipt' : 'Invoice';
   return `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:560px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">
     <div style="background:#1A1A2E;padding:24px 32px;">
@@ -183,9 +196,27 @@ function buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invo
         <tr><td style="font-size:13px;color:#6B7280;padding-top:8px;">Amount</td><td style="font-size:16px;font-weight:700;color:#C9903A;text-align:right;">$${parseFloat(total).toFixed(2)}</td></tr>
         ${!isReceipt && dueDate ? `<tr><td style="font-size:13px;color:#6B7280;padding-top:8px;">Due Date</td><td style="font-size:13px;font-weight:500;text-align:right;">${dueDate}</td></tr>` : ''}
       </table>
+      ${paymentHtml}
       <a href="${invoiceUrl}" style="display:inline-block;background:#C9903A;color:#fff;text-decoration:none;padding:12px 28px;font-size:13px;letter-spacing:0.1em;text-transform:uppercase;border-radius:2px;">View ${label}</a>
     </div>
   </div>`;
+}
+
+// Sends the "your invoice/receipt is ready" email. Shared by first-time
+// creation and by an explicit receipt resend, so both produce identical mail.
+async function sendInvoiceEmail({ isReceipt, invoiceNumber, tenantName, tenantEmail, total, dueDate, invoiceUrl, siteName, paymentHtml = '' }) {
+  const transporter = nodemailer.createTransport({
+    host:   process.env.SMTP_HOST,
+    port:   parseInt(process.env.SMTP_PORT || '587'),
+    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  await transporter.sendMail({
+    from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+    to:      tenantEmail,
+    subject: `${isReceipt ? 'Payment Receipt' : 'New Invoice'} #${invoiceNumber} — $${Number(total).toFixed(2)}`,
+    html:    buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invoiceUrl, siteName, paymentHtml }),
+  });
 }
 
 // ── Core logic — extracted verbatim from generate-invoice.js's handler ──────
@@ -193,7 +224,7 @@ function buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invo
 // Callers provide `a` (initialized firebase-admin) and `db` (its firestore()),
 // plus siteUrl directly (the HTTP handler derives this from env/headers;
 // a scheduled function has neither, so it must pass SITE_URL explicitly).
-async function createInvoice({ a, db, siteUrl,
+async function createInvoiceCore({ a, db, siteUrl,
   type = 'invoice', tenantId, tenantName, tenantEmail, unit, propertyId, propertyName,
   lineItems = [], taxRate = 0, dueDate, paidDate, notes, siteName,
   existingInvoiceId, sendNow = true, scheduledSendDate,
@@ -275,21 +306,83 @@ async function createInvoice({ a, db, siteUrl,
 
   // Email tenant (skipped for drafts)
   if (willSend && process.env.SMTP_HOST && tenantEmail) {
-    const transporter = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST,
-      port:   parseInt(process.env.SMTP_PORT || '587'),
-      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    });
-    await transporter.sendMail({
-      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
-      to:      tenantEmail,
-      subject: `${isReceipt ? 'Payment Receipt' : 'New Invoice'} #${invoiceNumber} — $${total.toFixed(2)}`,
-      html:    buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invoiceUrl, siteName }),
-    });
+    let paymentHtml = '';
+    if (!isReceipt) {
+      try { paymentHtml = renderPaymentEmailBlock(await getPaymentInfo(db, propertyId), { siteUrl }); }
+      catch (err) { console.warn('createInvoice: payment info unavailable, sending email without it:', err.message); }
+    }
+    await sendInvoiceEmail({ isReceipt, invoiceNumber, tenantName, tenantEmail, total, dueDate, invoiceUrl, siteName, paymentHtml });
   }
 
   return { success: true, invoiceId, invoiceUrl, invoiceNumber, sent: willSend };
 }
 
-module.exports = { createInvoice, buildHtml, buildEmail, nextInvoiceNumber, getStore };
+// ── Receipt idempotency ──────────────────────────────────────────────────
+// Clicking "Receipt" repeatedly (or a retried request) used to mint a new
+// receipt number and email the tenant every time. Receipts are now claimed
+// atomically in collection `receiptClaims`, keyed by what the
+// receipt is FOR: the invoice being receipted, or the payment (paymentId).
+//   - first request wins the claim, creates the receipt, records its result
+//   - any later/concurrent request for the same key returns the existing
+//     receipt with alreadySent:true and sends NOTHING
+//   - `resend: true` (an explicit admin choice) re-emails the SAME receipt —
+//     same number, same link — instead of creating another one
+//   - a failed attempt releases its claim so it can simply be retried
+//   - a claim with no result older than the TTL is treated as abandoned
+// Requests with no invoice/payment to key on (and all non-receipts) are
+// unaffected and behave exactly as before.
+const RECEIPT_CLAIM_TTL_MS = 2 * 60 * 1000;
+
+async function claimReceipt({ db, type, existingInvoiceId, paymentId, tenantId, tenantEmail }) {
+  if (type !== 'receipt') return { ref: null };
+  const key = existingInvoiceId ? `inv_${existingInvoiceId}` : (paymentId ? `pay_${paymentId}` : null);
+  if (!key) return { ref: null };
+  const ref = db.collection('receiptClaims').doc(key);
+  const outcome = await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (snap.exists) {
+      const d = snap.data();
+      const abandoned = !d.result && d.claimedAtMs && (Date.now() - d.claimedAtMs) > RECEIPT_CLAIM_TTL_MS;
+      if (!abandoned) return { duplicate: true, data: d };
+    }
+    tx.set(ref, { claimedAtMs: Date.now(), tenantId: tenantId || null, tenantEmail: tenantEmail || null });
+    return { duplicate: false };
+  });
+  return { ref, ...outcome };
+}
+
+async function createInvoice(args) {
+  const claim = await claimReceipt(args);
+
+  if (claim.duplicate) {
+    const d = claim.data || {};
+    if (!d.result) return { success: true, alreadySent: true, inProgress: true };
+    if (args.resend === true) {
+      // Explicit resend: same receipt, same number, one more email.
+      const { lineItems = [], taxRate = 0, tenantName, tenantEmail, dueDate, siteName } = args;
+      const subtotal = lineItems.reduce((n, i) => n + parseFloat(i.amount || 0), 0);
+      const total = subtotal + subtotal * (parseFloat(taxRate) / 100);
+      if (process.env.SMTP_HOST && tenantEmail) {
+        await sendInvoiceEmail({ isReceipt: true, invoiceNumber: d.result.invoiceNumber, tenantName, tenantEmail, total, dueDate, invoiceUrl: d.result.invoiceUrl, siteName });
+      }
+      return { ...d.result, resent: true };
+    }
+    return { ...d.result, alreadySent: true, sentAtMs: d.completedAtMs || null };
+  }
+
+  try {
+    const result = await createInvoiceCore(args);
+    if (claim.ref) {
+      // Best effort: if this write fails the claim simply expires via the TTL.
+      await claim.ref.set({ result, completedAtMs: Date.now() }, { merge: true })
+        .catch(err => console.warn('createInvoice: could not record receipt result:', err.message));
+    }
+    return result;
+  } catch (err) {
+    if (claim.ref) await claim.ref.delete().catch(() => {}); // release so it can be retried
+    throw err;
+  }
+}
+
+
+module.exports = { createInvoice, buildHtml, buildEmail, nextInvoiceNumber, getStore, sendInvoiceEmail, statusPillHtml, paidStampHtml };

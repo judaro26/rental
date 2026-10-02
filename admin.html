@@ -2719,6 +2719,7 @@
       'invoiceModal.draftMsg':'✓ Invoice {num} saved as a draft. Send it anytime from the list.',
       'invoiceModal.setDueDateFirst':'Set a due date first to use the quick-set buttons.',
       'invoiceModal.confirmGenerateReceipt':'Generate a paid receipt for {name} — ${amount}?',
+      'invoiceModal.receiptAlreadySent':'A receipt for this was already emailed to {email}. Send the same receipt again?', 'invoiceModal.receiptInProgress':'A receipt is already being sent — please wait a moment.', 'invoiceModal.receiptResent':'✓ Receipt re-sent to {email}.', 'payments.alreadyProcessed':'This payment was already processed.',
       'invoiceModal.receiptEmailed':'Receipt generated and emailed to {email}', 'common.errorPrefix':'Error: ',
       'common.permissionDeniedHint':'You don\'t currently have permission to view this. Ask whoever manages this account to update the Firestore security rules for this section.',
       'invoiceModal.confirmMarkPaid':'Mark this invoice as paid?', 'invoiceModal.confirmSendNow':'Email invoice {num} to {email} now?',
@@ -3325,6 +3326,7 @@
       'invoiceModal.draftMsg':'✓ Factura {num} guardada como borrador. Envíala cuando quieras desde la lista.',
       'invoiceModal.setDueDateFirst':'Establece primero una fecha de vencimiento para usar los botones de ajuste rápido.',
       'invoiceModal.confirmGenerateReceipt':'¿Generar un recibo de pago para {name} — ${amount}?',
+      'invoiceModal.receiptAlreadySent':'Ya se envió un recibo a {email}. ¿Enviar el mismo recibo otra vez?', 'invoiceModal.receiptInProgress':'Ya se está enviando un recibo — espera un momento.', 'invoiceModal.receiptResent':'✓ Recibo reenviado a {email}.', 'payments.alreadyProcessed':'Este pago ya fue procesado.',
       'invoiceModal.receiptEmailed':'Recibo generado y enviado por correo a {email}', 'common.errorPrefix':'Error: ',
       'common.permissionDeniedHint':'Actualmente no tienes permiso para ver esto. Pide a quien administra esta cuenta que actualice las reglas de seguridad de Firestore para esta sección.',
       'invoiceModal.confirmMarkPaid':'¿Marcar esta factura como pagada?', 'invoiceModal.confirmSendNow':'¿Enviar la factura {num} a {email} ahora?',
@@ -5854,10 +5856,36 @@
     if (!confirm(t('payments.confirmDelete'))) return;
     await deleteDoc(doc(db,'payments',id)); await loadPayments();
   };
-  window.approveZellePayment = async (id) => {
+  // ── Double-click protection ────────────────────────────────────────────
+  // Keys of operations currently running. Checked and set SYNCHRONOUSLY at the
+  // top of a handler (before any await/confirm), so a second click is dropped
+  // instead of racing the first request. The server also dedupes receipts
+  // (see receiptClaims in _lib/create-invoice.js), which covers other tabs.
+  const _opsInFlight = new Set();
+
+  // Posts a receipt request and handles the server's "already sent" answer:
+  // asks before re-sending, and a re-send reuses the SAME receipt number.
+  async function sendReceiptRequest(payload, email) {
+    let res = await authedFetch('/api/generate-invoice', payload);
+    let data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed');
+    if (data.inProgress) { alert(t('invoiceModal.receiptInProgress')); return null; }
+    if (data.alreadySent) {
+      if (!confirm(t('invoiceModal.receiptAlreadySent').replace('{email}', email || ''))) return null;
+      res = await authedFetch('/api/generate-invoice', { ...payload, resend: true });
+      data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+    }
+    return data;
+  }
+
+  const _approveZellePaymentImpl = async (id) => {
     const p = allPayments.find(x=>x.id===id);
     const tenant = allTenants.find(t=>t.id===p?.tenantId);
     if (!confirm(`Approve $${Number(p?.amount).toFixed(2)} payment from ${tenant?.firstName||'tenant'}?`)) return;
+    // allPayments can be stale (second click, second tab): re-check the live status
+    // so an already-processed payment is never approved, recorded as income, or receipted twice.
+    { const live = await getDoc(doc(db,'payments',id)); if (live.exists() && live.data().status !== 'pending_approval') { alert(t('payments.alreadyProcessed')); await loadPayments(); return; } }
     await updateDoc(doc(db,'payments',id), { status:'paid', paidAt: serverTimestamp(), approvedAt: serverTimestamp() });
     await autoRecordFinancial({
       propertyId: tenant?.propertyId||null,
@@ -5872,10 +5900,18 @@
     } catch(e){}
     if (tenant) {
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      authedFetch('/api/generate-invoice',{type:'receipt',tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:'Payment received via Zelle.',siteName}).catch(e=>console.warn('Receipt failed:',e));
+      authedFetch('/api/generate-invoice',{type:'receipt',paymentId:id,tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:'Payment received via Zelle.',siteName}).catch(e=>console.warn('Receipt failed:',e));
     }
     await loadPayments(); await loadFinancials();
     alert('✓ Payment approved and receipt emailed to tenant.');
+  };
+  window.approveZellePayment = async (id) => {
+    const key = 'approve:' + id;
+    if (_opsInFlight.has(key)) return;
+    _opsInFlight.add(key);
+    const btn = event?.target; if (btn) btn.disabled = true;
+    try { await _approveZellePaymentImpl(id); }
+    finally { _opsInFlight.delete(key); if (btn) btn.disabled = false; }
   };
   window.rejectZellePayment = async (id) => {
     const reason = prompt('Optional: reason for rejection:');
@@ -5884,19 +5920,23 @@
     await loadPayments();
   };
   window.generatePaymentReceipt = async (id) => {
+    const key = 'payreceipt:' + id;
+    if (_opsInFlight.has(key)) return;
     const p = allPayments.find(x=>x.id===id);
     const tenant = allTenants.find(t=>t.id===p?.tenantId);
     if (!p||!tenant) return;
-    let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
+    _opsInFlight.add(key);
+    // Disable immediately — this used to happen only AFTER an await, leaving a window for repeat clicks.
     const btn = event?.target; if (btn) { btn.disabled=true; btn.textContent=t('common.generating'); }
     try {
-      const res = await authedFetch('/api/generate-invoice',{type:'receipt',tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:`Payment method: ${p.method==='zelle'?'Zelle':p.method==='stripe'?'Stripe':'Manual'}.`,siteName});
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      alert(`✓ Receipt emailed to ${tenant.email}`);
-      if (data.invoiceUrl) window.open(data.invoiceUrl,'_blank');
+      let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
+      const data = await sendReceiptRequest({type:'receipt',paymentId:id,tenantId:p.tenantId,tenantName:`${tenant.firstName} ${tenant.lastName}`,tenantEmail:tenant.email,unit:tenant.unit||'',propertyId:tenant.propertyId||'',propertyName:allProperties.find(pr=>pr.id===tenant.propertyId)?.name||'',lineItems:[{description:p.description||'Rent Payment',quantity:1,unitPrice:p.amount,amount:p.amount}],taxRate:0,paidDate:new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}),notes:`Payment method: ${p.method==='zelle'?'Zelle':p.method==='stripe'?'Stripe':'Manual'}.`,siteName}, tenant.email);
+      if (data) {
+        alert(data.resent ? t('invoiceModal.receiptResent').replace('{email}', tenant.email) : `✓ Receipt emailed to ${tenant.email}`);
+        if (data.invoiceUrl) window.open(data.invoiceUrl,'_blank');
+      }
     } catch(e) { alert('Error: '+e.message); }
-    if (btn) { btn.disabled=false; btn.textContent='🧾 Receipt'; }
+    finally { _opsInFlight.delete(key); if (btn) { btn.disabled=false; btn.textContent='🧾 Receipt'; } }
   };
   window.openManualPaymentModal = () => {
     document.getElementById('manual-pay-amount').value='';
@@ -6924,17 +6964,23 @@
     document.getElementById('inv-schedule-date').value = d.toISOString().slice(0,10);
   };
   window.generateReceipt = async (invoiceId) => {
+    const key = 'receipt:' + invoiceId;
+    if (_opsInFlight.has(key)) return;
     const inv = allInvoices.find(i=>i.id===invoiceId); if (!inv) return;
-    const paidDate = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
-    if (!confirm(t('invoiceModal.confirmGenerateReceipt').replace('{name}', inv.tenantName).replace('{amount}', parseFloat(inv.total).toFixed(2)))) return;
+    _opsInFlight.add(key);
+    const btn = event?.target;
     try {
+      const paidDate = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+      if (!confirm(t('invoiceModal.confirmGenerateReceipt').replace('{name}', inv.tenantName).replace('{amount}', parseFloat(inv.total).toFixed(2)))) return;
+      if (btn) btn.disabled = true;
       let siteName=''; try{const s=await getDoc(doc(db,'settings','site'));siteName=s.data()?.siteName||'';}catch{}
-      const res = await authedFetch('/api/generate-invoice',{...inv,type:'receipt',paidDate,existingInvoiceId:invoiceId,siteName});
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error||'Failed');
-      alert(t('invoiceModal.receiptEmailed').replace('{email}', inv.tenantEmail));
-      loadInvoices();
+      const data = await sendReceiptRequest({...inv,type:'receipt',paidDate,existingInvoiceId:invoiceId,siteName}, inv.tenantEmail);
+      if (data) {
+        alert(data.resent ? t('invoiceModal.receiptResent').replace('{email}', inv.tenantEmail) : t('invoiceModal.receiptEmailed').replace('{email}', inv.tenantEmail));
+        loadInvoices();
+      }
     } catch(e) { alert(t('common.errorPrefix')+e.message); }
+    finally { _opsInFlight.delete(key); if (btn) btn.disabled = false; }
   };
   window.markInvoicePaid = async (invoiceId) => {
     if (!confirm(t('invoiceModal.confirmMarkPaid'))) return;

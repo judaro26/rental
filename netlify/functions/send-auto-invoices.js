@@ -50,7 +50,7 @@ exports.handler = async () => {
   await require('./_lib/apply-email-config')();
   const { findMatchingCycle, computeCycle, utcMidnightToday } = require('./_lib/reminder-cycle');
   const { createInvoice } = require('./_lib/create-invoice');
-  const { isRentAlreadyCoveredForCycle } = require('./_lib/check-rent-paid');
+  const { isRentAlreadyCoveredForCycle, coverageWindowStartMs } = require('./_lib/check-rent-paid');
   const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
   const a = getAdmin();
@@ -71,7 +71,7 @@ exports.handler = async () => {
   }
 
   const todayMs = utcMidnightToday();
-  let invoicesGenerated = 0, errors = 0;
+  let invoicesGenerated = 0, skipped = 0, errors = 0;
   const errorMessages = [];
 
   try {
@@ -92,12 +92,16 @@ exports.handler = async () => {
       // fired. Window is the previous due date through the upcoming one.
       const upcomingDue = new Date(cycle.dueMs);
       const prevCycle = computeCycle(tenant.rentDueDay, 0, upcomingDue.getUTCFullYear(), upcomingDue.getUTCMonth() - 1);
-      const windowStartMs = prevCycle.dueMs + Math.floor((cycle.dueMs - prevCycle.dueMs) / 2);
+      const windowStartMs = coverageWindowStartMs(prevCycle.dueMs, cycle.dueMs);
       const rentCovered = await isRentAlreadyCoveredForCycle({
         db, tenantId: tenantDoc.id, monthlyRent: tenant.monthlyRent,
         cycleStartMs: windowStartMs, cycleEndMs: cycle.dueMs,
       });
       if (rentCovered) {
+        // Skipped on purpose, but never silently: this is the exact path that
+        // once hid missing invoices, so leave a trace in the function log.
+        console.log(`send-auto-invoices: SKIPPED tenant ${tenantDoc.id} (${tenant.email}) for ${cycle.period} — rent already covered in window ${new Date(windowStartMs).toISOString().slice(0,10)} to ${new Date(cycle.dueMs).toISOString().slice(0,10)}.`);
+        skipped++;
         await tenantDoc.ref.update({ autoInvoiceLastPeriod: cycle.period });
         continue;
       }
@@ -128,9 +132,9 @@ exports.handler = async () => {
       }
     }
 
-    console.log(`send-auto-invoices: ${invoicesGenerated} invoice(s) generated, ${errors} error(s).`);
+    console.log(`send-auto-invoices: ${invoicesGenerated} invoice(s) generated, ${skipped} skipped as already covered, ${errors} error(s).`);
     await notifyAdminOnFailure({ functionName: 'send-auto-invoices', errorCount: errors, sampleErrors: errorMessages });
-    return { statusCode: 200, body: JSON.stringify({ invoicesGenerated, errors }) };
+    return { statusCode: 200, body: JSON.stringify({ invoicesGenerated, skipped, errors }) };
 
   } catch (err) {
     console.error('send-auto-invoices error:', err);

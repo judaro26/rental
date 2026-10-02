@@ -48,6 +48,20 @@ async function hasAlreadyPaidInvoice(db, tenantId, cycleStartMs, cycleEndMs) {
   });
 }
 
+// Start of the window in which a payment/invoice can count as covering the
+// UPCOMING cycle. The window must not begin at the previous due date: last
+// month's own paid invoice (due exactly on that date) and last month's rent
+// (paid on or just after it) would then look like coverage for this month and
+// silently suppress the invoice. Starting at the midpoint between the two due
+// dates keeps last month's activity out while still catching genuinely early
+// payments. Single shared definition so the scheduled sweep and the admin
+// "Generate Now" path cannot drift apart.
+// Known limit: rent for the PREVIOUS month paid after the midpoint (~the 16th)
+// is still indistinguishable from an early payment for the next one.
+function coverageWindowStartMs(prevDueMs, upcomingDueMs) {
+  return prevDueMs + Math.floor((upcomingDueMs - prevDueMs) / 2);
+}
+
 // cycleStartMs/cycleEndMs define the window rent for this cycle could
 // reasonably have been paid in — typically the previous due date through
 // the upcoming one, since tenants often pay a few days to weeks early.
@@ -59,4 +73,4 @@ async function isRentAlreadyCoveredForCycle({ db, tenantId, monthlyRent, cycleSt
   return byPayment || byInvoice;
 }
 
-module.exports = { isRentAlreadyCoveredForCycle };
+module.exports = { isRentAlreadyCoveredForCycle, coverageWindowStartMs };
