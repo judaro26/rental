@@ -10,6 +10,7 @@
 // (WhatsApp only ever supports Twilio in this app, so there's no
 // "wrong provider" case to guard against here the way SMS has).
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const twilio = require('twilio');
 
 let admin;
@@ -31,7 +32,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   let provider;
   try {
@@ -71,3 +72,6 @@ exports.handler = async (event) => {
 
   return { statusCode: 200, headers: { 'Content-Type': 'text/xml' }, body: '<Response/>' };
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

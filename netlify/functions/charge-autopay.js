@@ -4,6 +4,7 @@
 //
 // Required env vars: STRIPE_SECRET_KEY, FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 let admin;
@@ -32,7 +33,7 @@ exports.handler = async (event) => {
   if (!consentId) return { statusCode: 400, body: JSON.stringify({ error: 'consentId required' }) };
 
   const fb = getAdmin();
-  const db = fb.firestore();
+  const db = getDb();
 
   // Admin-only: this charges a real payment method for real money, and
   // despite the intent stated in the header comment, nothing here
@@ -145,3 +146,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: msg }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

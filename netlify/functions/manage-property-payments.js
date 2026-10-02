@@ -17,6 +17,7 @@
 // POST /api/manage-property-payments
 // Body: { action: 'get_status' | 'set_bold' | 'clear_bold', propertyId, ... }
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -81,7 +82,7 @@ exports.handler = async (event) => {
   if (!propertyId) return { statusCode: 400, body: JSON.stringify({ error: 'propertyId is required.' }) };
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   let caller;
   try { caller = await requireCanManageProperty(event, a, db, propertyId); }
@@ -356,3 +357,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Internal server error' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

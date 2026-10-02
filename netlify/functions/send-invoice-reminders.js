@@ -12,6 +12,7 @@
 //   ADMIN_NOTIFY_EMAIL (optional — for admin copies)
 //   SITE_URL (optional — for links)
 
+const { getDb, withEachWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 const { toUtcMidnight, buildEmail, buildSubject } = require('./_lib/invoice-reminder-email');
@@ -36,7 +37,7 @@ async function runSendInvoiceReminders() {
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
   }
 
-  const db = getAdmin().firestore();
+  const db = getDb();
   const siteSnap = await db.collection('settings').doc('site').get();
   const site = siteSnap.exists ? siteSnap.data() : {};
   const cfg = site.invoiceReminders || {};
@@ -172,3 +173,6 @@ exports.handler = async () => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withEachWorkspace(exports.handler);

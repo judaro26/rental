@@ -6,6 +6,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SITE_URL, SMTP_*
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const crypto     = require('crypto');
 const nodemailer = require('nodemailer');
 
@@ -46,7 +47,7 @@ exports.handler = async (event) => {
   const hours = Math.max(1, Math.min(168, parseInt(expiresInHours) || 24));
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
   if (!siteUrl) {
@@ -171,3 +172,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

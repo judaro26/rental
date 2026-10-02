@@ -11,6 +11,7 @@
 // history and burn a real sequential invoice number — neither of which is
 // an acceptable side effect of just wanting to see a preview.
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -35,7 +36,7 @@ exports.handler = async (event) => {
   if (!match) return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) };
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   let decoded;
   try { decoded = await a.auth().verifyIdToken(match[1]); }
@@ -137,3 +138,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Internal server error' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

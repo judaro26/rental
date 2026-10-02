@@ -6,6 +6,7 @@
 // POST body: { tenantId, tenantName, tenantEmail, action, details, sessionId, propertyId, unit }
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -70,7 +71,7 @@ exports.handler = async (event) => {
 
   const isOwnLog = decoded.uid === tenantId;
   if (!isOwnLog) {
-    const adminSnap = await fbForAuth.firestore().collection('admins').doc(decoded.uid).get();
+    const adminSnap = await getDb().collection('admins').doc(decoded.uid).get();
     if (!adminSnap.exists || adminSnap.data().status === 'revoked') {
       return { statusCode: 403, body: JSON.stringify({ error: 'Not authorized to log an action for this tenant.' }) };
     }
@@ -87,7 +88,7 @@ exports.handler = async (event) => {
   const [, geoData] = await Promise.allSettled([
     (async () => {
       const fb = getAdmin();
-      const db = fb.firestore();
+      const db = getDb();
       const geo = await geolocate(ip);
       await db.collection('auditLogs').add({
         tenantId,
@@ -109,3 +110,6 @@ exports.handler = async (event) => {
 
   return { statusCode: 200, body: JSON.stringify({ logged: true }) };
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

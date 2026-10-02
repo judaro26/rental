@@ -23,6 +23,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
@@ -40,11 +41,10 @@ function getAdmin() {
 }
 
 function getStore() {
-  const { getStore: _gs } = require('@netlify/blobs');
   const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
   const token  = process.env.NETLIFY_API_TOKEN;
   if (!siteID || !token) throw new Error(`Missing env vars: ${[!siteID&&'NETLIFY_SITE_ID',!token&&'NETLIFY_API_TOKEN'].filter(Boolean).join(', ')}`);
-  return _gs({ name: 'moveout-statements', consistency: 'strong', siteID, token });
+  return getWorkspaceStore({ name: 'moveout-statements', consistency: 'strong', siteID, token });
 }
 
 // Photos are stored in the `documents` Blob store (same one upload-document.js
@@ -56,11 +56,10 @@ function getStore() {
 // (same as view-invoice.js), so there's no session available to attach a
 // Bearer token to a separate image request anyway.
 function getDocumentsStore() {
-  const { getStore: _gs } = require('@netlify/blobs');
   const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
   const token  = process.env.NETLIFY_API_TOKEN;
   if (!siteID || !token) throw new Error(`Missing env vars: ${[!siteID&&'NETLIFY_SITE_ID',!token&&'NETLIFY_API_TOKEN'].filter(Boolean).join(', ')}`);
-  return _gs({ name: 'documents', consistency: 'strong', siteID, token });
+  return getWorkspaceStore({ name: 'documents', consistency: 'strong', siteID, token });
 }
 
 async function photosToDataUris(photoRefs, documentsStore) {
@@ -304,7 +303,7 @@ exports.handler = async (event) => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   const { verifyAdmin } = require('./_lib/verify-admin');
   const authResult = await verifyAdmin(event, db, a);
@@ -417,3 +416,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

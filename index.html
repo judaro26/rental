@@ -287,7 +287,7 @@
   // Init
   const app  = initializeApp(_cfg.firebase);
   const auth = getAuth(app);
-  const db   = getFirestore(app);
+  const db   = getFirestore(app, _cfg.firestoreDatabaseId || '(default)');
 
   // ── Visitor country detection (drives which properties are shown below) ────
   // Uses Netlify's built-in edge geolocation (netlify/functions/geo.js) — no

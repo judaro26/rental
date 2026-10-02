@@ -16,6 +16,7 @@
 // existing integration-override system via _lib/apply-email-config.js,
 // falling back to SMTP_HOST etc. if nothing custom is configured).
 
+const { getDb, withEachWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -70,7 +71,7 @@ exports.handler = async () => {
   const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
   const nodemailer = require('nodemailer');
 
   if (!process.env.SMTP_HOST) {
@@ -192,3 +193,6 @@ exports.handler = async () => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withEachWorkspace(exports.handler);

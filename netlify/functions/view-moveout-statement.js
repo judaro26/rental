@@ -12,6 +12,7 @@
 // email link-wrapping services pass the entire original URL through as
 // the key value.
 
+const { getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') return { statusCode: 405, body: 'Method not allowed' };
 
@@ -31,12 +32,11 @@ exports.handler = async (event) => {
   if (!key) return { statusCode: 400, body: 'Missing key parameter' };
 
   try {
-    const { getStore } = require('@netlify/blobs');
     const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
     const token  = process.env.NETLIFY_API_TOKEN;
     if (!siteID || !token) return { statusCode: 500, body: 'Storage not configured' };
 
-    const store = getStore({ name: 'moveout-statements', consistency: 'strong', siteID, token });
+    const store = getWorkspaceStore({ name: 'moveout-statements', consistency: 'strong', siteID, token });
     const blob  = await store.getWithMetadata(key, { type: 'arrayBuffer' });
     if (!blob) return { statusCode: 404, body: notFoundHtml() };
 
@@ -74,3 +74,6 @@ function notFoundHtml() {
   </div>
 </div></body></html>`;
 }
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

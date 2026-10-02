@@ -311,11 +311,60 @@ function checkI18n() {
 // ── 8. firestore.rules brace balance ────────────────────────────────────────
 function checkFirestoreRules() {
   const rules = readIfExists('firestore.rules');
-  if (rules == null) return;
+  // Unlike the other readIfExists callers in this script, a missing
+  // firestore.rules isn't "this checkout doesn't happen to have this
+  // optional file" — it's a required security artifact for this app, and
+  // its absence is exactly the kind of thing this script exists to catch
+  // loudly rather than quietly wave through.
+  if (rules == null) { fail('firestore.rules', 'File does not exist at repo root — Firestore is running whatever rules were last deployed directly, with no version-controlled record of what they are.'); return; }
   const opens = (rules.match(/{/g) || []).length;
   const closes = (rules.match(/}/g) || []).length;
   if (opens !== closes) fail('firestore.rules brace balance', `${opens} "{" vs ${closes} "}"`);
   else pass('firestore.rules brace balance');
+}
+
+// ── 9. Workspace seam (multi-client isolation) ──────────────────────────────
+// Every client ("workspace") has its own Firestore database and Blobs stores, and
+// _lib/workspace.js is the ONLY place allowed to open either. A function that opens
+// Firestore itself (admin.firestore(), getFirestore(app)) would silently read the
+// DEFAULT workspace's database while serving another client's request — a data leak
+// that no test of that one function would notice. These rules make the mistake
+// impossible to merge, which is what keeps the isolation true as the code grows.
+function checkWorkspaceSeam() {
+  const fnDir = path.join(ROOT, 'netlify/functions');
+  if (!fs.existsSync(fnDir)) return;
+  const code = text => text.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n'); // ignore full-line comments
+
+  // Which functions are scheduled (netlify.toml): these must fan out across workspaces.
+  const toml = readIfExists('netlify.toml') || '';
+  const scheduled = new Set([...toml.matchAll(/\[functions\."([^"]+)"\]\s*\n\s*schedule\s*=/g)].map(m => m[1]));
+
+  const targets = [];
+  for (const f of fs.readdirSync(fnDir)) if (f.endsWith('.js')) targets.push({ rel: `netlify/functions/${f}`, name: f.slice(0, -3), isHandler: true });
+  const libDir = path.join(fnDir, '_lib');
+  if (fs.existsSync(libDir)) for (const f of fs.readdirSync(libDir)) if (f.endsWith('.js') && f !== 'workspace.js') targets.push({ rel: `netlify/functions/_lib/${f}`, name: f.slice(0, -3), isHandler: false });
+
+  let ok = true;
+  for (const t of targets) {
+    const text = code(fs.readFileSync(path.join(ROOT, t.rel), 'utf8'));
+    if (/\.firestore\(\)/.test(text)) { ok = false; fail(`Workspace seam: ${t.rel} opens Firestore directly`, 'Use getDb() from _lib/workspace.js — a direct handle reads the default workspace\'s database for every client.'); }
+    if (/require\(\s*['"]@netlify\/blobs['"]\s*\)/.test(text)) { ok = false; fail(`Workspace seam: ${t.rel} opens Blobs directly`, 'Use getWorkspaceStore() from _lib/workspace.js so the store name is workspace-prefixed.'); }
+    if (!t.isHandler) continue;
+    const m = text.match(/^exports\.handler\s*=\s*(withWorkspace|withEachWorkspace|withoutWorkspace)\(exports\.handler\);?\s*$/m);
+    if (!m) { ok = false; fail(`Workspace seam: ${t.rel} handler is not wrapped`, 'Add at the end of the file: exports.handler = withWorkspace(exports.handler); (withEachWorkspace for scheduled functions, withoutWorkspace only for a function that touches no workspace data).'); continue; }
+    if (scheduled.has(t.name) && m[1] !== 'withEachWorkspace') { ok = false; fail(`Workspace seam: ${t.rel} is scheduled but not wrapped with withEachWorkspace`, 'A scheduled function has no request to take a workspace from; it must run once per workspace.'); }
+    if (!scheduled.has(t.name) && m[1] === 'withEachWorkspace') { ok = false; fail(`Workspace seam: ${t.rel} uses withEachWorkspace but is not scheduled in netlify.toml`); }
+  }
+  if (ok) pass(`Workspace seam: ${targets.length} files — no direct Firestore/Blobs access, every handler wrapped, ${scheduled.size} scheduled functions fan out`);
+
+  // The browser must open the workspace's database, not always the default one.
+  let pagesOk = true;
+  for (const page of ['admin.html', 'tenant-portal.html', 'index.html', 'apply.html']) {
+    const html = readIfExists(page);
+    if (html == null) continue;
+    if (/getFirestore\(\s*app\s*\)/.test(html) || !/firestoreDatabaseId/.test(html)) { pagesOk = false; fail(`Workspace seam: ${page} does not open the workspace's database`, "Use getFirestore(app, _cfg.firestoreDatabaseId || '(default)') — /api/config says which database this workspace uses."); }
+  }
+  if (pagesOk) pass('Workspace seam: pages open the database named by /api/config');
 }
 
 // ── Run everything ───────────────────────────────────────────────────────────
@@ -326,6 +375,7 @@ checkHtmlSyntax();
 checkHtmlRegressions();
 checkI18n();
 checkFirestoreRules();
+checkWorkspaceSeam();
 
 console.log(`\n${checksRun} checks passed, ${failures} failed.`);
 if (failures > 0) {

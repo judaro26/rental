@@ -4,6 +4,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, ADMIN_NOTIFY_EMAIL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -52,7 +53,7 @@ exports.handler = async (event) => {
   if (!bearerMatch) return { statusCode: 401, body: JSON.stringify({ error: 'Missing Authorization bearer token.' }) };
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   let decoded;
   try { decoded = await a.auth().verifyIdToken(bearerMatch[1]); }
@@ -181,3 +182,6 @@ Device: ${userAgent}`;
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

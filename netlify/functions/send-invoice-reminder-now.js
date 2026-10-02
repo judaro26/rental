@@ -19,6 +19,7 @@
 //   ADMIN_NOTIFY_EMAIL (optional — for admin copies, same as the scheduled system)
 //   SITE_URL (optional — for links)
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const { toUtcMidnight, buildEmail, buildSubject } = require('./_lib/invoice-reminder-email');
 
@@ -45,7 +46,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   const { verifyAdmin } = require('./_lib/verify-admin');
   const authResult = await verifyAdmin(event, db, a);
@@ -123,3 +124,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

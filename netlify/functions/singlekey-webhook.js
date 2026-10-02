@@ -9,6 +9,7 @@
 // Configure this URL (https://yoursite.com/api/singlekey-webhook) and an
 // optional Handshake Token in the SingleKey Partner Portal.
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -44,7 +45,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   // Optional Handshake Token verification, same override-with-fallback
   // pattern used elsewhere: a saved provider's own token takes priority.
@@ -126,3 +127,6 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ received: true, error: 'internal error logged' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

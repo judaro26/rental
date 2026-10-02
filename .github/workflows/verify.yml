@@ -1,5 +1,8 @@
 name: Verify
 
+# NOTE: this file must live in .github/workflows/ — GitHub ignores workflows anywhere else
+# (it used to sit in the repo root, so these checks never actually ran in CI).
+#
 # Runs the same checks documented in scripts/verify.js on every push and
 # every pull request against main — syntax validation, dangling handlers,
 # duplicate definitions, missing DOM references, and i18n key parity.
@@ -27,5 +30,13 @@ jobs:
         with:
           node-version: '18'
 
+      # The behavioural tests use the real firebase-admin (no network), so dependencies are needed.
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
       - name: Run verification checks
         run: npm run verify
+
+      # Workspace isolation, receipts, invoice payment info, rent coverage.
+      - name: Run tests
+        run: npm test

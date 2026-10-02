@@ -24,6 +24,7 @@
 // RentPrep's own API — it never trusts a status or score value taken
 // directly from the postback body itself.
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -58,7 +59,7 @@ exports.handler = async (event) => {
 
   try {
     const a = getAdmin();
-    const db = a.firestore();
+    const db = getDb();
     const appRef = db.collection('applications').doc(applicationId);
     const snap = await appRef.get();
     if (!snap.exists) {
@@ -81,3 +82,6 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ received: true }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

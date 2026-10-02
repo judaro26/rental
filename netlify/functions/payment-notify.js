@@ -4,6 +4,7 @@
 //
 // Required env vars: SMTP_*, ADMIN_NOTIFY_EMAIL, SITE_URL
 
+const { withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 exports.handler = async (event) => {
@@ -69,3 +70,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

@@ -5,6 +5,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 // No Cloudinary needed — files served via /api/view-doc
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 const Busboy = require('busboy');
 
 let admin;
@@ -54,7 +55,7 @@ exports.handler = async (event) => {
   // this could attach an arbitrary file to an arbitrary tenantId's document
   // list.
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
   const { verifyAdmin } = require('./_lib/verify-admin');
   const authResult = await verifyAdmin(event, db, a);
   if (authResult.error) return authResult.error;
@@ -74,7 +75,6 @@ exports.handler = async (event) => {
     const displayName = isChunked ? `${name} (Part ${chunkIdx + 1} of ${chunkTotal})` : name;
 
     // Store in Netlify Blobs
-    const { getStore } = require('@netlify/blobs');
     // Netlify injects SITE_ID automatically; NETLIFY_API_TOKEN must be set manually
     const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
     const token  = process.env.NETLIFY_API_TOKEN;
@@ -82,7 +82,7 @@ exports.handler = async (event) => {
       const missing = [!siteID && 'NETLIFY_SITE_ID (or SITE_ID)', !token && 'NETLIFY_API_TOKEN'].filter(Boolean);
       throw new Error(`Netlify Blobs: missing env vars: ${missing.join(', ')}. Add them in Netlify → Site → Environment variables.`);
     }
-    const store = getStore({ name: 'documents', consistency: 'strong', siteID, token });
+    const store = getWorkspaceStore({ name: 'documents', consistency: 'strong', siteID, token });
     const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const blobKey = isChunked
       ? `${documentGroupId}_chunk${chunkIdx}_${safeFileName}`
@@ -97,7 +97,7 @@ exports.handler = async (event) => {
     const ext  = fileName.split('.').pop().toLowerCase();
     const type = ext === 'pdf' ? 'pdf' : ['jpg','jpeg','png','gif','webp'].includes(ext) ? 'image' : 'file';
 
-    const ref = await a.firestore().collection('documents').add({
+    const ref = await getDb().collection('documents').add({
       name: displayName, category: category || 'Other',
       url: viewUrl,
       storagePath: blobKey,
@@ -127,3 +127,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

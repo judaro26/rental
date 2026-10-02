@@ -15,6 +15,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, NETLIFY_SITE_ID (or SITE_ID), NETLIFY_API_TOKEN
 
+const { getDb, getWorkspaceStore, withEachWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -52,14 +53,13 @@ async function runPurgeExpiredApplications() {
   const deleteCutoff = now - deleteDays * DAY;
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   let store = null;
   try {
-    const { getStore } = require('@netlify/blobs');
     const siteID    = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
     const blobToken = process.env.NETLIFY_API_TOKEN;
-    if (siteID && blobToken) store = getStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
+    if (siteID && blobToken) store = getWorkspaceStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
     else console.warn('purge-expired-applications: Netlify Blobs env vars missing — will clear references but cannot delete blobs.');
   } catch (e) { console.warn('purge-expired-applications: blob store unavailable:', e.message); }
 
@@ -158,3 +158,6 @@ exports.handler = async () => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withEachWorkspace(exports.handler);

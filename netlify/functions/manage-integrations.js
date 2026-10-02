@@ -30,6 +30,7 @@
 // Body: { action: 'list_providers' | 'add_provider' | 'update_provider'
 //               | 'remove_provider' | 'set_active_provider' | 'test_email', ... }
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -112,7 +113,7 @@ exports.handler = async (event) => {
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
   const coll = db.collection('integrationSecrets');
   const activeRef = coll.doc('_active');
 
@@ -727,3 +728,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Internal server error' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

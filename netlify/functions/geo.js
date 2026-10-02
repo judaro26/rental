@@ -10,6 +10,7 @@
 // in local dev. That's expected — the front end falls back to showing all
 // properties when country is null.
 
+const { withoutWorkspace } = require('./_lib/workspace');
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
@@ -48,3 +49,6 @@ exports.handler = async (event) => {
     }),
   };
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withoutWorkspace(exports.handler);

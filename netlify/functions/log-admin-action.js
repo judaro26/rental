@@ -10,6 +10,7 @@
 // Header: Authorization: Bearer <Firebase ID token>
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -50,7 +51,7 @@ exports.handler = async (event) => {
     return { statusCode: 401, body: JSON.stringify({ error: 'Invalid or expired session.' }) };
   }
 
-  const db = a.firestore();
+  const db = getDb();
   // Confirm the caller is a real (non-revoked) admin — this is an admin
   // audit log, not a general-purpose logging endpoint.
   try {
@@ -87,3 +88,6 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ logged: false }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

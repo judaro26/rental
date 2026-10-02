@@ -5,7 +5,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "verify": "node scripts/verify.js"
+    "verify": "node scripts/verify.js",
+    "test": "node scripts/run-tests.js"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0",

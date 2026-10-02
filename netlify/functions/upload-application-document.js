@@ -7,6 +7,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, NETLIFY_SITE_ID (or SITE_ID),
 //                    NETLIFY_API_TOKEN, SITE_URL
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 const Busboy = require('busboy');
 
 let admin;
@@ -65,7 +66,7 @@ exports.handler = async (event) => {
     }
 
     const a  = getAdmin();
-    const db = a.firestore();
+    const db = getDb();
     const ref = db.collection('applications').doc(appId);
     const snap = await ref.get();
     if (!snap.exists) return { statusCode: 404, body: JSON.stringify({ error: 'This application could not be found.' }) };
@@ -82,14 +83,13 @@ exports.handler = async (event) => {
     }
 
     // Store the file in Netlify Blobs (same store the admin/tenant docs use)
-    const { getStore } = require('@netlify/blobs');
     const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
     const blobToken = process.env.NETLIFY_API_TOKEN;
     if (!siteID || !blobToken) {
       const missing = [!siteID && 'NETLIFY_SITE_ID (or SITE_ID)', !blobToken && 'NETLIFY_API_TOKEN'].filter(Boolean);
       throw new Error(`Netlify Blobs: missing env vars: ${missing.join(', ')}.`);
     }
-    const store = getStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
+    const store = getWorkspaceStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_');
     const blobKey = `app_${appId}_${Date.now()}_${safeName}`;
     await store.set(blobKey, fileBuffer, { metadata: { contentType: mimeType, fileName } });
@@ -131,3 +131,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

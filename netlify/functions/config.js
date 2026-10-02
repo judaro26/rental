@@ -9,6 +9,7 @@
  *   ALLOWED_ORIGIN  (e.g. https://your-site.netlify.app)
  */
 
+const { getDb, getWorkspace, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -30,7 +31,7 @@ async function getCloudinaryCloudName() {
   try {
     const a = getAdmin();
     if (!a.apps.length) return process.env.CLOUDINARY_CLOUD_NAME || null;
-    const db = a.firestore();
+    const db = getDb();
     const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
     const activeId = activeSnap.exists ? activeSnap.data().storage : null;
     if (activeId) {
@@ -45,17 +46,27 @@ async function getCloudinaryCloudName() {
 
 exports.handler = async (event) => {
   // ── Origin check ────────────────────────────────────────────────────────────
-  const allowedOrigin = process.env.ALLOWED_ORIGIN || '';
+  const ws = getWorkspace();
   const requestOrigin = event.headers?.origin || event.headers?.referer || '';
   const isLocalDev    = requestOrigin.startsWith('http://localhost') ||
                         requestOrigin.startsWith('http://127.0.0.1');
 
-  if (allowedOrigin && !isLocalDev) {
-    const originOk = requestOrigin === allowedOrigin ||
-                     requestOrigin.startsWith(allowedOrigin);
-    if (!originOk) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
-    }
+  // Default workspace: unchanged — ALLOWED_ORIGIN, only enforced when set.
+  // Any other workspace: ALWAYS enforced, and only against its own registered
+  // domains (exact origin match, so portal.acme.com.evil.com cannot pass), never
+  // against the default workspace's origin. A workspace with no domains allows nothing.
+  let allowedOrigin, originOk;
+  if (ws.isDefault) {
+    allowedOrigin = process.env.ALLOWED_ORIGIN || '';
+    originOk = !allowedOrigin || requestOrigin === allowedOrigin || requestOrigin.startsWith(allowedOrigin);
+  } else {
+    const origins = ws.domains.map(d => `https://${d}`);
+    const matched = origins.find(o => requestOrigin === o || requestOrigin.startsWith(o + '/'));
+    allowedOrigin = matched || origins[0] || '';
+    originOk = !!matched;
+  }
+  if (!originOk && !isLocalDev) {
+    return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) };
   }
 
   // ── Method check ────────────────────────────────────────────────────────────
@@ -86,6 +97,8 @@ exports.handler = async (event) => {
       'Access-Control-Allow-Origin': allowedOrigin || '*',
     },
     body: JSON.stringify({
+      // Which Firestore database this workspace lives in ('(default)' for the original install).
+      firestoreDatabaseId: ws.databaseId,
       firebase: {
         apiKey:            process.env.FIREBASE_API_KEY,
         authDomain:        `${projectId}.firebaseapp.com`,
@@ -100,3 +113,6 @@ exports.handler = async (event) => {
     }),
   };
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

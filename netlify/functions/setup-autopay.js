@@ -5,6 +5,7 @@
 // POST body: { tenantId, tenantEmail, tenantName, methodType? ('card' | 'us_bank_account') }
 // Required env vars: STRIPE_SECRET_KEY, FIREBASE_SERVICE_ACCOUNT
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 let admin;
@@ -35,7 +36,7 @@ exports.handler = async (event) => {
   }
 
   const fb = getAdmin();
-  const db = fb.firestore();
+  const db = getDb();
 
   // Authentication: previously this function had no auth check, and the
   // impact here is more than impersonation — it creates/links a real
@@ -112,3 +113,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

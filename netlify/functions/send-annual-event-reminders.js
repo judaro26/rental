@@ -20,6 +20,7 @@
 //
 // The schedule is declared in netlify.toml ([functions."send-annual-event-reminders"]).
 
+const { getDb, withEachWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -41,7 +42,7 @@ exports.handler = async () => {
   const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   if (!process.env.SMTP_HOST) {
     console.warn('send-annual-event-reminders: no email configuration available (no custom provider, no SMTP_HOST env var) — skipping this run.');
@@ -180,3 +181,6 @@ exports.handler = async () => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withEachWorkspace(exports.handler);

@@ -18,6 +18,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -73,7 +74,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   const { verifyOwner } = require('./_lib/verify-owner');
   const authResult = await verifyOwner(event, db, a);
@@ -153,3 +154,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

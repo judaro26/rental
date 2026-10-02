@@ -5,6 +5,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_* (optional), ADMIN_NOTIFY_EMAIL (optional), SITE_URL (optional)
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -53,7 +54,7 @@ exports.handler = async (event) => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   try {
     const ref  = db.collection('applications').doc(appId);
@@ -136,3 +137,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Something went wrong saving your details. Please try again.' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

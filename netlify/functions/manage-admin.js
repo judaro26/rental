@@ -14,6 +14,7 @@
 // Required Netlify env vars (all already used by the tenant invite flow):
 //   FIREBASE_SERVICE_ACCOUNT, SITE_URL, SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -174,7 +175,7 @@ exports.handler = async (event) => {
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
   const siteUrl = getSiteUrl(event);
 
   let caller;
@@ -336,3 +337,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message || 'Internal server error' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

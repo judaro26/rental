@@ -8,6 +8,7 @@
 // POST body: { choice: 'accepted'|'rejected', policyVersion, page, language }
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -57,7 +58,7 @@ exports.handler = async (event) => {
 
   try {
     const a = getAdmin();
-    const db = a.firestore();
+    const db = getDb();
     const geo = await geolocate(ip);
     await db.collection('cookieConsents').add({
       choice,
@@ -76,3 +77,6 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ logged: false }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

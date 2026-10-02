@@ -15,6 +15,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -64,7 +65,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   try {
     const invoiceRef = db.collection('invoices').doc(invoiceId);
@@ -132,3 +133,6 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ received: true, error: 'internal error logged' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

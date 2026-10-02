@@ -6,6 +6,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SITE_URL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -84,7 +85,7 @@ exports.handler = async (event) => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   try {
     // Look up the token
@@ -169,3 +170,6 @@ exports.handler = async (event) => {
     };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);
