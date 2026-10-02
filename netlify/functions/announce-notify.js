@@ -6,6 +6,7 @@
 //   FIREBASE_SERVICE_ACCOUNT
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -69,7 +70,7 @@ exports.handler = async (event) => {
   }
 
   const a   = getAdmin();
-  const db  = a.firestore();
+  const db  = getDb();
 
   // Admin-only: previously this function had no auth check at all, so
   // anyone could POST directly to this endpoint (bypassing admin.html and
@@ -212,3 +213,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

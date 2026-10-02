@@ -4,6 +4,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -107,7 +108,7 @@ exports.handler = async (event) => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
   const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
 
   const { verifyAdmin } = require('./_lib/verify-admin');
@@ -408,3 +409,6 @@ Your right to a free annual credit report: AnnualCreditReport.com | 1-877-322-82
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

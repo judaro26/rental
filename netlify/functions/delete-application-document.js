@@ -5,6 +5,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, NETLIFY_SITE_ID (or SITE_ID), NETLIFY_API_TOKEN
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -33,7 +34,7 @@ exports.handler = async (event) => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   try {
     const ref  = db.collection('applications').doc(appId);
@@ -54,11 +55,10 @@ exports.handler = async (event) => {
 
     // Remove the blob (best-effort — proceed to detach even if this fails).
     try {
-      const { getStore } = require('@netlify/blobs');
       const siteID   = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
       const blobToken = process.env.NETLIFY_API_TOKEN;
       if (siteID && blobToken) {
-        const store = getStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
+        const store = getWorkspaceStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
         await store.delete(storagePath);
       }
     } catch (e) { console.warn('delete-application-document blob delete failed:', e.message); }
@@ -75,3 +75,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

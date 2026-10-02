@@ -12,6 +12,7 @@
 //   SMTP_PASS                  — app password / SMTP password
 //   SMTP_FROM                  — "My Properties <noreply@yourcompany.com>"
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -128,7 +129,7 @@ exports.handler = async (event) => {
   }
 
   const a   = getAdmin();
-  const db  = a.firestore();
+  const db  = getDb();
   // Derive site URL from env var, or fall back to the incoming request's host
   let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
   if (!siteUrl) {
@@ -204,3 +205,6 @@ exports.handler = async (event) => {
     };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

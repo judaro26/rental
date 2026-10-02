@@ -8,6 +8,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SITE_URL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -74,7 +75,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   try {
     const snap = await db.collection('adminInviteTokens').where('token', '==', token).limit(1).get();
@@ -111,3 +112,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, headers: { 'Content-Type': 'text/html' }, body: errorPage('Something Went Wrong', `We encountered an error processing your link: ${err.message}`, siteUrl) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

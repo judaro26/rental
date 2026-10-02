@@ -33,6 +33,7 @@
 // (or SITE_ID), NETLIFY_API_TOKEN (email creds come from the existing
 // integration-override system, falling back to SMTP_* if not configured).
 
+const { getDb, withEachWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -54,7 +55,7 @@ exports.handler = async () => {
   const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   if (!process.env.SMTP_HOST) {
     console.warn('send-auto-invoices: no email configuration available (no custom provider, no SMTP_HOST env var) — skipping this run.');
@@ -142,3 +143,6 @@ exports.handler = async () => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withEachWorkspace(exports.handler);

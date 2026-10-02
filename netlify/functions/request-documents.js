@@ -5,6 +5,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
@@ -65,7 +66,7 @@ exports.handler = async (event) => {
   if (!requested.length) return { statusCode: 400, body: JSON.stringify({ error: 'Select at least one document to request.' }) };
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   // Admin-only: this had no auth check, and the impact goes beyond the
   // usual "who can trigger this" concern — the response body returns
@@ -130,3 +131,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

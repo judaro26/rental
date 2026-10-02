@@ -4,6 +4,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, ADMIN_NOTIFY_EMAIL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -43,7 +44,7 @@ exports.handler = async (event) => {
   // against an actual bank record, this could mark real rent as paid when
   // it wasn't.
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   const authHeader = event.headers?.authorization || event.headers?.Authorization || '';
   const bearerMatch = authHeader.match(/^Bearer (.+)$/i);
@@ -148,3 +149,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

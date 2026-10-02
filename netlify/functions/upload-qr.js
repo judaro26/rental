@@ -3,6 +3,7 @@
 // POST with multipart form: file + method ('zelle' | 'cashapp')
 // GET /api/view-qr?method=zelle  or  ?method=cashapp
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 const Busboy = require('busboy');
 
 let admin;
@@ -36,7 +37,7 @@ exports.handler = async (event) => {
   // tenant rent payments to themselves, a direct financial-fraud vector,
   // not just an unauthorized-write concern.
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
   const { verifyAdmin } = require('./_lib/verify-admin');
   const authResult = await verifyAdmin(event, db, a);
   if (authResult.error) return authResult.error;
@@ -62,8 +63,7 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'No file received' }) };
     }
 
-    const { getStore } = require('@netlify/blobs');
-    const store   = getStore({ name: 'settings', consistency: 'strong', siteID, token });
+    const store   = getWorkspaceStore({ name: 'settings', consistency: 'strong', siteID, token });
     const blobKey = `${result.method}-qr`;
     await store.set(blobKey, result.fileBuffer, { metadata: { contentType: result.mimeType } });
 
@@ -73,3 +73,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

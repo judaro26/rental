@@ -13,13 +13,13 @@
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { getPaymentInfo, renderPaymentEmailBlock } = require('./payment-info');
+const { getWorkspaceStore } = require('./workspace');
 
 function getStore() {
-  const { getStore: _gs } = require('@netlify/blobs');
   const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
   const token  = process.env.NETLIFY_API_TOKEN;
   if (!siteID || !token) throw new Error(`Missing env vars: ${[!siteID&&'NETLIFY_SITE_ID',!token&&'NETLIFY_API_TOKEN'].filter(Boolean).join(', ')}`);
-  return _gs({ name: 'invoices', consistency: 'strong', siteID, token });
+  return getWorkspaceStore({ name: 'invoices', consistency: 'strong', siteID, token });
 }
 
 // ── Auto-increment invoice number ───────────────────────────────────────────

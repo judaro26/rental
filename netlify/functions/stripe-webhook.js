@@ -13,6 +13,7 @@
 //   payment_intent.succeeded
 //   payment_intent.payment_failed
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const stripe    = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const nodemailer = require('nodemailer');
 
@@ -104,7 +105,7 @@ exports.handler = async (event) => {
   }
 
   const fb = getAdmin();
-  const db = fb.firestore();
+  const db = getDb();
 
   // Idempotency guard — Stripe redelivers events on timeouts/network issues,
   // which would otherwise double-record income + fee entries below.
@@ -239,3 +240,6 @@ async function updatePaymentByIntentId(db, admin, intentId, updateData) {
   }
   await snap.docs[0].ref.update(updateData);
 }
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

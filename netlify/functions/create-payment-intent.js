@@ -5,6 +5,7 @@
 //   STRIPE_SECRET_KEY          — sk_live_... or sk_test_...
 //   FIREBASE_SERVICE_ACCOUNT   — JSON string of your Firebase service account key
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 let admin;
@@ -60,7 +61,7 @@ exports.handler = async (event) => {
 
     // Record pending payment in Firestore
     const fb = getAdmin();
-    const db = fb.firestore();
+    const db = getDb();
     await db.collection('payments').add({
       tenantId,
       propertyId:             propertyId || null,
@@ -94,3 +95,6 @@ function jsonResponse(statusCode, body) {
     body: JSON.stringify(body),
   };
 }
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

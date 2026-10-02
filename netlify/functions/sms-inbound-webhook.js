@@ -22,6 +22,7 @@
 // rather than reconstructed from request headers, which is exactly where
 // Twilio's docs warn proxies/load balancers can cause a mismatch.
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const twilio = require('twilio');
 
 let admin;
@@ -43,7 +44,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   // The active SMS provider's own Twilio auth token is the signing key —
   // not an app-wide secret, since this app supports multiple SMS
@@ -94,3 +95,6 @@ exports.handler = async (event) => {
   // here.
   return { statusCode: 200, headers: { 'Content-Type': 'text/xml' }, body: '<Response/>' };
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

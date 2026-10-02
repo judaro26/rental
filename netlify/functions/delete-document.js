@@ -1,6 +1,7 @@
 // netlify/functions/delete-document.js
 // Deletes a document from Netlify Blobs and Firestore.
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -29,7 +30,7 @@ exports.handler = async (event) => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   // Admin-only: previously this had no auth check, so anyone who obtained
   // a docId or documentGroupId could delete that record (and its
@@ -49,12 +50,11 @@ exports.handler = async (event) => {
       if (!targets.length) targets = [{ docId, storagePath }];
     }
 
-    const { getStore } = require('@netlify/blobs');
     const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
     const token  = process.env.NETLIFY_API_TOKEN;
     let store = null;
     if (siteID && token) {
-      store = getStore({ name: 'documents', consistency: 'strong', siteID, token });
+      store = getWorkspaceStore({ name: 'documents', consistency: 'strong', siteID, token });
     } else {
       console.warn('Netlify Blobs env vars missing — skipping blob cleanup, deleting Firestore records only.');
     }
@@ -75,3 +75,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

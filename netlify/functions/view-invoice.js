@@ -6,6 +6,7 @@
 // http:/// URL — Google's link wrapper passes the raw query string through,
 // so the function still receives ?key=... correctly even if the domain was missing.
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') return { statusCode: 405, body: 'Method not allowed' };
 
@@ -28,12 +29,11 @@ exports.handler = async (event) => {
   if (!key) return { statusCode: 400, body: 'Missing key parameter' };
 
   try {
-    const { getStore } = require('@netlify/blobs');
     const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
     const token  = process.env.NETLIFY_API_TOKEN;
     if (!siteID || !token) return { statusCode: 500, body: 'Storage not configured' };
 
-    const store = getStore({ name: 'invoices', consistency: 'strong', siteID, token });
+    const store = getWorkspaceStore({ name: 'invoices', consistency: 'strong', siteID, token });
     const blob  = await store.getWithMetadata(key, { type: 'arrayBuffer' });
     if (!blob) return { statusCode: 404, body: notFoundHtml(key) };
 
@@ -91,7 +91,7 @@ function stripMarkers(html) {
 async function personalizeInvoice(html, blobKey) {
   const { statusPillHtml, paidStampHtml } = require('./_lib/create-invoice');
   const { getPaymentInfo, renderPaymentSectionHtml } = require('./_lib/payment-info');
-  const db = getAdmin().firestore();
+  const db = getDb();
 
   const snap = await db.collection('invoices').where('blobKey', '==', blobKey).limit(1).get();
   if (snap.empty) return stripMarkers(html); // can't tell its state: show the page as created
@@ -131,3 +131,6 @@ function notFoundHtml(key) {
   </div>
 </div></body></html>`;
 }
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

@@ -10,6 +10,7 @@
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 //   ADMIN_NOTIFY_EMAIL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -41,7 +42,7 @@ exports.handler = async (event) => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   const { verifyOwner } = require('./_lib/verify-owner');
   const authResult = await verifyOwner(event, db, a);
@@ -152,3 +153,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

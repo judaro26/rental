@@ -40,6 +40,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, plus NETLIFY_SITE_ID/SITE_ID
 // and NETLIFY_API_TOKEN as before.
 
+const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -63,7 +64,7 @@ exports.handler = async (event) => {
 
   try {
     const a  = getAdmin();
-    const db = a.firestore();
+    const db = getDb();
 
     // Look up whether this key belongs to a documents-collection record.
     // If it does, this is the tenant/admin path and needs real auth. If it
@@ -133,7 +134,6 @@ exports.handler = async (event) => {
       }
     }
 
-    const { getStore } = require('@netlify/blobs');
     // Netlify injects SITE_ID automatically; NETLIFY_API_TOKEN must be set manually
     const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
     const blobToken = process.env.NETLIFY_API_TOKEN;
@@ -141,7 +141,7 @@ exports.handler = async (event) => {
       const missing = [!siteID && 'NETLIFY_SITE_ID (or SITE_ID)', !blobToken && 'NETLIFY_API_TOKEN'].filter(Boolean);
       throw new Error(`Netlify Blobs: missing env vars: ${missing.join(', ')}. Add them in Netlify → Site → Environment variables.`);
     }
-    const store = getStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
+    const store = getWorkspaceStore({ name: 'documents', consistency: 'strong', siteID, token: blobToken });
 
     const blob = await store.getWithMetadata(key, { type: 'arrayBuffer' });
     if (!blob) return { statusCode: 404, body: 'Document not found' };
@@ -165,3 +165,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: err.message };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

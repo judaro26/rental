@@ -21,6 +21,7 @@
 // env-var fallback — it's a newer addition with no prior established
 // convention to preserve) — same override-with-fallback pattern as email.
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -39,7 +40,7 @@ function getAdmin() {
 async function getActiveStorageConfig() {
   try {
     const a = getAdmin();
-    const db = a.firestore();
+    const db = getDb();
     const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
     const activeId = activeSnap.exists ? activeSnap.data().storage : null;
     if (activeId) {
@@ -133,3 +134,6 @@ exports.handler = async (event) => {
     body: JSON.stringify({ backend: 'cloudinary', signature, timestamp, apiKey: config.apiKey, cloudName: config.cloudName }),
   };
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

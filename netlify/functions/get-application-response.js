@@ -4,6 +4,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -29,7 +30,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const db   = getAdmin().firestore();
+    const db   = getDb();
     const snap = await db.collection('applications').doc(appId).get();
     if (!snap.exists) return { statusCode: 404, body: JSON.stringify({ error: 'This application could not be found.' }) };
     const app = snap.data();
@@ -62,3 +63,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'Something went wrong loading your form.' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

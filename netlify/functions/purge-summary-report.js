@@ -11,6 +11,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, ADMIN_NOTIFY_EMAIL
 
+const { getDb, withEachWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
@@ -40,7 +41,7 @@ exports.handler = async () => {
   }
 
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   // Previous calendar month window (UTC).
   const now = new Date();
@@ -138,3 +139,6 @@ exports.handler = async () => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withEachWorkspace(exports.handler);

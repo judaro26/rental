@@ -645,7 +645,7 @@
   // change here to ever disrupt elsewhere.
   const app  = _isImpersonationTarget ? initializeApp(_cfg.firebase, 'impersonation') : initializeApp(_cfg.firebase);
   const auth = getAuth(app);
-  const db   = getFirestore(app);
+  const db   = getFirestore(app, _cfg.firestoreDatabaseId || '(default)');
 
   // Positioned immediately after getAuth(app), before any other code —
   // this matters for the same reason the app name above needs deciding

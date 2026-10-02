@@ -5,6 +5,7 @@
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM  (same as send-invite)
 //   ADMIN_NOTIFY_EMAIL  — where to send notifications (e.g. judaro26@gmail.com)
 
+const { withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -238,3 +239,6 @@ exports.handler = async (event) => {
     return { statusCode: 200, body: JSON.stringify({ notified: false, error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

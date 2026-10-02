@@ -10,6 +10,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 // Optional: DOCUMENSO_WEBHOOK_SECRET, SMTP_*, ADMIN_NOTIFY_EMAIL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -43,7 +44,7 @@ exports.handler = async (event) => {
   }
 
   const a = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
 
   // Optional shared-secret check (Documenso can send a configured secret).
   // A saved envelope integration's own webhookSecret takes priority over
@@ -140,3 +141,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);

@@ -582,7 +582,7 @@
     if (!res.ok) throw new Error('Config failed');
     _cfg = await res.json();
     const app = initializeApp(_cfg.firebase);
-    db = getFirestore(app);
+    db = getFirestore(app, _cfg.firestoreDatabaseId || '(default)');
   } catch(e) {
     document.getElementById('properties-grid').innerHTML =
       '<p style="color:#DC2626;font-size:13px;padding:20px;">Failed to load listings. Please try again later.</p>';

@@ -9,6 +9,7 @@
 //   ADMIN_NOTIFY_EMAIL
 //   SITE_URL
 
+const { getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -196,7 +197,7 @@ exports.handler = async (event) => {
   // household members sharing a connection, or a retry after a mistake)
   // while still limiting scripted abuse.
   const a  = getAdmin();
-  const db = a.firestore();
+  const db = getDb();
   const { checkRateLimit } = require('./_lib/rate-limit');
   const rl = await checkRateLimit(event, db, { endpoint: 'submit-application', limit: 5, windowMinutes: 60 });
   if (rl.limited) return rl.error;
@@ -363,3 +364,6 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'An error occurred while submitting your application. Please try again.' }) };
   }
 };
+
+// Resolves which workspace (client) this invocation belongs to — see _lib/workspace.js
+exports.handler = withWorkspace(exports.handler);
