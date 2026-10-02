@@ -5,7 +5,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_* (optional), ADMIN_NOTIFY_EMAIL (optional), SITE_URL (optional)
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -94,12 +94,12 @@ exports.handler = async (event) => {
     } catch (e) { console.warn('audit log failed:', e.message); }
 
     // Notify admin (best-effort)
-    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
-    if (adminEmail && process.env.SMTP_HOST) {
+    const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
+    if (adminEmail && getConfig('SMTP_HOST')) {
       try {
         let siteName = 'Tenant Portal';
         try { const s = await db.collection('settings').doc('site').get(); if (s.exists) siteName = s.data().siteName || siteName; } catch {}
-        const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+        const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
         const occHtml = cleanedOccupants.length
           ? cleanedOccupants.map(o => `<li>${o.name || '—'}${o.age ? ` — age ${o.age}` : ''}</li>`).join('')
           : '<li>None provided</li>';
@@ -107,13 +107,13 @@ exports.handler = async (event) => {
           ? cleanedReferences.map(r => `<li>${r.name || '—'}${r.relationship ? ` (${r.relationship})` : ''}${r.contact ? ` — ${r.contact}` : ''}</li>`).join('')
           : '<li>None provided</li>';
         const transporter = nodemailer.createTransport({
-          host:   process.env.SMTP_HOST,
-          port:   parseInt(process.env.SMTP_PORT || '587'),
-          secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-          auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+          host:   getConfig('SMTP_HOST'),
+          port:   parseInt(getConfig('SMTP_PORT') || '587'),
+          secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+          auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
         });
         await transporter.sendMail({
-          from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+          from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
           to:      adminEmail,
           subject: `✅ Applicant details received — ${appData.firstName || ''} ${appData.lastName || ''}`.trim(),
           html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:560px;margin:auto;">

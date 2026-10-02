@@ -7,7 +7,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, NETLIFY_SITE_ID (or SITE_ID),
 //                    NETLIFY_API_TOKEN, SITE_URL
 
-const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 const Busboy = require('busboy');
 
 let admin;
@@ -94,7 +94,7 @@ exports.handler = async (event) => {
     const blobKey = `app_${appId}_${Date.now()}_${safeName}`;
     await store.set(blobKey, fileBuffer, { metadata: { contentType: mimeType, fileName } });
 
-    const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+    const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
     const viewUrl = `${siteUrl}/api/view-doc?key=${encodeURIComponent(blobKey)}&app=${encodeURIComponent(appId)}&token=${encodeURIComponent(token)}`;
     const type = ext === 'pdf' ? 'pdf' : ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic'].includes(ext) ? 'image' : 'file';
     const label = (fields.label || 'Document').toString().slice(0, 120);

@@ -13,20 +13,21 @@
 // Or, from a catastrophic top-level catch:
 //   await notifyAdminOnFailure({ functionName: 'send-property-reminders', fatalError: err.message });
 
+const { getConfig } = require('./workspace');
 async function notifyAdminOnFailure({ functionName, errorCount, sampleErrors, fatalError }) {
   if (!fatalError && (!errorCount || errorCount === 0)) return; // nothing to report
-  if (!process.env.ADMIN_NOTIFY_EMAIL) return; // no one to notify
+  if (!getConfig('ADMIN_NOTIFY_EMAIL')) return; // no one to notify
 
   try {
     await require('./apply-email-config')();
-    if (!process.env.SMTP_HOST) return; // can't send without email configured
+    if (!getConfig('SMTP_HOST')) return; // can't send without email configured
 
     const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      host: getConfig('SMTP_HOST'),
+      port: parseInt(getConfig('SMTP_PORT') || '587'),
+      secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+      auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
     });
 
     const subject = fatalError
@@ -39,8 +40,8 @@ async function notifyAdminOnFailure({ functionName, errorCount, sampleErrors, fa
       : '<p style="font-size:12px;color:#6B7280;">Check Netlify function logs for details.</p>';
 
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: process.env.ADMIN_NOTIFY_EMAIL,
+      from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
+      to: getConfig('ADMIN_NOTIFY_EMAIL'),
       subject,
       html: `
         <p>The scheduled function <strong>${functionName}</strong> ${fatalError ? 'did not complete' : 'ran with errors'}.</p>

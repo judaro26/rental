@@ -5,7 +5,7 @@
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM  (same as send-invite)
 //   ADMIN_NOTIFY_EMAIL  — where to send notifications (e.g. judaro26@gmail.com)
 
-const { withWorkspace } = require('./_lib/workspace');
+const { getConfig, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -23,12 +23,12 @@ function getAdmin() {
 
 function getTransporter() {
   return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+    host:   getConfig('SMTP_HOST'),
+    port:   parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: getConfig('SMTP_USER'),
+      pass: getConfig('SMTP_PASS'),
     },
   });
 }
@@ -174,14 +174,14 @@ exports.handler = async (event) => {
   const authResult = await verifyAuthenticated(event, a);
   if (authResult.error) return authResult.error;
 
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+  const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
   if (!adminEmail) {
     console.warn('ADMIN_NOTIFY_EMAIL not set — skipping maintenance notification');
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
   }
 
   const { tenantName, unit, propertyName, category, priority, description, imageUrls, siteName, isUpdate, statusUpdate, adminNotes, tenantEmail, notifyTenant, isComment, commentText } = body;
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
   try {
     const subject = isComment
@@ -191,21 +191,21 @@ exports.handler = async (event) => {
         : `[${priority?.toUpperCase() || 'NEW'}] Maintenance Request — ${category}${unit ? ' · Unit ' + unit : ''}`;
 
     await getTransporter().sendMail({
-      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to:      adminEmail,
       subject,
       html:    buildEmailHtml({ tenantName, unit, propertyName, category, priority, description, imageUrls, siteUrl, siteName, isUpdate, statusUpdate, adminNotes, isComment, commentText }),
     });
 
     // If this is an admin update and tenant email is provided, notify the tenant too
-    if (isUpdate && notifyTenant && tenantEmail && process.env.SMTP_HOST) {
+    if (isUpdate && notifyTenant && tenantEmail && getConfig('SMTP_HOST')) {
       const statusLabel = statusUpdate === 'resolved' ? 'Resolved ✓'
         : statusUpdate === 'in-progress' ? 'In Progress'
         : 'Open';
       const statusColor = statusUpdate === 'resolved' ? '#16A34A'
         : statusUpdate === 'in-progress' ? '#D97706' : '#3B82F6';
       await getTransporter().sendMail({
-        from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+        from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to:      tenantEmail,
         subject: `Your ${category} request has been updated — ${statusLabel}`,
         html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">

@@ -6,7 +6,7 @@
 //   FIREBASE_SERVICE_ACCOUNT
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -24,10 +24,10 @@ function getAdmin() {
 
 function getTransporter() {
   return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host:   getConfig('SMTP_HOST'),
+    port:   parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+    auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
   });
 }
 
@@ -83,7 +83,7 @@ exports.handler = async (event) => {
   const authResult = await verifyAdmin(event, db, a);
   if (authResult.error) return authResult.error;
 
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
   try {
     let tenants;
@@ -111,13 +111,13 @@ exports.handler = async (event) => {
     let emailSent = 0, emailFailed = 0, smsSent = 0, smsFailed = 0, smsSkipped = 0, whatsappSent = 0, whatsappFailed = 0, whatsappSkipped = 0;
 
     // Email — independent of SMS; only attempted if SMTP is actually configured.
-    if (process.env.SMTP_HOST) {
+    if (getConfig('SMTP_HOST')) {
       const transporter = getTransporter();
       for (const tenant of tenants) {
         if (!tenant.email) continue;
         try {
           await transporter.sendMail({
-            from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+            from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
             to:      tenant.email,
             subject: `${urgent ? '🚨 URGENT' : '📢'}: ${title}${propertyName ? ` — ${propertyName}` : ''}`,
             html:    buildAnnouncementEmail({

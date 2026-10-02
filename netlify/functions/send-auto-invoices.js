@@ -33,7 +33,7 @@
 // (or SITE_ID), NETLIFY_API_TOKEN (email creds come from the existing
 // integration-override system, falling back to SMTP_* if not configured).
 
-const { getDb, withEachWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withEachWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -57,12 +57,12 @@ exports.handler = async () => {
   const a = getAdmin();
   const db = getDb();
 
-  if (!process.env.SMTP_HOST) {
+  if (!getConfig('SMTP_HOST')) {
     console.warn('send-auto-invoices: no email configuration available (no custom provider, no SMTP_HOST env var) — skipping this run.');
     return { statusCode: 200, body: 'No email configuration available.' };
   }
 
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
   let siteName = 'Tenant Portal';
   try {
     const settingsSnap = await db.collection('settings').doc('site').get();

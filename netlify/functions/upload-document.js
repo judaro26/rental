@@ -5,7 +5,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 // No Cloudinary needed — files served via /api/view-doc
 
-const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 const Busboy = require('busboy');
 
 let admin;
@@ -90,7 +90,7 @@ exports.handler = async (event) => {
     await store.set(blobKey, fileBuffer, { metadata: { contentType: mimeType, fileName } });
 
     // The URL tenants/admin use to view the file via our proxy
-    const siteUrl    = (process.env.SITE_URL || '').replace(/\/+$/, '');
+    const siteUrl    = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
     const viewUrl    = `${siteUrl}/api/view-doc?key=${encodeURIComponent(blobKey)}`;
     const storagePath = blobKey; // used for deletion
 

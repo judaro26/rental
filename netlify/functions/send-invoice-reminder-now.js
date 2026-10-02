@@ -19,7 +19,7 @@
 //   ADMIN_NOTIFY_EMAIL (optional — for admin copies, same as the scheduled system)
 //   SITE_URL (optional — for links)
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const { toUtcMidnight, buildEmail, buildSubject } = require('./_lib/invoice-reminder-email');
 
@@ -41,7 +41,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.SMTP_HOST) {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT || !getConfig('SMTP_HOST')) {
     return { statusCode: 500, body: JSON.stringify({ error: 'Email is not configured on this deployment.' }) };
   }
 
@@ -83,15 +83,15 @@ exports.handler = async (event) => {
   const site = siteSnap.exists ? siteSnap.data() : {};
   const cfg = site.invoiceReminders || {};
   const copyAdmin = cfg.copyAdmin !== false;
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+  const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
   const siteName = site.siteName || 'Tenant Portal';
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
   const transporter = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host:   getConfig('SMTP_HOST'),
+    port:   parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+    auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
   });
 
   try {
@@ -102,7 +102,7 @@ exports.handler = async (event) => {
     });
     const subject = buildSubject({ invoiceNumber: inv.invoiceNumber, total: inv.total, daysUntil, ...(isOverdue ? { daysOverdue } : {}) });
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to: inv.tenantEmail,
       cc: (copyAdmin && adminEmail) ? adminEmail : undefined,
       subject,

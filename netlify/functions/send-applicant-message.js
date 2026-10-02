@@ -5,7 +5,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
@@ -49,7 +49,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
-  if (!process.env.SMTP_HOST) {
+  if (!getConfig('SMTP_HOST')) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Email is not configured (SMTP env vars are missing).' }) };
   }
 
@@ -88,7 +88,7 @@ exports.handler = async (event) => {
         token = crypto.randomBytes(24).toString('hex');
         await ref.update({ responseToken: token });
       }
-      const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+      const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
       if (!siteUrl) return { statusCode: 400, body: JSON.stringify({ error: 'SITE_URL is not set, so a form link cannot be generated.' }) };
       formUrl = `${siteUrl}/respond.html?app=${encodeURIComponent(applicationId)}&token=${encodeURIComponent(token)}`;
     }
@@ -96,13 +96,13 @@ exports.handler = async (event) => {
     const bodyHtml = esc(messageBody).replace(/\n/g, '<br>');
 
     const transporter = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST,
-      port:   parseInt(process.env.SMTP_PORT || '587'),
-      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      host:   getConfig('SMTP_HOST'),
+      port:   parseInt(getConfig('SMTP_PORT') || '587'),
+      secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+      auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
     });
     await transporter.sendMail({
-      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to:      app.email,
       subject: subject,
       html:    buildEmail({ siteName, bodyHtml, formUrl }),

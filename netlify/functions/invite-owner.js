@@ -17,7 +17,7 @@
 //   SITE_URL (or falls back to the request's own host)
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -36,12 +36,12 @@ function getAdmin() {
 async function sendEmail({ to, subject, html }) {
   const nodemailer = require('nodemailer');
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host: getConfig('SMTP_HOST'),
+    port: parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+    auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
   });
-  await transporter.sendMail({ from: process.env.SMTP_FROM || process.env.SMTP_USER, to, subject, html });
+  await transporter.sendMail({ from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'), to, subject, html });
 }
 
 function inviteEmailHtml({ name, propertyName, activationUrl, siteUrl, siteName }) {
@@ -124,7 +124,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'email, name, propertyId, and ownerName are required' }) };
   }
 
-  let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  let siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
   if (!siteUrl) {
     const host = event.headers?.['x-forwarded-host'] || event.headers?.host || '';
     const proto = event.headers?.['x-forwarded-proto'] || 'https';

@@ -11,7 +11,7 @@
 // not a choice made here. Applications tied to a non-US property are
 // rejected before any request is sent.
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -109,7 +109,7 @@ exports.handler = async (event) => {
       method: 'POST',
       headers: { Authorization: `Token ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        external_customer_id: process.env.SITE_URL || 'landlord',
+        external_customer_id: getConfig('SITE_URL') || 'landlord',
         external_tenant_id: applicationId,
         external_listing_id: application.propertyId || undefined,
         tenant_form: true,
@@ -141,13 +141,13 @@ exports.handler = async (event) => {
     });
 
     // Email the applicant their screening link directly.
-    if (process.env.SMTP_HOST) {
+    if (getConfig('SMTP_HOST')) {
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host: getConfig('SMTP_HOST'),
+        port: parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
       let siteName = 'Tenant Portal';
       try {
@@ -156,7 +156,7 @@ exports.handler = async (event) => {
       } catch { /* use default siteName */ }
       try {
         await transporter.sendMail({
-          from: process.env.SMTP_FROM || process.env.SMTP_USER,
+          from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
           to: application.email,
           subject: `Complete your rental screening for ${property.name || 'your application'}`,
           html: `

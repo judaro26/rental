@@ -29,7 +29,7 @@
 // is the one line to change (currency + removing any USD assumption) —
 // flagging this explicitly rather than silently guessing.
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -94,7 +94,7 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Bold is not configured or is disabled for this property.' }) };
     }
 
-    const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+    const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
     const reference = `invoice_${invoiceId}`;
 
     const boldRes = await fetch(`${BOLD_BASE_URL}/online/link/v1`, {

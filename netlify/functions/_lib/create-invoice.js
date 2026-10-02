@@ -13,7 +13,7 @@
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { getPaymentInfo, renderPaymentEmailBlock } = require('./payment-info');
-const { getWorkspaceStore } = require('./workspace');
+const { getConfig, getWorkspaceStore } = require('./workspace');
 
 function getStore() {
   const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
@@ -206,13 +206,13 @@ function buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invo
 // creation and by an explicit receipt resend, so both produce identical mail.
 async function sendInvoiceEmail({ isReceipt, invoiceNumber, tenantName, tenantEmail, total, dueDate, invoiceUrl, siteName, paymentHtml = '' }) {
   const transporter = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host:   getConfig('SMTP_HOST'),
+    port:   parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+    auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
   });
   await transporter.sendMail({
-    from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+    from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
     to:      tenantEmail,
     subject: `${isReceipt ? 'Payment Receipt' : 'New Invoice'} #${invoiceNumber} — $${Number(total).toFixed(2)}`,
     html:    buildEmail({ isReceipt, invoiceNumber, tenantName, total, dueDate, invoiceUrl, siteName, paymentHtml }),
@@ -305,7 +305,7 @@ async function createInvoiceCore({ a, db, siteUrl,
   }
 
   // Email tenant (skipped for drafts)
-  if (willSend && process.env.SMTP_HOST && tenantEmail) {
+  if (willSend && getConfig('SMTP_HOST') && tenantEmail) {
     let paymentHtml = '';
     if (!isReceipt) {
       try { paymentHtml = renderPaymentEmailBlock(await getPaymentInfo(db, propertyId), { siteUrl }); }
@@ -362,7 +362,7 @@ async function createInvoice(args) {
       const { lineItems = [], taxRate = 0, tenantName, tenantEmail, dueDate, siteName } = args;
       const subtotal = lineItems.reduce((n, i) => n + parseFloat(i.amount || 0), 0);
       const total = subtotal + subtotal * (parseFloat(taxRate) / 100);
-      if (process.env.SMTP_HOST && tenantEmail) {
+      if (getConfig('SMTP_HOST') && tenantEmail) {
         await sendInvoiceEmail({ isReceipt: true, invoiceNumber: d.result.invoiceNumber, tenantName, tenantEmail, total, dueDate, invoiceUrl: d.result.invoiceUrl, siteName });
       }
       return { ...d.result, resent: true };

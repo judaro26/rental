@@ -4,8 +4,8 @@
 //
 // Required env vars: STRIPE_SECRET_KEY, FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getStripe } = require('./_lib/stripe-client');
 
 let admin;
 function getAdmin() {
@@ -47,7 +47,7 @@ exports.handler = async (event) => {
   const authResult = await verifyAdmin(event, db, fb);
   if (authResult.error) return authResult.error;
 
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
   try {
     // Load consent record
@@ -66,7 +66,7 @@ exports.handler = async (event) => {
     const description = `Auto-pay — ${consent.tenantName || 'Tenant'}${consent.unit ? ' Unit '+consent.unit : ''}`;
 
     // Create and confirm PaymentIntent using saved card (off_session)
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await getStripe().paymentIntents.create({
       amount,
       currency: 'usd',
       customer: consent.stripeCustomerId,

@@ -13,26 +13,26 @@
 //   payment_intent.succeeded
 //   payment_intent.payment_failed
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
-const stripe    = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
+const { getStripe } = require('./_lib/stripe-client');
 const nodemailer = require('nodemailer');
 
 function getTransporter() {
   return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host:   getConfig('SMTP_HOST'),
+    port:   parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+    auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
   });
 }
 
 async function sendPaymentNotification({ tenantName, tenantEmail, amount, description, method, siteName, siteUrl }) {
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
-  if (!adminEmail || !process.env.SMTP_HOST) return;
+  const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
+  if (!adminEmail || !getConfig('SMTP_HOST')) return;
   const label = method === 'zelle' ? 'Zelle' : method === 'stripe' ? 'Stripe' : 'Manual';
   try {
     await getTransporter().sendMail({
-      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to:      adminEmail,
       subject: `💳 Payment Received — ${tenantName} · $${parseFloat(amount).toFixed(2)}`,
       html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">
@@ -94,10 +94,10 @@ exports.handler = async (event) => {
 
   let stripeEvent;
   try {
-    stripeEvent = stripe.webhooks.constructEvent(
+    stripeEvent = getStripe().webhooks.constructEvent(
       event.body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET
+      getConfig('STRIPE_WEBHOOK_SECRET')
     );
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
@@ -132,8 +132,8 @@ exports.handler = async (event) => {
         });
         // Notify admin of payment
         try {
-          const siteUrl   = (process.env.SITE_URL || '').replace(/\/+$/, '');
-          const siteName  = process.env.SITE_NAME || '';
+          const siteUrl   = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
+          const siteName  = getConfig('SITE_NAME') || '';
           // Fetch payment record to get tenant info
           const pmtSnap = await db.collection('payments')
             .where('stripePaymentIntentId', '==', pi.id).limit(1).get();

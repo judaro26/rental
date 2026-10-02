@@ -16,7 +16,7 @@
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 //   SITE_URL
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -47,7 +47,7 @@ exports.handler = async (event) => {
   try { body = JSON.parse(event.body); }
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
-  let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  let siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
   if (!siteUrl) {
     const host  = event.headers?.['x-forwarded-host'] || event.headers?.host || '';
     const proto = event.headers?.['x-forwarded-proto'] || 'https';

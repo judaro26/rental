@@ -9,7 +9,7 @@
  *   ALLOWED_ORIGIN  (e.g. https://your-site.netlify.app)
  */
 
-const { getDb, getWorkspace, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, getWorkspace, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -30,7 +30,7 @@ function getAdmin() {
 async function getCloudinaryCloudName() {
   try {
     const a = getAdmin();
-    if (!a.apps.length) return process.env.CLOUDINARY_CLOUD_NAME || null;
+    if (!a.apps.length) return getConfig('CLOUDINARY_CLOUD_NAME') || null;
     const db = getDb();
     const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
     const activeId = activeSnap.exists ? activeSnap.data().storage : null;
@@ -41,7 +41,7 @@ async function getCloudinaryCloudName() {
   } catch (err) {
     console.warn('config.js: could not check storage override, using env var:', err.message);
   }
-  return process.env.CLOUDINARY_CLOUD_NAME || null;
+  return getConfig('CLOUDINARY_CLOUD_NAME') || null;
 }
 
 exports.handler = async (event) => {
@@ -57,7 +57,7 @@ exports.handler = async (event) => {
   // against the default workspace's origin. A workspace with no domains allows nothing.
   let allowedOrigin, originOk;
   if (ws.isDefault) {
-    allowedOrigin = process.env.ALLOWED_ORIGIN || '';
+    allowedOrigin = getConfig('ALLOWED_ORIGIN') || '';
     originOk = !allowedOrigin || requestOrigin === allowedOrigin || requestOrigin.startsWith(allowedOrigin);
   } else {
     const origins = ws.domains.map(d => `https://${d}`);
@@ -75,14 +75,23 @@ exports.handler = async (event) => {
   }
 
   // ── Validate env vars ───────────────────────────────────────────────────────
-  const required = ['FIREBASE_API_KEY','FIREBASE_PROJECT_ID','FIREBASE_SENDER_ID','FIREBASE_APP_ID','STRIPE_PUBLISHABLE_KEY'];
-  const missing  = required.filter(k => !process.env[k]);
+  // Firebase settings are platform-level (one project serves every workspace) and always required.
+  // Stripe is per workspace: still required for the default workspace, as before, but a client
+  // that does not take card payments simply has none (the pages only need it when a tenant pays).
+  const platform = {
+    FIREBASE_API_KEY:   process.env.FIREBASE_API_KEY,
+    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
+    FIREBASE_SENDER_ID: process.env.FIREBASE_SENDER_ID,
+    FIREBASE_APP_ID:    process.env.FIREBASE_APP_ID,
+  };
+  const missing = Object.keys(platform).filter(k => !platform[k]);
+  if (ws.isDefault && !getConfig('STRIPE_PUBLISHABLE_KEY')) missing.push('STRIPE_PUBLISHABLE_KEY');
   if (missing.length) {
     console.error('Missing env vars:', missing);
     return { statusCode: 500, body: JSON.stringify({ error: 'Server misconfiguration' }) };
   }
   // Cloudinary is optional — warn but don't block
-  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_UPLOAD_PRESET) {
+  if (ws.isDefault && (!getConfig('CLOUDINARY_CLOUD_NAME') || !getConfig('CLOUDINARY_UPLOAD_PRESET'))) {
     console.warn('CLOUDINARY_CLOUD_NAME or CLOUDINARY_UPLOAD_PRESET not set — document uploads will be unavailable.');
   }
 
@@ -107,9 +116,9 @@ exports.handler = async (event) => {
         messagingSenderId: process.env.FIREBASE_SENDER_ID,
         appId:             process.env.FIREBASE_APP_ID,
       },
-      stripePk:         process.env.STRIPE_PUBLISHABLE_KEY,
+      stripePk:         getConfig('STRIPE_PUBLISHABLE_KEY') || null,
       cloudinaryCloud,
-      cloudinaryPreset: process.env.CLOUDINARY_UPLOAD_PRESET || null,
+      cloudinaryPreset: getConfig('CLOUDINARY_UPLOAD_PRESET') || null,
     }),
   };
 };

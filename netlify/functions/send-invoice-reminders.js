@@ -12,7 +12,7 @@
 //   ADMIN_NOTIFY_EMAIL (optional — for admin copies)
 //   SITE_URL (optional — for links)
 
-const { getDb, withEachWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withEachWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 const { toUtcMidnight, buildEmail, buildSubject } = require('./_lib/invoice-reminder-email');
@@ -32,7 +32,7 @@ function getAdmin() {
 
 async function runSendInvoiceReminders() {
   await require('./_lib/apply-email-config')(); // load any custom email provider override before this function's existing nodemailer code runs
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.SMTP_HOST) {
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT || !getConfig('SMTP_HOST')) {
     console.warn('send-invoice-reminders: missing FIREBASE_SERVICE_ACCOUNT or SMTP_HOST — skipping.');
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
   }
@@ -50,19 +50,19 @@ async function runSendInvoiceReminders() {
   const autoSendDaysBefore = Number(cfg.autoSendDaysBefore) || 0;
 
   const copyAdmin = cfg.copyAdmin !== false;
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+  const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
   const siteName = site.siteName || 'Tenant Portal';
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
   // Today at UTC midnight
   const now = new Date();
   const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
 
   const transporter = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-    auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host:   getConfig('SMTP_HOST'),
+    port:   parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+    auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
   });
 
   const snap = await db.collection('invoices').get();
@@ -140,7 +140,7 @@ async function runSendInvoiceReminders() {
       });
       const subject = buildSubject({ invoiceNumber: inv.invoiceNumber, total: inv.total, daysUntil, ...(isOverdue ? { daysOverdue } : {}) });
       await transporter.sendMail({
-        from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+        from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to:      inv.tenantEmail,
         cc:      (copyAdmin && adminEmail) ? adminEmail : undefined,
         subject,

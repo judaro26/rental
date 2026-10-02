@@ -34,15 +34,20 @@
 //   unreadable -> 503. It never falls back to the default workspace, because
 //   that would show one client the wrong client's data.
 //
-// KNOWN LIMITS (tracked in docs/MULTI-WORKSPACE.md, do not enable a second
+// PER-WORKSPACE SETTINGS
+//   Anything that differs per client (Stripe, mail, site URL, notification address, API
+//   keys) is read with getConfig('KEY'), never process.env. The default workspace gets the
+//   environment variable; every other workspace gets only its own value, loaded from the
+//   platform database (workspaceSecrets/{id}) or, for mail, its own email provider. See
+//   getConfig below. The context is one object per request and nothing in it is shared, so
+//   scheduled sweeps run workspaces in parallel.
+//
+// KNOWN LIMITS (docs/MULTI-WORKSPACE.md has the full list; do not enable a second
 // workspace until they are closed)
-//   - Integration credentials are still process-wide env vars (Stripe, Cloudinary,
-//     Documenso, ...). Non-default workspaces must not inherit them. SMTP is
-//     already isolated (see apply-email-config.js); the rest is the next patch.
 //   - Sign-in is not yet per-workspace (Firebase Identity Platform tenants).
-//   - Scheduled sweeps run workspaces one after another inside the platform's
-//     time limit for scheduled functions, with a budget guard; they need to fan
-//     out before the client count grows.
+//   - Security rules are deployed to one database only; every workspace database and the
+//     platform database (which now holds client settings) need them.
+//   - No automated provisioning, and no per-database backups.
 
 'use strict';
 
@@ -53,6 +58,34 @@ const als = new AsyncLocalStorage();
 const REGISTRY_CACHE_MS = 60 * 1000;   // a suspension takes up to this long to bite
 const NEGATIVE_CACHE_MS = 30 * 1000;   // unknown hosts are remembered briefly
 const CACHE_MAX_ENTRIES = 500;         // Host is attacker-controlled: bound the cache
+
+// ── per-workspace settings ───────────────────────────────────────────────────
+// Everything that differs per client and used to be a deployment-wide environment
+// variable. Code reads these ONLY through getConfig(); scripts/verify.js fails the
+// build on a raw process.env read of any of them. For the default workspace
+// getConfig() returns exactly what the environment variable did; for every other
+// workspace it returns only that workspace's own value and NEVER falls back to the
+// deployment's, so a client can never use (or be billed through) the platform
+// owner's Stripe account, mail server, API keys or notification address.
+//
+// Not listed on purpose (platform-level, shared by every workspace, read from env
+// directly): FIREBASE_*, NETLIFY_*, SITE_ID and the switches in this file.
+const MAIL_KEYS = Object.freeze(['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM']);
+// Operator-managed: stored in the platform database (workspaceSecrets/{id}), which no
+// client can read or write.
+const SECRET_KEYS = Object.freeze([
+  'SITE_URL', 'SITE_NAME', 'ADMIN_NOTIFY_EMAIL', 'ALLOWED_ORIGIN',
+  'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_PUBLISHABLE_KEY',
+  'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET', 'CLOUDINARY_UPLOAD_PRESET',
+  'DOCUMENSO_API_KEY', 'DOCUMENSO_API_URL', 'DOCUMENSO_APP_URL', 'DOCUMENSO_TEMPLATE_ID', 'DOCUMENSO_WEBHOOK_SECRET',
+  'SMARTMOVE_API_KEY', 'SMARTMOVE_API_URL', 'SMARTMOVE_LANDING_PAGE',
+  'EMPLOYMENT_VERIFICATION_API_KEY', 'EMPLOYMENT_VERIFICATION_API_URL',
+  'APPLICATION_RETENTION_DAYS', 'APPLICATION_DELETE_DAYS',
+]);
+const MAIL_KEY_SET = new Set(MAIL_KEYS);
+const SECRET_KEY_SET = new Set(SECRET_KEYS);
+const CLIENT_CONFIG_KEYS = Object.freeze([...MAIL_KEYS, ...SECRET_KEYS]);
+const CLIENT_KEY_SET = new Set(CLIENT_CONFIG_KEYS);
 
 const WORKSPACE_ID_RE = /^[a-z][a-z0-9-]{2,28}[a-z0-9]$/;        // 4-30 chars
 const DATABASE_ID_RE  = /^[a-z][a-z0-9-]{2,61}[a-z0-9]$/;        // 4-63 chars (Firestore)
@@ -172,6 +205,11 @@ const defaultRegistry = {
     if (!snap.exists) return null;
     return normalizeWorkspace(workspaceId, snap.data());
   },
+  // The operator-managed settings of one workspace. {} when none have been set.
+  async loadSecrets(workspaceId) {
+    const snap = await getPlatformDb().collection('workspaceSecrets').doc(workspaceId).get();
+    return snap.exists ? (snap.data() || {}) : {};
+  },
   async listActive() {
     const snap = await getPlatformDb().collection('workspaces').where('status', '==', 'active').get();
     const out = [];
@@ -195,6 +233,28 @@ function cacheGet(key) {
 function cacheSet(key, value, ms) {
   if (_cache.size >= CACHE_MAX_ENTRIES) _cache.clear();
   _cache.set(key, { value, exp: Date.now() + ms });
+}
+
+// Loaded once per cache window, not per request. A failure is NOT swallowed: without
+// its own settings a workspace must not run (it would have no Stripe key, mail, etc.).
+const _secretsCache = new Map();
+async function loadWorkspaceConfig(ws) {
+  if (ws.isDefault) return null; // the default workspace's settings are the environment, as before
+  const hit = _secretsCache.get(ws.id);
+  if (hit && hit.exp > Date.now()) return hit.value;
+  let raw;
+  try { raw = await _registry.loadSecrets(ws.id); }
+  catch (err) { throw new WorkspaceError(503, 'workspace_config_unavailable', `could not load settings for "${ws.id}": ${err && err.message}`); }
+  const cfg = {};
+  for (const [k, v] of Object.entries(raw || {})) {
+    if (!SECRET_KEY_SET.has(k)) { console.warn(`workspace "${ws.id}": ignoring setting "${k}" (not a per-workspace setting, or managed elsewhere)`); continue; }
+    if (v == null || v === '') continue;
+    cfg[k] = String(v);
+  }
+  Object.freeze(cfg);
+  if (_secretsCache.size >= CACHE_MAX_ENTRIES) _secretsCache.clear();
+  _secretsCache.set(ws.id, { value: cfg, exp: Date.now() + REGISTRY_CACHE_MS });
+  return cfg;
 }
 
 async function resolveWorkspace(event) {
@@ -221,7 +281,9 @@ async function listActiveWorkspaces() {
 }
 
 // ── request context ──────────────────────────────────────────────────────────
-const runWithWorkspace = (ws, fn) => als.run({ workspace: ws }, fn);
+// The context is one object PER REQUEST: { workspace, config, mail }. Nothing in it is shared
+// between requests, which is what lets scheduled sweeps run workspaces in parallel.
+const runWithWorkspace = (ws, fn, config) => als.run({ workspace: ws, config: config || null, mail: null }, fn);
 const currentWorkspace = () => { const s = als.getStore(); return s ? s.workspace : null; };
 
 function getWorkspace() {
@@ -231,6 +293,36 @@ function getWorkspace() {
                     '(or withEachWorkspace for scheduled functions).');
   }
   return ws;
+}
+
+// A per-workspace setting. Synchronous (a drop-in for process.env.KEY): the workspace's
+// settings were loaded before the handler started. Unknown names THROW, so a typo cannot
+// silently read as "not configured", and platform secrets (FIREBASE_SERVICE_ACCOUNT, ...)
+// cannot be reached through this accessor at all.
+function getConfig(key) {
+  if (!CLIENT_KEY_SET.has(key)) throw new Error(`getConfig: "${key}" is not a per-workspace setting`);
+  const store = als.getStore();
+  if (!store) throw new Error('No workspace context. Wrap the handler: exports.handler = withWorkspace(exports.handler).');
+  const ws = store.workspace;
+
+  if (MAIL_KEY_SET.has(key)) {
+    // From the workspace's own email provider, loaded by apply-email-config. Provided keys win;
+    // the default workspace falls back to the deployment's SMTP_* (as it always has).
+    const m = store.mail ? store.mail[key] : undefined;
+    return ws.isDefault ? (m !== undefined ? m : process.env[key]) : m;
+  }
+  if (ws.isDefault) return process.env[key];
+
+  const c = store.config || {};
+  if (key === 'SITE_URL') return c.SITE_URL || ws.siteUrl || undefined;
+  if (key === 'SITE_NAME') return c.SITE_NAME || ws.name || undefined;
+  return c[key];
+}
+
+// Called by apply-email-config with this request's mail settings (or null).
+function setMailOverride(mail) {
+  const store = als.getStore();
+  if (store) store.mail = mail ? Object.freeze({ ...mail }) : null;
 }
 
 // The Firestore database of the current workspace.
@@ -257,10 +349,10 @@ function errorResponse(err) {
 // HTTP functions: resolve the workspace from the request, then run the handler inside it.
 function withWorkspace(handler) {
   return async function workspaceHandler(event, context) {
-    let ws;
-    try { ws = await resolveWorkspace(event); }
+    let ws, config;
+    try { ws = await resolveWorkspace(event); config = await loadWorkspaceConfig(ws); }
     catch (err) { return errorResponse(err); }
-    return runWithWorkspace(ws, () => handler(event, context));
+    return runWithWorkspace(ws, () => handler(event, context), config);
   };
 }
 
@@ -282,16 +374,22 @@ function withEachWorkspace(handler) {
     // Only the default workspace: behave exactly like the pre-workspace function.
     if (list.length === 1 && !registryFailed) return runWithWorkspace(list[0], () => handler(event, context));
 
-    const results = {}; let failed = registryFailed ? 1 : 0;
-    for (const ws of list) {
+    // Workspaces run in parallel (bounded). This is safe because nothing is shared between
+    // runs: each gets its own context and settings, and no code mutates process.env.
+    const concurrency = Math.max(1, Number(process.env.SWEEP_CONCURRENCY) || 4);
+    const results = {}; for (const ws of list) results[ws.id] = null; // keeps the list's order
+    let failed = registryFailed ? 1 : 0; let next = 0;
+
+    async function runOne(ws) {
       if (Date.now() - startedAt > budgetMs) {
         failed++;
         results[ws.id] = { statusCode: 500, error: 'skipped: sweep time budget exhausted' };
         console.error(`workspace: sweep budget exhausted, skipped "${ws.id}"`);
-        continue;
+        return;
       }
       try {
-        const res = await runWithWorkspace(ws, () => handler(event, context));
+        const config = await loadWorkspaceConfig(ws);
+        const res = await runWithWorkspace(ws, () => handler(event, context), config);
         const code = (res && res.statusCode) || 200;
         if (code >= 500) failed++;
         results[ws.id] = { statusCode: code, body: res && res.body };
@@ -301,6 +399,8 @@ function withEachWorkspace(handler) {
         console.error(`workspace: sweep failed for "${ws.id}":`, err && err.message);
       }
     }
+    async function worker() { while (next < list.length) { await runOne(list[next++]); } }
+    await Promise.all(Array.from({ length: Math.min(concurrency, list.length) }, worker));
     return { statusCode: failed ? 500 : 200, body: JSON.stringify({ workspaces: results }) };
   };
 }
@@ -313,12 +413,13 @@ module.exports = {
   withWorkspace, withEachWorkspace, withoutWorkspace,
   getWorkspace, currentWorkspace, runWithWorkspace,
   getDb, getWorkspaceStore, getPlatformDb,
+  getConfig, setMailOverride, loadWorkspaceConfig, CLIENT_CONFIG_KEYS, MAIL_KEYS, SECRET_KEYS,
   resolveWorkspace, listActiveWorkspaces, hostFromEvent,
   WorkspaceError,
   // Test hooks only.
   _testing: {
     setRegistry(r) { _registry = r || defaultRegistry; },
-    resetCaches() { _cache.clear(); _handles.clear(); },
+    resetCaches() { _cache.clear(); _secretsCache.clear(); _handles.clear(); },
     normalizeWorkspace, defaultWorkspace,
   },
 };

@@ -16,7 +16,7 @@
 // existing integration-override system via _lib/apply-email-config.js,
 // falling back to SMTP_HOST etc. if nothing custom is configured).
 
-const { getDb, withEachWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withEachWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -74,15 +74,15 @@ exports.handler = async () => {
   const db = getDb();
   const nodemailer = require('nodemailer');
 
-  if (!process.env.SMTP_HOST) {
+  if (!getConfig('SMTP_HOST')) {
     console.warn('send-property-reminders: no email configuration available (no custom provider, no SMTP_HOST env var) — skipping this run.');
     return { statusCode: 200, body: 'No email configuration available.' };
   }
   const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    host: getConfig('SMTP_HOST'),
+    port: parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+    auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
   });
 
   // One global template (colors, logo, footer) for every reminder email —
@@ -157,7 +157,7 @@ exports.handler = async () => {
         for (const recipient of recipients) {
           try {
             await transporter.sendMail({
-              from: process.env.SMTP_FROM || process.env.SMTP_USER,
+              from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
               to: recipient.email,
               subject: renderReminderSubject({ lang, label, dueLabel: dueDateLabel }),
               html: renderReminderEmailHtml({

@@ -4,7 +4,7 @@
 //
 // Required env vars: SMTP_*, ADMIN_NOTIFY_EMAIL, SITE_URL
 
-const { withWorkspace } = require('./_lib/workspace');
+const { getConfig, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 exports.handler = async (event) => {
@@ -13,8 +13,8 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
 
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
-  if (!adminEmail || !process.env.SMTP_HOST) {
+  const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
+  if (!adminEmail || !getConfig('SMTP_HOST')) {
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
   }
 
@@ -23,19 +23,19 @@ exports.handler = async (event) => {
   catch { return { statusCode: 400, body: JSON.stringify({ error: 'Invalid JSON' }) }; }
 
   const { tenantName, amount, description, method, siteName } = body;
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
   const label   = method === 'zelle' ? 'Zelle' : method === 'stripe' ? 'Stripe' : 'Manual';
 
   try {
     const transporter = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST,
-      port:   parseInt(process.env.SMTP_PORT || '587'),
-      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      host:   getConfig('SMTP_HOST'),
+      port:   parseInt(getConfig('SMTP_PORT') || '587'),
+      secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+      auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
     });
 
     await transporter.sendMail({
-      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to:      adminEmail,
       subject: `💳 Payment Confirmed — ${tenantName||'Tenant'} · $${parseFloat(amount).toFixed(2)}`,
       html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;box-shadow:0 2px 16px rgba(26,26,46,0.08);">

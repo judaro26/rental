@@ -6,7 +6,7 @@
 //   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
 //   ADMIN_NOTIFY_EMAIL
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -41,7 +41,7 @@ exports.handler = async (event) => {
 
   const a  = getAdmin();
   const db = getDb();
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
   try {
     // 1. Save to Firestore
@@ -58,17 +58,17 @@ exports.handler = async (event) => {
     });
 
     // 2. Email admin
-    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
-    if (adminEmail && process.env.SMTP_HOST) {
+    const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
+    if (adminEmail && getConfig('SMTP_HOST')) {
       const transporter = nodemailer.createTransport({
-        host:   process.env.SMTP_HOST,
-        port:   parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host:   getConfig('SMTP_HOST'),
+        port:   parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
 
       await transporter.sendMail({
-        from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+        from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to:      adminEmail,
         replyTo: tenantEmail || undefined,
         subject: `[Support] ${subject} — ${tenantName || 'Tenant'}${unit ? ' · Unit ' + unit : ''}`,
@@ -112,16 +112,16 @@ exports.handler = async (event) => {
     }
 
     // Send confirmation email to the tenant
-    if (tenantEmail && process.env.SMTP_HOST) {
+    if (tenantEmail && getConfig('SMTP_HOST')) {
       try {
         const tenantTransporter = nodemailer.createTransport({
-          host:   process.env.SMTP_HOST,
-          port:   parseInt(process.env.SMTP_PORT || '587'),
-          secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-          auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+          host:   getConfig('SMTP_HOST'),
+          port:   parseInt(getConfig('SMTP_PORT') || '587'),
+          secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+          auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
         });
         await tenantTransporter.sendMail({
-          from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+          from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
           to:      tenantEmail,
           subject: `We received your message — ${subject}`,
           html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">
