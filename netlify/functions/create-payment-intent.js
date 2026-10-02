@@ -6,7 +6,7 @@
 //   FIREBASE_SERVICE_ACCOUNT   — JSON string of your Firebase service account key
 
 const { getDb, withWorkspace } = require('./_lib/workspace');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { getStripe } = require('./_lib/stripe-client');
 
 let admin;
 function getAdmin() {
@@ -48,7 +48,7 @@ exports.handler = async (event) => {
     }
 
     // Create Stripe PaymentIntent
-    const paymentIntent = await stripe.paymentIntents.create({
+    const paymentIntent = await getStripe().paymentIntents.create({
       amount: Math.round(parseFloat(amount) * 100), // cents
       currency: 'usd',
       automatic_payment_methods: { enabled: true },

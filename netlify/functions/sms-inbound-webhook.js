@@ -22,7 +22,7 @@
 // rather than reconstructed from request headers, which is exactly where
 // Twilio's docs warn proxies/load balancers can cause a mismatch.
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const twilio = require('twilio');
 
 let admin;
@@ -67,7 +67,7 @@ exports.handler = async (event) => {
   const body = new URLSearchParams(rawBody);
   const params = Object.fromEntries(body.entries());
   const signature = event.headers['x-twilio-signature'] || event.headers['X-Twilio-Signature'];
-  const webhookUrl = `${(process.env.SITE_URL || '').replace(/\/+$/, '')}/api/sms-inbound-webhook`;
+  const webhookUrl = `${(getConfig('SITE_URL') || '').replace(/\/+$/, '')}/api/sms-inbound-webhook`;
 
   const validRequest = twilio.validateRequest(provider.authToken, signature || '', webhookUrl, params);
   if (!validRequest) {

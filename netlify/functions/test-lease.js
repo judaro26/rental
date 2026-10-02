@@ -30,7 +30,7 @@
 //   DOCUMENSO_API_KEY, DOCUMENSO_TEMPLATE_ID (or a saved integration under Settings → Integrations)
 //   DOCUMENSO_API_URL / DOCUMENSO_APP_URL (optional)
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -98,9 +98,9 @@ exports.handler = async (event) => {
 
   // Same credential resolution as generate-lease.js: a saved integration
   // (Settings → Integrations) takes priority over environment variables.
-  let apiKey = process.env.DOCUMENSO_API_KEY;
-  let apiUrl = (process.env.DOCUMENSO_API_URL || 'https://app.documenso.com/api/v2').replace(/\/+$/, '');
-  let envDefaultTemplateId = process.env.DOCUMENSO_TEMPLATE_ID;
+  let apiKey = getConfig('DOCUMENSO_API_KEY');
+  let apiUrl = (getConfig('DOCUMENSO_API_URL') || 'https://app.documenso.com/api/v2').replace(/\/+$/, '');
+  let envDefaultTemplateId = getConfig('DOCUMENSO_TEMPLATE_ID');
   try {
     const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
     const activeId = activeSnap.exists ? activeSnap.data().envelope : null;
@@ -131,7 +131,7 @@ exports.handler = async (event) => {
     let siteEmail = '', resolvedSiteName = siteName;
     try { const s = await db.collection('settings').doc('site').get(); if (s.exists) { siteEmail = s.data().email || ''; resolvedSiteName = resolvedSiteName || s.data().siteName; } } catch {}
     const landlordName = resolvedSiteName || 'Landlord';
-    const landlordEmail = siteEmail || process.env.ADMIN_NOTIFY_EMAIL;
+    const landlordEmail = siteEmail || getConfig('ADMIN_NOTIFY_EMAIL');
     if (!landlordEmail) return { statusCode: 400, body: JSON.stringify({ error: 'No landlord email is configured. Set a contact email in Settings.' }) };
 
     const terms = placeholderTerms();

@@ -23,7 +23,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
-const { getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, getWorkspaceStore, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
@@ -289,6 +289,7 @@ function buildEmail({ isUS, tenantName, siteName, statementUrl, netAmount }) {
 }
 
 exports.handler = async (event) => {
+  await require('./_lib/apply-email-config')(); // the workspace's own mail provider (this was the one mail-sending function that skipped it)
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -316,7 +317,7 @@ exports.handler = async (event) => {
     if (!tenant.email) return { statusCode: 400, body: JSON.stringify({ error: 'This tenant has no email address on file.' }) };
 
     const isUS = country !== 'CO';
-    const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+    const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
     const moveOutDateFormatted = new Date(moveOutDate + 'T00:00:00').toLocaleDateString(isUS ? 'en-US' : 'es-CO', { year:'numeric', month:'long', day:'numeric' });
 
     let html, netAmount = null, cleanDeductions = [], depositAmount = 0;
@@ -395,15 +396,15 @@ exports.handler = async (event) => {
     };
     await db.collection('moveOuts').add(moveOutData);
 
-    if (process.env.SMTP_HOST) {
+    if (getConfig('SMTP_HOST')) {
       const transporter = nodemailer.createTransport({
-        host:   process.env.SMTP_HOST,
-        port:   parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host:   getConfig('SMTP_HOST'),
+        port:   parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
       await transporter.sendMail({
-        from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+        from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to:      tenant.email,
         subject: isUS ? 'Your Security Deposit Itemization' : 'Tu Registro de Salida',
         html:    buildEmail({ isUS, tenantName: `${tenant.firstName||''} ${tenant.lastName||''}`.trim(), siteName, statementUrl, netAmount }),

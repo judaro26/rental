@@ -10,7 +10,7 @@
 // Required env vars: FIREBASE_SERVICE_ACCOUNT
 // Optional: DOCUMENSO_WEBHOOK_SECRET, SMTP_*, ADMIN_NOTIFY_EMAIL
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -49,7 +49,7 @@ exports.handler = async (event) => {
   // Optional shared-secret check (Documenso can send a configured secret).
   // A saved envelope integration's own webhookSecret takes priority over
   // the env var, same override-with-fallback pattern as everywhere else.
-  let expected = process.env.DOCUMENSO_WEBHOOK_SECRET;
+  let expected = getConfig('DOCUMENSO_WEBHOOK_SECRET');
   try {
     const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
     const activeId = activeSnap.exists ? activeSnap.data().envelope : null;
@@ -119,16 +119,16 @@ exports.handler = async (event) => {
     } catch (e) { console.warn('lease webhook audit failed:', e.message); }
 
     // Notify admin when fully signed.
-    if (mapped === 'completed' && process.env.SMTP_HOST && process.env.ADMIN_NOTIFY_EMAIL) {
+    if (mapped === 'completed' && getConfig('SMTP_HOST') && getConfig('ADMIN_NOTIFY_EMAIL')) {
       try {
         const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-          auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+          host: getConfig('SMTP_HOST'), port: parseInt(getConfig('SMTP_PORT') || '587'),
+          secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+          auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
         });
         await transporter.sendMail({
-          from: process.env.SMTP_FROM || process.env.SMTP_USER,
-          to: process.env.ADMIN_NOTIFY_EMAIL,
+          from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
+          to: getConfig('ADMIN_NOTIFY_EMAIL'),
           subject: `✅ Lease fully signed — ${app.firstName || ''} ${app.lastName || ''}`.trim(),
           html: `<p>The lease agreement for <strong>${app.firstName || ''} ${app.lastName || ''}</strong> (${app.email || ''}) has been fully signed in Documenso.</p>`,
         });

@@ -6,7 +6,7 @@
 // Required env vars: STRIPE_SECRET_KEY, FIREBASE_SERVICE_ACCOUNT
 
 const { getDb, withWorkspace } = require('./_lib/workspace');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { getStripe } = require('./_lib/stripe-client');
 
 let admin;
 function getAdmin() {
@@ -70,7 +70,7 @@ exports.handler = async (event) => {
     let customerId   = tenantData.stripeCustomerId;
 
     if (!customerId) {
-      const customer = await stripe.customers.create({
+      const customer = await getStripe().customers.create({
         email: tenantEmail,
         name:  tenantName || tenantEmail,
         metadata: { tenantId },
@@ -98,7 +98,7 @@ exports.handler = async (event) => {
       siOptions.payment_method_types = ['card'];
     }
 
-    const setupIntent = await stripe.setupIntents.create(siOptions);
+    const setupIntent = await getStripe().setupIntents.create(siOptions);
 
     return {
       statusCode: 200,

@@ -6,7 +6,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SITE_URL, SMTP_*
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const crypto     = require('crypto');
 const nodemailer = require('nodemailer');
 
@@ -49,7 +49,7 @@ exports.handler = async (event) => {
   const a  = getAdmin();
   const db = getDb();
 
-  let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  let siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
   if (!siteUrl) {
     const host  = event.headers?.host || event.headers?.['x-forwarded-host'] || '';
     const proto = event.headers?.['x-forwarded-proto'] || 'https';
@@ -98,21 +98,21 @@ exports.handler = async (event) => {
       lastTokenExpiry: expiresAt.toISOString(),
     });
 
-    if (!process.env.SMTP_HOST) {
+    if (!getConfig('SMTP_HOST')) {
       return { statusCode: 200, body: JSON.stringify({ success: true, activationLink, skippedEmail: true }) };
     }
 
     const transporter = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST,
-      port:   parseInt(process.env.SMTP_PORT || '587'),
-      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      host:   getConfig('SMTP_HOST'),
+      port:   parseInt(getConfig('SMTP_PORT') || '587'),
+      secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+      auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
     });
 
     const siteLine = siteName || 'the Tenant Portal';
 
     await transporter.sendMail({
-      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to:      email,
       subject: `🔑 Activate your account — ${siteLine} (expires in ${expiresLabel})`,
       html: `<!DOCTYPE html>

@@ -15,7 +15,7 @@
 // (FIREBASE_SERVICE_ACCOUNT, SITE_URL, NETLIFY_SITE_ID/SITE_ID,
 // NETLIFY_API_TOKEN, SMTP_* or a configured email integration).
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -113,7 +113,7 @@ exports.handler = async (event) => {
       }
     }
 
-    let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+    let siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
     let siteName = 'Tenant Portal';
     try {
       const settingsSnap = await db.collection('settings').doc('site').get();

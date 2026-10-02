@@ -17,7 +17,7 @@
 // POST /api/manage-property-payments
 // Body: { action: 'get_status' | 'set_bold' | 'clear_bold', propertyId, ... }
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -186,16 +186,16 @@ exports.handler = async (event) => {
       if (!label || !label.trim()) return { statusCode: 400, body: JSON.stringify({ error: 'Enter a label to test with.' }) };
 
       await require('./_lib/apply-email-config')();
-      if (!process.env.SMTP_HOST) {
+      if (!getConfig('SMTP_HOST')) {
         return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
       }
       const { renderReminderEmailHtml, renderReminderSubject } = require('./_lib/render-reminder-email');
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host: getConfig('SMTP_HOST'),
+        port: parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
 
       const effectiveLang = lang === 'es' ? 'es' : 'en';
@@ -207,7 +207,7 @@ exports.handler = async (event) => {
       } catch { /* fall back to default template styling */ }
 
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to: caller.email,
         subject: renderReminderSubject({ lang: effectiveLang, label, dueLabel, isTest: true }),
         html: renderReminderEmailHtml({
@@ -233,16 +233,16 @@ exports.handler = async (event) => {
       if (!label || !label.trim()) return { statusCode: 400, body: JSON.stringify({ error: 'This reminder has no label — check the rule is saved correctly.' }) };
 
       await require('./_lib/apply-email-config')();
-      if (!process.env.SMTP_HOST) {
+      if (!getConfig('SMTP_HOST')) {
         return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
       }
       const { renderReminderEmailHtml, renderReminderSubject } = require('./_lib/render-reminder-email');
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host: getConfig('SMTP_HOST'),
+        port: parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
 
       const effectiveLang = lang === 'es' ? 'es' : 'en';
@@ -281,7 +281,7 @@ exports.handler = async (event) => {
       for (const recipient of recipients) {
         try {
           await transporter.sendMail({
-            from: process.env.SMTP_FROM || process.env.SMTP_USER,
+            from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
             to: recipient.email,
             subject: renderReminderSubject({ lang: effectiveLang, label, dueLabel }),
             html: renderReminderEmailHtml({
@@ -308,17 +308,17 @@ exports.handler = async (event) => {
       if (!month || !day) return { statusCode: 400, body: JSON.stringify({ error: 'Set a month and day to test with.' }) };
 
       await require('./_lib/apply-email-config')();
-      if (!process.env.SMTP_HOST) {
+      if (!getConfig('SMTP_HOST')) {
         return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
       }
       const { renderReminderEmailHtml, renderReminderSubject } = require('./_lib/render-reminder-email');
       const { generateIcs } = require('./_lib/generate-ics');
       const nodemailer = require('nodemailer');
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host: getConfig('SMTP_HOST'),
+        port: parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
 
       const effectiveLang = lang === 'es' ? 'es' : 'en';
@@ -337,7 +337,7 @@ exports.handler = async (event) => {
       const icsContent = generateIcs({ uid: `test-${Date.now()}@rentbay`, label, propertyName: caller.propertyName || '', month, day });
 
       await transporter.sendMail({
-        from: process.env.SMTP_FROM || process.env.SMTP_USER,
+        from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to: caller.email,
         subject: renderReminderSubject({ lang: effectiveLang, label, dueLabel, isTest: true }),
         html: renderReminderEmailHtml({

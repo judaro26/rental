@@ -31,9 +31,19 @@ Object.assign(process.env, {
   STRIPE_PUBLISHABLE_KEY: 'pk_test', STRIPE_SECRET_KEY: 'sk_test_x', NETLIFY_SITE_ID: 'site', NETLIFY_API_TOKEN: 'tok',
   SMTP_HOST: 'smtp.deployment.example', SMTP_PORT: '587', SMTP_USER: 'deploy-user', SMTP_PASS: 'deploy-pass', SMTP_FROM: 'deploy@example.com',
   ADMIN_NOTIFY_EMAIL: 'owner@example.com',
+  // Distinctive deployment-only values: if any of these ever shows up in something done for another
+  // workspace, that is a leak of the platform owner's credentials.
+  DOCUMENSO_API_KEY: 'DEPLOYMENT-documenso-key', DOCUMENSO_API_URL: 'https://deployment-documenso.example', DOCUMENSO_WEBHOOK_SECRET: 'DEPLOYMENT-documenso-whsec',
+  SMARTMOVE_API_KEY: 'DEPLOYMENT-smartmove-key', SMARTMOVE_API_URL: 'https://deployment-smartmove.example',
+  EMPLOYMENT_VERIFICATION_API_KEY: 'DEPLOYMENT-employment-key', EMPLOYMENT_VERIFICATION_API_URL: 'https://deployment-employment.example',
+  CLOUDINARY_API_KEY: 'DEPLOYMENT-cloudinary-key', CLOUDINARY_API_SECRET: 'DEPLOYMENT-cloudinary-secret', CLOUDINARY_CLOUD_NAME: 'deployment-cloud', CLOUDINARY_UPLOAD_PRESET: 'deployment-preset',
+  STRIPE_WEBHOOK_SECRET: 'DEPLOYMENT-stripe-whsec',
 });
+process.env.STRIPE_SECRET_KEY = 'DEPLOYMENT-sk-live';
 delete process.env.ALLOWED_ORIGIN;
-global.fetch = async () => { throw new Error('network disabled in test'); };
+const outbound = [];       // everything that left the process: { kind, ws, text }
+const note = (kind, payload) => outbound.push({ kind, ws: W && W.currentWorkspace(), text: JSON.stringify(payload, (_k, v) => (typeof v === 'function' ? undefined : v)) });
+global.fetch = async (url, opts) => { note('fetch', { url: String(url), opts }); throw new Error('network disabled in test'); };
 
 // ── fakes ───────────────────────────────────────────────────────────────────
 const violations = [];     // I/O that landed in the wrong workspace
@@ -96,7 +106,9 @@ Module._load = function (req, parent, ...rest) {
   if (req === 'firebase-admin') return fakeAdmin;
   if (req === 'firebase-admin/firestore') return { getFirestore: (_app, id) => dbFor(id || '(default)'), FieldValue, Timestamp };
   if (req === '@netlify/blobs') return { getStore: o => { stores.push({ name: o.name, ws: W && W.currentWorkspace() }); return { get: async () => null, getWithMetadata: async () => null, set: async () => {}, delete: async () => {}, list: async () => ({ blobs: [] }) }; } };
-  if (req === 'nodemailer') return { createTransport: () => ({ sendMail: async () => ({}), verify: async () => true }) };
+  if (req === 'nodemailer') return { createTransport: o => { note('smtp-transport', o); return { sendMail: async m => { note('mail', m); return {}; }, verify: async () => true }; } };
+  if (req === 'stripe') return key => { note('stripe-client', { key }); const rej = async () => { throw new Error('stripe stubbed'); };
+    return { paymentIntents: { create: rej }, customers: { create: rej }, setupIntents: { create: rej }, webhooks: { constructEvent: () => { throw new Error('bad signature'); } } }; };
   return origLoad.call(this, req, parent, ...rest);
 };
 
@@ -109,7 +121,9 @@ function check(name, cond, detail) {
   else { failed++; console.log(`\x1b[31m✗ ${name}\x1b[0m${detail ? '\n  ' + String(detail).split('\n').join('\n  ') : ''}`); }
 }
 const ACME = { id: 'acme', name: 'Acme Rentals', databaseId: 'ws-acme', status: 'active', domains: ['portal.acme.com'] };
+const ACME_SECRETS = { STRIPE_SECRET_KEY: 'sk_acme', STRIPE_WEBHOOK_SECRET: 'whsec_acme', STRIPE_PUBLISHABLE_KEY: 'pk_acme', ADMIN_NOTIFY_EMAIL: 'ops@acme.example', SITE_NAME: 'Acme Rentals' };
 W._testing.setRegistry({
+  async loadSecrets(id) { return id === 'acme' ? ACME_SECRETS : {}; },
   async lookupDomain(h) { return h === ACME.domains[0] ? W._testing.normalizeWorkspace(ACME.id, ACME) : null; },
   async listActive() { return [W._testing.normalizeWorkspace(ACME.id, ACME)]; },
 });
@@ -186,40 +200,45 @@ const SEAM_ERROR = /no workspace context|is not defined|getDb is not a function|
     check(`all ${scheduled.length} scheduled functions run once for each workspace, with no cross-workspace I/O`, bad.length === 0, bad.join('\n'));
   }
 
-  // ── E. mail settings never leak ──────────────────────────────────────────
+  // ── E. mail settings: per request, never shared ──────────────────────────
   {
     const apply = require(path.join(FN_DIR, '_lib/apply-email-config'));
-    const env = () => ({ host: process.env.SMTP_HOST, user: process.env.SMTP_USER, from: process.env.SMTP_FROM });
-    const run = (ws, fn) => W.runWithWorkspace(ws, fn);
     const DEF = W._testing.defaultWorkspace(), AC = W._testing.normalizeWorkspace('acme', ACME);
+    const mailFor = ws => W.runWithWorkspace(ws, async () => {
+      await apply();
+      await new Promise(r => setTimeout(r, Math.random() * 10)); // let other requests interleave
+      return { host: W.getConfig('SMTP_HOST'), user: W.getConfig('SMTP_USER'), pass: W.getConfig('SMTP_PASS'), from: W.getConfig('SMTP_FROM'), port: W.getConfig('SMTP_PORT') };
+    });
+    const envBefore = JSON.stringify(['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].map(k => process.env[k]));
     SEEDS['(default)'] = {}; SEEDS['ws-acme'] = {};
 
-    await run(DEF, apply);
-    check('default workspace, no override: uses the deployment\'s own SMTP', env().host === 'smtp.deployment.example' && env().user === 'deploy-user');
+    let m = await mailFor(DEF);
+    check('default workspace, no override: uses the deployment\'s own SMTP', m.host === 'smtp.deployment.example' && m.user === 'deploy-user' && m.pass === 'deploy-pass');
 
     SEEDS['ws-acme'] = { integrationSecrets: { _active: { email: 'e1' }, e1: { host: 'smtp.acme.example', port: 465, user: 'acme-user', pass: 'acme-pass', fromAddress: 'hello@acme.example' } } };
-    await run(AC, apply);
-    check('acme with its own provider: uses it', env().host === 'smtp.acme.example' && env().user === 'acme-user' && env().from === 'hello@acme.example');
+    m = await mailFor(AC);
+    check('acme with its own provider: uses it', m.host === 'smtp.acme.example' && m.user === 'acme-user' && m.from === 'hello@acme.example' && m.port === '465');
 
-    await run(DEF, apply);
-    check('NEXT request on the same warm instance (default): back to the deployment SMTP — acme\'s credentials did not leak', env().host === 'smtp.deployment.example' && env().user === 'deploy-user' && process.env.SMTP_PASS === 'deploy-pass');
+    const runs = await Promise.all(Array.from({ length: 60 }, (_, i) => (i % 2 ? mailFor(AC) : mailFor(DEF)).then(r => ({ who: i % 2 ? 'acme' : 'def', r }))));
+    const wrong = runs.filter(x => x.who === 'acme' ? x.r.host !== 'smtp.acme.example' || x.r.pass !== 'acme-pass' : x.r.host !== 'smtp.deployment.example' || x.r.pass !== 'deploy-pass');
+    check('60 interleaved requests, default and acme at the same time: each used only its own mail server and password', wrong.length === 0, JSON.stringify(wrong[0]));
 
     SEEDS['ws-acme'] = {};
-    await run(AC, apply);
-    check('acme with NO provider: gets NO mail config — it does not inherit the deployment owner\'s SMTP account',
-      env().host === undefined && env().user === undefined && process.env.SMTP_PASS === undefined && env().from === undefined);
+    m = await mailFor(AC);
+    check('acme with NO provider: no mail config at all — it does not inherit the deployment owner\'s SMTP account', m.host === undefined && m.user === undefined && m.pass === undefined && m.from === undefined);
 
     SEEDS['(default)'] = { integrationSecrets: { _active: { email: 'd1' }, d1: { host: 'smtp.custom-default.example', user: 'cd' } } };
-    await run(DEF, apply);
-    check('default workspace with its own override: applied', env().host === 'smtp.custom-default.example');
+    m = await mailFor(DEF);
+    check('default workspace with its own override: host/user replaced, password still the deployment\'s (as before)', m.host === 'smtp.custom-default.example' && m.user === 'cd' && m.pass === 'deploy-pass');
     SEEDS['(default)'] = {};
-    await run(DEF, apply);
-    check('...and when that override is switched off, the next request returns to the deployment SMTP (old stale-override bug fixed)', env().host === 'smtp.deployment.example');
+    m = await mailFor(DEF);
+    check('...and once that override is switched off the very next request is back on the deployment SMTP', m.host === 'smtp.deployment.example');
 
-    await run(AC, apply); const before = env().host;
     SEEDS['ws-acme'] = { integrationSecrets: { _active: { email: 'e1' }, e1: { host: '' } } };
-    await run(AC, apply);
-    check('incomplete override (no host) is ignored, not half-applied; non-default stays blank', before === undefined && env().host === undefined);
+    m = await mailFor(AC);
+    check('incomplete override (no host) is ignored, not half-applied', m.host === undefined);
+    SEEDS['ws-acme'] = {};
+    check('process.env\'s SMTP_* were never modified by any of it', JSON.stringify(['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'].map(k => process.env[k])) === envBefore);
   }
 
   // ── G. authenticated: handlers get past login, isolation still holds ────
@@ -269,6 +288,22 @@ const SEAM_ERROR = /no workspace context|is not defined|getDb is not a function|
     check('...and an admin is accepted on their own workspace (the refusal is about the workspace, not a broken fake)', ownBlocked.length === 0, ownBlocked.join('\n'));
     check('every admin-gated handler could be driven to its admin check', unreachable.length === 0, unreachable.join('\n'));
     SEEDS['(default)'] = {}; SEEDS['ws-acme'] = {};
+  }
+
+  // ── H. what actually left the process for other workspaces ───────────────
+  {
+    const secrets = Object.entries(process.env).filter(([k, v]) => /^(SMTP_(HOST|USER|PASS|FROM)|STRIPE_(SECRET_KEY|WEBHOOK_SECRET)|DOCUMENSO_(API_KEY|API_URL|WEBHOOK_SECRET)|SMARTMOVE_(API_KEY|API_URL)|EMPLOYMENT_VERIFICATION_(API_KEY|API_URL)|CLOUDINARY_(API_KEY|API_SECRET)|ADMIN_NOTIFY_EMAIL)$/.test(k) && v).map(([k, v]) => [k, v]);
+    const acmeOut = outbound.filter(o => o.ws && o.ws.id === 'acme');
+    const defOut  = outbound.filter(o => o.ws && o.ws.isDefault);
+    const kinds = k => acmeOut.filter(o => o.kind === k).length;
+    const leaks = [];
+    for (const o of acmeOut) for (const [k, v] of secrets) if (o.text.includes(v)) leaks.push(`${o.kind} for acme contains the deployment's ${k}`);
+    check(`${acmeOut.length} outbound calls made for acme (${kinds('smtp-transport')} mail transports, ${kinds('mail')} emails, ${kinds('stripe-client')} Stripe clients, ${kinds('fetch')} HTTP requests): none contains any of the deployment's ${secrets.length} credentials`, leaks.length === 0 && acmeOut.length > 0, leaks.slice(0, 6).join('\n'));
+    check('...the recorder is live: it did see the deployment\'s own credentials used for the default workspace', defOut.some(o => secrets.some(([, v]) => o.text.includes(v))));
+    const stripeAcme = acmeOut.filter(o => o.kind === 'stripe-client').map(o => JSON.parse(o.text).key);
+    check('every Stripe client created for acme used acme\'s own key', stripeAcme.every(k => k === 'sk_acme'), stripeAcme.join());
+    const mailsToOwner = acmeOut.filter(o => o.kind === 'mail' && /owner@example\.com/.test(o.text));
+    check('no email made for acme was addressed to the platform owner\'s notification address', mailsToOwner.length === 0);
   }
 
   // ── F. /api/config tells each workspace's browser which database to open ─

@@ -11,7 +11,7 @@
 // history and burn a real sequential invoice number — neither of which is
 // an acceptable side effect of just wanting to see a preview.
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -77,7 +77,7 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'This tenant has no monthly rent amount set.' }) };
     }
 
-    let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+    let siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
     let siteName = 'Tenant Portal';
     try {
       const settingsSnap = await db.collection('settings').doc('site').get();
@@ -107,22 +107,22 @@ exports.handler = async (event) => {
     await store.set(blobKey, Buffer.from(html, 'utf8'), { metadata: { contentType: 'text/html', fileName: blobKey } });
     const previewUrl = `${siteUrl}/api/view-invoice?key=${encodeURIComponent(blobKey)}`;
 
-    if (!process.env.SMTP_HOST) {
+    if (!getConfig('SMTP_HOST')) {
       return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available. Set one up under Settings → Integrations.' }) };
     }
     const nodemailer = require('nodemailer');
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      host: getConfig('SMTP_HOST'),
+      port: parseInt(getConfig('SMTP_PORT') || '587'),
+      secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+      auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
     });
 
     // Same email shell and same "view invoice" link pattern the real flow
     // uses — no fake invoice record, no consumed invoice number, and no
     // odd HTML file attachment that looks out of place in an inbox.
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to: callerEmail,
       subject: `[TEST PREVIEW] Rent invoice for ${tenantName} — $${total.toFixed(2)}`,
       html: `

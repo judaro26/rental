@@ -367,6 +367,40 @@ function checkWorkspaceSeam() {
   if (pagesOk) pass('Workspace seam: pages open the database named by /api/config');
 }
 
+// ── 10. Per-workspace settings ──────────────────────────────────────────────
+// Anything that differs per client (Stripe, mail, site URL, notify address, API keys) is read
+// with getConfig('KEY'), never process.env.KEY. For the default workspace getConfig returns
+// the environment variable; for every other workspace it returns only that workspace's own
+// value and never falls back to the deployment's. A raw env read would silently hand every
+// client the platform owner's settings — their Stripe account, their mail server.
+function checkWorkspaceConfig() {
+  const fnDir = path.join(ROOT, 'netlify/functions');
+  if (!fs.existsSync(fnDir)) return;
+  let KEYS;
+  try { KEYS = require(path.join(fnDir, '_lib/workspace')).CLIENT_CONFIG_KEYS; }
+  catch (e) { fail('Workspace config: could not load the key list from _lib/workspace.js', e.message); return; }
+  const keySet = new Set(KEYS);
+  const code = text => text.split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+
+  const files = [];
+  for (const dir of ['netlify/functions', 'netlify/functions/_lib'])
+    for (const f of fs.readdirSync(path.join(ROOT, dir))) if (f.endsWith('.js') && !(dir.endsWith('_lib') && f === 'workspace.js')) files.push(`${dir}/${f}`);
+
+  const rawRead = new RegExp('process\\.env\\.(' + KEYS.join('|') + ')\\b|process\\.env\\[');
+  let ok = true;
+  for (const rel of files) {
+    const text = code(fs.readFileSync(path.join(ROOT, rel), 'utf8'));
+    const m = text.match(rawRead);
+    if (m) { ok = false; fail(`Workspace config: ${rel} reads a per-workspace setting from the environment`, `Found "${m[0]}". Use getConfig('KEY') from _lib/workspace.js — a raw read gives every client the deployment's value.`); }
+    if (/process\.env(\.[A-Za-z_]+|\[[^\]]+\])\s*=[^=]/.test(text) || /delete\s+process\.env/.test(text)) { ok = false; fail(`Workspace config: ${rel} writes to process.env`, 'process.env is shared by every request on a warm instance; put per-request values in the workspace context instead (see apply-email-config.js).'); }
+    if (/require\(\s*['"]stripe['"]\s*\)/.test(text) && !rel.endsWith('_lib/stripe-client.js')) { ok = false; fail(`Workspace config: ${rel} creates a Stripe client itself`, 'Use getStripe() from _lib/stripe-client.js — a client built at load time uses one key for every workspace.'); }
+    for (const g of text.matchAll(/getConfig\(\s*['"]([^'"]*)['"]\s*\)/g)) {
+      if (!keySet.has(g[1])) { ok = false; fail(`Workspace config: ${rel} calls getConfig('${g[1]}')`, 'Not a per-workspace setting (typo?). Valid keys are CLIENT_CONFIG_KEYS in _lib/workspace.js.'); }
+    }
+  }
+  if (ok) pass(`Workspace config: ${files.length} files — no raw reads of the ${KEYS.length} per-workspace settings, no process.env writes, no direct Stripe clients, every getConfig key valid`);
+}
+
 // ── Run everything ───────────────────────────────────────────────────────────
 console.log('Running verification checks...\n');
 checkFunctionSyntax();
@@ -376,6 +410,7 @@ checkHtmlRegressions();
 checkI18n();
 checkFirestoreRules();
 checkWorkspaceSeam();
+checkWorkspaceConfig();
 
 console.log(`\n${checksRun} checks passed, ${failures} failed.`);
 if (failures > 0) {

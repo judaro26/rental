@@ -4,7 +4,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, SITE_URL
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -109,7 +109,7 @@ exports.handler = async (event) => {
 
   const a  = getAdmin();
   const db = getDb();
-  const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
   const { verifyAdmin } = require('./_lib/verify-admin');
   const authResult = await verifyAdmin(event, db, a);
@@ -141,9 +141,9 @@ exports.handler = async (event) => {
       updates.archivedAt = archived ? a.firestore.FieldValue.serverTimestamp() : null;
     }
     if (creditCheckOrder) {
-      const smartMoveLanding = process.env.SMARTMOVE_LANDING_PAGE || 'https://rentals-secure.mysmartmove.com/landlord/firstscreening/step-one';
-      const smartMoveApiUrl = process.env.SMARTMOVE_API_URL;
-      const smartMoveApiKey = process.env.SMARTMOVE_API_KEY;
+      const smartMoveLanding = getConfig('SMARTMOVE_LANDING_PAGE') || 'https://rentals-secure.mysmartmove.com/landlord/firstscreening/step-one';
+      const smartMoveApiUrl = getConfig('SMARTMOVE_API_URL');
+      const smartMoveApiKey = getConfig('SMARTMOVE_API_KEY');
       const reportType = smartMoveReportType || 'smartcheck_premium';
       updates.creditCheckOrderedAt = a.firestore.FieldValue.serverTimestamp();
       updates.creditCheckOrderedBy = 'admin';
@@ -184,13 +184,13 @@ exports.handler = async (event) => {
             updates.creditCheckProviderMessage = providerData.error || providerData.message || 'SmartMove provider returned an error';
           }
 
-          const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
-          if (adminEmail && process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+          const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
+          if (adminEmail && getConfig('SMTP_HOST') && getConfig('SMTP_USER') && getConfig('SMTP_PASS')) {
             const transporter = nodemailer.createTransport({
-              host:   process.env.SMTP_HOST,
-              port:   parseInt(process.env.SMTP_PORT || '587'),
-              secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-              auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+              host:   getConfig('SMTP_HOST'),
+              port:   parseInt(getConfig('SMTP_PORT') || '587'),
+              secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+              auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
             });
             const adminNotificationHtml = buildSmartMoveAdminNotificationEmail({
               applicantName: `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Applicant',
@@ -204,7 +204,7 @@ exports.handler = async (event) => {
               siteName: siteName || 'Tenant Portal',
             });
             await transporter.sendMail({
-              from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+              from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
               to:      adminEmail,
               subject: `SmartMove screening request ${smartMoveStatus} for ${app.firstName || 'Applicant'} ${app.lastName || ''}`.trim(),
               html: adminNotificationHtml,
@@ -214,12 +214,12 @@ exports.handler = async (event) => {
           updates.creditCheckStatus = 'order_error';
           updates.creditCheckProviderMessage = err.message;
         }
-      } else if (process.env.SMTP_HOST && app.email) {
+      } else if (getConfig('SMTP_HOST') && app.email) {
         const transporter = nodemailer.createTransport({
-          host:   process.env.SMTP_HOST,
-          port:   parseInt(process.env.SMTP_PORT || '587'),
-          secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-          auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+          host:   getConfig('SMTP_HOST'),
+          port:   parseInt(getConfig('SMTP_PORT') || '587'),
+          secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+          auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
         });
         try {
           const smartMoveLandingWithParams = appendQueryParams(smartMoveLanding, {
@@ -241,12 +241,12 @@ exports.handler = async (event) => {
             submittedAt: app.submittedAt?.toDate ? app.submittedAt.toDate().toLocaleString() : new Date().toLocaleString(),
           });
           await transporter.sendMail({
-            from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+            from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
             to:      app.email,
             subject: `Complete your SmartMove rental screening for ${app.propertyName || 'your application'}`,
             html:    emailHtml,
           });
-          const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+          const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
           if (adminEmail) {
             const adminNotificationHtml = buildSmartMoveAdminNotificationEmail({
               applicantName: `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Applicant',
@@ -260,7 +260,7 @@ exports.handler = async (event) => {
               siteName: siteName || 'Tenant Portal',
             });
             await transporter.sendMail({
-              from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+              from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
               to:      adminEmail,
               subject: `SmartMove screening request sent for ${app.firstName || 'Applicant'} ${app.lastName || ''}`.trim(),
               html: adminNotificationHtml,
@@ -275,8 +275,8 @@ exports.handler = async (event) => {
       }
     }
     if (employmentVerificationOrder) {
-      const employmentProviderUrl = process.env.EMPLOYMENT_VERIFICATION_API_URL;
-      const employmentProviderKey = process.env.EMPLOYMENT_VERIFICATION_API_KEY;
+      const employmentProviderUrl = getConfig('EMPLOYMENT_VERIFICATION_API_URL');
+      const employmentProviderKey = getConfig('EMPLOYMENT_VERIFICATION_API_KEY');
       updates.employmentVerificationOrderedAt = a.firestore.FieldValue.serverTimestamp();
       updates.employmentVerificationOrderedBy = 'admin';
       updates.employmentVerificationStatus = 'ordered';
@@ -345,12 +345,12 @@ exports.handler = async (event) => {
     }
 
     // Email the applicant
-    if (process.env.SMTP_HOST && app.email && (status === 'approved' || status === 'declined')) {
+    if (getConfig('SMTP_HOST') && app.email && (status === 'approved' || status === 'declined')) {
       const transporter = nodemailer.createTransport({
-        host:   process.env.SMTP_HOST,
-        port:   parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host:   getConfig('SMTP_HOST'),
+        port:   parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
 
       const isApproved = status === 'approved';
@@ -396,7 +396,7 @@ Your right to a free annual credit report: AnnualCreditReport.com | 1-877-322-82
       </div>`;
 
       await transporter.sendMail({
-        from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+        from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to:      app.email,
         subject,
         html,

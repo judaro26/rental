@@ -4,7 +4,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, ADMIN_NOTIFY_EMAIL
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -75,7 +75,7 @@ exports.handler = async (event) => {
   const userAgent  = event.headers?.['user-agent'] || 'unknown';
   const consentDate = new Date().toISOString();
 
-  const siteUrl  = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  const siteUrl  = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
   const methodLabel = paymentMethod === 'stripe' ? 'Credit/Debit Card (Stripe)'
     : paymentMethod === 'zelle' ? 'Zelle'
     : paymentMethod === 'cashapp' ? 'Cash App' : paymentMethod;
@@ -127,14 +127,14 @@ Device: ${userAgent}`;
     });
 
     // Email confirmation to tenant
-    if (tenantEmail && process.env.SMTP_HOST) {
+    if (tenantEmail && getConfig('SMTP_HOST')) {
       const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || '587'),
-        secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-        auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+        host: getConfig('SMTP_HOST'), port: parseInt(getConfig('SMTP_PORT') || '587'),
+        secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+        auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
       });
       await transporter.sendMail({
-        from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+        from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
         to:      tenantEmail,
         subject: `Auto-Pay Authorization Confirmed — $${parseFloat(monthlyAmount).toFixed(2)}/month`,
         html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:560px;margin:auto;background:#fff;border-radius:4px;overflow:hidden;">
@@ -160,10 +160,10 @@ Device: ${userAgent}`;
       });
 
       // Notify admin
-      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+      const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
       if (adminEmail) {
         await transporter.sendMail({
-          from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+          from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
           to:      adminEmail,
           subject: `✅ Auto-Pay Authorized — ${tenantName} · $${parseFloat(monthlyAmount).toFixed(2)}/mo`,
           html: `<div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:520px;margin:auto;padding:32px;">

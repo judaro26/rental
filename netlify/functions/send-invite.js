@@ -12,7 +12,7 @@
 //   SMTP_PASS                  — app password / SMTP password
 //   SMTP_FROM                  — "My Properties <noreply@yourcompany.com>"
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -33,16 +33,16 @@ function getAdmin() {
 async function sendEmail({ to, subject, html }) {
   const nodemailer = require('nodemailer');
   const transporter = nodemailer.createTransport({
-    host:   process.env.SMTP_HOST,
-    port:   parseInt(process.env.SMTP_PORT || '587'),
-    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
+    host:   getConfig('SMTP_HOST'),
+    port:   parseInt(getConfig('SMTP_PORT') || '587'),
+    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: getConfig('SMTP_USER'),
+      pass: getConfig('SMTP_PASS'),
     },
   });
   await transporter.sendMail({
-    from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+    from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
     to,
     subject,
     html,
@@ -131,7 +131,7 @@ exports.handler = async (event) => {
   const a   = getAdmin();
   const db  = getDb();
   // Derive site URL from env var, or fall back to the incoming request's host
-  let siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+  let siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
   if (!siteUrl) {
     const host = event.headers?.host || event.headers?.['x-forwarded-host'] || '';
     const proto = event.headers?.['x-forwarded-proto'] || 'https';

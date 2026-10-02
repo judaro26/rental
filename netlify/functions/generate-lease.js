@@ -28,7 +28,7 @@
 //   DOCUMENSO_API_URL (optional, default https://app.documenso.com/api/v2)
 //   DOCUMENSO_APP_URL (optional, default https://app.documenso.com — builds signing links)
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 
 let admin;
@@ -74,10 +74,10 @@ exports.handler = async (event) => {
     // Integrations) takes priority over the environment variables, which
     // remain the fallback if nothing is configured there — same
     // override-with-fallback pattern as email/storage.
-    let apiKey = process.env.DOCUMENSO_API_KEY;
-    let apiUrl = (process.env.DOCUMENSO_API_URL || 'https://app.documenso.com/api/v2').replace(/\/+$/, '');
-    let appUrl = (process.env.DOCUMENSO_APP_URL || 'https://app.documenso.com').replace(/\/+$/, '');
-    let envDefaultTemplateId = process.env.DOCUMENSO_TEMPLATE_ID;
+    let apiKey = getConfig('DOCUMENSO_API_KEY');
+    let apiUrl = (getConfig('DOCUMENSO_API_URL') || 'https://app.documenso.com/api/v2').replace(/\/+$/, '');
+    let appUrl = (getConfig('DOCUMENSO_APP_URL') || 'https://app.documenso.com').replace(/\/+$/, '');
+    let envDefaultTemplateId = getConfig('DOCUMENSO_TEMPLATE_ID');
     try {
           const activeSnap = await db.collection('integrationSecrets').doc('_active').get();
           const activeId = activeSnap.exists ? activeSnap.data().envelope : null;
@@ -126,7 +126,7 @@ exports.handler = async (event) => {
       let siteEmail = '', resolvedSiteName = siteName;
           try { const s = await db.collection('settings').doc('site').get(); if (s.exists) { siteEmail = s.data().email || ''; resolvedSiteName = resolvedSiteName || s.data().siteName; } } catch {}
           const landlordName = terms.landlordName || resolvedSiteName || 'Landlord';
-          const landlordEmail = terms.landlordEmail || siteEmail || process.env.ADMIN_NOTIFY_EMAIL;
+          const landlordEmail = terms.landlordEmail || siteEmail || getConfig('ADMIN_NOTIFY_EMAIL');
           if (!landlordEmail) return { statusCode: 400, body: JSON.stringify({ error: 'No landlord email is configured. Set a contact email in Settings or provide one on the lease form.' }) };
 
       const tenantName = `${app.firstName || ''} ${app.lastName || ''}`.trim() || 'Tenant';
@@ -203,17 +203,17 @@ exports.handler = async (event) => {
               });
       } catch (e) { console.warn('lease audit failed:', e.message); }
 
-      if (process.env.SMTP_HOST && process.env.ADMIN_NOTIFY_EMAIL) {
+      if (getConfig('SMTP_HOST') && getConfig('ADMIN_NOTIFY_EMAIL')) {
               try {
                         const transporter = nodemailer.createTransport({
-                                    host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || '587'),
-                                    secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-                                    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+                                    host: getConfig('SMTP_HOST'), port: parseInt(getConfig('SMTP_PORT') || '587'),
+                                    secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+                                    auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
                         });
                         const llLink = leaseAgreement.landlordSigningUrl ? `<p><a href="${leaseAgreement.landlordSigningUrl}">Open your (landlord) signing link</a></p>` : '';
                         await transporter.sendMail({
-                                    from: process.env.SMTP_FROM || process.env.SMTP_USER,
-                                    to: process.env.ADMIN_NOTIFY_EMAIL,
+                                    from: getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
+                                    to: getConfig('ADMIN_NOTIFY_EMAIL'),
                                     subject: `📝 Lease sent for signature — ${tenantName}`,
                                     html: `<p>A lease agreement was generated via Documenso and sent for signature.</p>
                                                      <p><strong>Tenant:</strong> ${tenantName} (${app.email})<br><strong>Property:</strong> ${prop.name || app.propertyName || ''}</p>${llLink}`,

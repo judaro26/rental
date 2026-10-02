@@ -30,7 +30,7 @@
 // Body: { action: 'list_providers' | 'add_provider' | 'update_provider'
 //               | 'remove_provider' | 'set_active_provider' | 'test_email', ... }
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -405,8 +405,8 @@ exports.handler = async (event) => {
       let transportOpts;
       if (cfg) {
         transportOpts = { host: cfg.host, port: cfg.port || 587, secure: (cfg.port || 587) === 465, auth: { user: cfg.user, pass: cfg.pass } };
-      } else if (process.env.SMTP_HOST) {
-        transportOpts = { host: process.env.SMTP_HOST, port: parseInt(process.env.SMTP_PORT || '587'), secure: parseInt(process.env.SMTP_PORT || '587') === 465, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } };
+      } else if (getConfig('SMTP_HOST')) {
+        transportOpts = { host: getConfig('SMTP_HOST'), port: parseInt(getConfig('SMTP_PORT') || '587'), secure: parseInt(getConfig('SMTP_PORT') || '587') === 465, auth: { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') } };
       } else {
         return { statusCode: 400, body: JSON.stringify({ error: 'No email configuration available to test (neither a saved provider nor an environment default).' }) };
       }
@@ -422,7 +422,7 @@ exports.handler = async (event) => {
 
       const transporter = nodemailer.createTransport(transportOpts);
       await transporter.sendMail({
-        from: (cfg && cfg.fromAddress) || process.env.SMTP_FROM || transportOpts.auth.user,
+        from: (cfg && cfg.fromAddress) || getConfig('SMTP_FROM') || transportOpts.auth.user,
         to: caller.email,
         subject: 'Test email — RentBay integration check',
         html: `<p>This confirms ${cfg ? `the "${cfg.label || 'saved'}" provider` : 'your environment default configuration'} is working. Sent to ${caller.email} at ${new Date().toISOString()}.</p>`,

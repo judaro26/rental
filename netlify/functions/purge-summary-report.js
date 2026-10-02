@@ -11,7 +11,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, SMTP_*, ADMIN_NOTIFY_EMAIL
 
-const { getDb, withEachWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withEachWorkspace } = require('./_lib/workspace');
 const nodemailer = require('nodemailer');
 const { notifyAdminOnFailure } = require('./_lib/notify-admin-on-failure');
 
@@ -34,8 +34,8 @@ function esc(s) {
 
 exports.handler = async () => {
   await require('./_lib/apply-email-config')(); // load any custom email provider override before this function's existing nodemailer code runs
-  const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT || !process.env.SMTP_HOST || !adminEmail) {
+  const adminEmail = getConfig('ADMIN_NOTIFY_EMAIL');
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT || !getConfig('SMTP_HOST') || !adminEmail) {
     console.warn('purge-summary-report: missing FIREBASE_SERVICE_ACCOUNT / SMTP_HOST / ADMIN_NOTIFY_EMAIL — skipping.');
     return { statusCode: 200, body: JSON.stringify({ skipped: true }) };
   }
@@ -68,7 +68,7 @@ exports.handler = async () => {
 
     let siteName = 'Tenant Portal';
     try { const s = await db.collection('settings').doc('site').get(); if (s.exists) siteName = s.data().siteName || siteName; } catch {}
-    const siteUrl = (process.env.SITE_URL || '').replace(/\/+$/, '');
+    const siteUrl = (getConfig('SITE_URL') || '').replace(/\/+$/, '');
 
     const rows = (arr, kind) => arr.length
       ? arr.map(r => {
@@ -119,13 +119,13 @@ exports.handler = async () => {
     </div>`;
 
     const transporter = nodemailer.createTransport({
-      host:   process.env.SMTP_HOST,
-      port:   parseInt(process.env.SMTP_PORT || '587'),
-      secure: parseInt(process.env.SMTP_PORT || '587') === 465,
-      auth:   { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      host:   getConfig('SMTP_HOST'),
+      port:   parseInt(getConfig('SMTP_PORT') || '587'),
+      secure: parseInt(getConfig('SMTP_PORT') || '587') === 465,
+      auth:   { user: getConfig('SMTP_USER'), pass: getConfig('SMTP_PASS') },
     });
     await transporter.sendMail({
-      from:    process.env.SMTP_FROM || process.env.SMTP_USER,
+      from:    getConfig('SMTP_FROM') || getConfig('SMTP_USER'),
       to:      adminEmail,
       subject: `🗂 Data retention report — ${periodLabel} (${purged.length} purged, ${deleted.length} deleted)`,
       html,

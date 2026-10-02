@@ -40,6 +40,7 @@ function makeRegistry(workspaces, { failLookup = false, failList = false } = {})
       const ws = workspaces.find(w => w.domains.includes(host));
       return ws ? W._testing.normalizeWorkspace(ws.id, ws) : null;
     },
+    async loadSecrets() { return {}; },
     async listActive() {
       reg.lists++;
       if (failList) throw new Error('registry unavailable');
@@ -57,7 +58,7 @@ const dbName = db => db.formattedName;
 function reset({ flag = 'true', registry } = {}) {
   W._testing.resetCaches(); storeCalls.length = 0;
   if (flag == null) delete process.env.ALLOW_MULTI_WORKSPACE; else process.env.ALLOW_MULTI_WORKSPACE = flag;
-  delete process.env.DEFAULT_WORKSPACE_HOSTS; delete process.env.SWEEP_BUDGET_MS;
+  delete process.env.DEFAULT_WORKSPACE_HOSTS; delete process.env.SWEEP_BUDGET_MS; delete process.env.SWEEP_CONCURRENCY;
   process.env.SITE_URL = 'https://rentbay.netlify.app';
   W._testing.setRegistry(registry || makeRegistry([ACME, BETA, GONE, NEW]));
 }
@@ -211,12 +212,23 @@ function reset({ flag = 'true', registry } = {}) {
     out = await W.withEachWorkspace(soft)({}, {});
     check('a handler RETURNING 500 for one workspace also fails the run', out.statusCode === 500);
 
-    process.env.SWEEP_BUDGET_MS = '20'; seen.length = 0;
+    process.env.SWEEP_BUDGET_MS = '20'; process.env.SWEEP_CONCURRENCY = '1'; seen.length = 0;
     const slow = async () => { seen.push(W.getWorkspace().id); await new Promise(r => setTimeout(r, 40)); return { statusCode: 200, body: '{}' }; };
     out = await W.withEachWorkspace(slow)({}, {});
     const rb = JSON.parse(out.body).workspaces;
-    check('time budget: remaining workspaces are skipped LOUDLY (500), not silently dropped',
+    check('time budget (one at a time): remaining workspaces are skipped LOUDLY (500), not silently dropped',
       seen.join() === 'default' && out.statusCode === 500 && /budget/.test(rb.acme.error) && /budget/.test(rb.beta.error), JSON.stringify(rb));
+
+    process.env.SWEEP_CONCURRENCY = '2'; seen.length = 0;
+    out = await W.withEachWorkspace(slow)({}, {});
+    const rc = JSON.parse(out.body).workspaces;
+    check('time budget (2 slots, 3 workspaces): the two that started finish, the one still waiting is skipped loudly',
+      seen.length === 2 && out.statusCode === 500 && Object.values(rc).filter(x => /budget/.test(x.error || '')).length === 1, JSON.stringify(rc));
+
+    process.env.SWEEP_BUDGET_MS = '5000'; process.env.SWEEP_CONCURRENCY = '4'; seen.length = 0;
+    out = await W.withEachWorkspace(slow)({}, {});
+    check('with the default parallelism all three workspaces start together and all succeed', seen.length === 3 && out.statusCode === 200);
+    delete process.env.SWEEP_BUDGET_MS; delete process.env.SWEEP_CONCURRENCY;
 
     reset({ registry: makeRegistry([ACME], { failList: true }) }); seen.length = 0;
     out = await W.withEachWorkspace(inner)({}, {});

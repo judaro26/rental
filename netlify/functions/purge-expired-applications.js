@@ -15,7 +15,7 @@
 //
 // Required env vars: FIREBASE_SERVICE_ACCOUNT, NETLIFY_SITE_ID (or SITE_ID), NETLIFY_API_TOKEN
 
-const { getDb, getWorkspaceStore, withEachWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, getWorkspaceStore, withEachWorkspace } = require('./_lib/workspace');
 let admin;
 function getAdmin() {
   if (!admin) {
@@ -45,8 +45,8 @@ async function runPurgeExpiredApplications() {
   }
 
   const DAY = 24 * 60 * 60 * 1000;
-  const retentionDays = parseInt(process.env.APPLICATION_RETENTION_DAYS || '90', 10) || 90;
-  let deleteDays = parseInt(process.env.APPLICATION_DELETE_DAYS || '365', 10) || 365;
+  const retentionDays = parseInt(getConfig('APPLICATION_RETENTION_DAYS') || '90', 10) || 90;
+  let deleteDays = parseInt(getConfig('APPLICATION_DELETE_DAYS') || '365', 10) || 365;
   if (deleteDays < retentionDays) deleteDays = retentionDays; // never delete before purging files
   const now = Date.now();
   const purgeCutoff = now - retentionDays * DAY;

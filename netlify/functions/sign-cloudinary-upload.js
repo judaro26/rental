@@ -21,7 +21,7 @@
 // env-var fallback — it's a newer addition with no prior established
 // convention to preserve) — same override-with-fallback pattern as email.
 
-const { getDb, withWorkspace } = require('./_lib/workspace');
+const { getConfig, getDb, withWorkspace } = require('./_lib/workspace');
 const crypto = require('crypto');
 
 let admin;
@@ -58,8 +58,8 @@ async function getActiveStorageConfig() {
   } catch (err) {
     console.warn('sign-cloudinary-upload: could not check storage override, using env vars:', err.message);
   }
-  if (process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET) {
-    return { backend: 'cloudinary', cloudName: process.env.CLOUDINARY_CLOUD_NAME || null, apiKey: process.env.CLOUDINARY_API_KEY, apiSecret: process.env.CLOUDINARY_API_SECRET };
+  if (getConfig('CLOUDINARY_API_KEY') && getConfig('CLOUDINARY_API_SECRET')) {
+    return { backend: 'cloudinary', cloudName: getConfig('CLOUDINARY_CLOUD_NAME') || null, apiKey: getConfig('CLOUDINARY_API_KEY'), apiSecret: getConfig('CLOUDINARY_API_SECRET') };
   }
   return null;
 }

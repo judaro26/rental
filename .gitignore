@@ -1,0 +1,10 @@
+# Dependencies (installed by npm install; never commit)
+node_modules/
+
+# macOS
+.DS_Store
+
+# Local environment files
+.env
+.env.*
+.netlify/
