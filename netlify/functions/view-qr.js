@@ -1,6 +1,6 @@
 // netlify/functions/view-qr.js
-// Serves the Zelle QR code image stored in Netlify Blobs.
-// GET /api/view-qr
+// Serves the Zelle or Cash App QR code image stored in Netlify Blobs.
+// GET /api/view-qr?method=zelle|cashapp   (defaults to zelle)
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') return { statusCode: 405, body: 'Method not allowed' };
@@ -12,7 +12,10 @@ exports.handler = async (event) => {
   try {
     const { getStore } = require('@netlify/blobs');
     const store = getStore({ name: 'settings', consistency: 'strong', siteID, token });
-    const blob  = await store.getWithMetadata('zelle-qr', { type: 'arrayBuffer' });
+    // upload-qr.js stores each QR as `${method}-qr`. Whitelist the method so the
+    // query string can never select an arbitrary blob key.
+    const method = event.queryStringParameters?.method === 'cashapp' ? 'cashapp' : 'zelle';
+    const blob  = await store.getWithMetadata(`${method}-qr`, { type: 'arrayBuffer' });
     if (!blob) return { statusCode: 404, body: 'QR code not found' };
 
     const contentType = blob.metadata?.contentType || 'image/png';
