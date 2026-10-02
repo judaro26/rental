@@ -437,6 +437,66 @@ function checkWorkspaceAuth() {
   }
 }
 
+// ── 12. Workspace operations (provisioning, rules deployment, backups) ──────
+function checkWorkspaceOperations() {
+  // (a) The operator tooling must at least parse.
+  let syntaxOk = true; let n = 0;
+  for (const dir of ['scripts', 'scripts/lib']) {
+    const full = path.join(ROOT, dir);
+    if (!fs.existsSync(full)) continue;
+    for (const f of fs.readdirSync(full)) {
+      if (!f.endsWith('.js')) continue;
+      n++;
+      try { execFileSync(process.execPath, ['--check', path.join(full, f)], { stdio: 'pipe' }); }
+      catch (e) { syntaxOk = false; fail(`Syntax: ${dir}/${f}`, e.stderr?.toString() || e.message); }
+    }
+  }
+  if (syntaxOk) pass(`Syntax: ${n} operator scripts`);
+
+  // (b) A blob store the code writes to but the backup list does not know about would silently be left out
+  //     of every backup.
+  const fnDir = path.join(ROOT, 'netlify/functions');
+  if (fs.existsSync(fnDir)) {
+    let BLOB_STORES;
+    try { BLOB_STORES = require(path.join(fnDir, '_lib/workspace')).BLOB_STORES; } catch (e) { fail('Workspace operations: could not load BLOB_STORES', e.message); return; }
+    const used = new Set(); let ok = true;
+    for (const dir of ['netlify/functions', 'netlify/functions/_lib']) {
+      for (const f of fs.readdirSync(path.join(ROOT, dir))) {
+        if (!f.endsWith('.js')) continue;
+        const text = fs.readFileSync(path.join(ROOT, dir, f), 'utf8').split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+        for (const m of text.matchAll(/getWorkspaceStore\(\s*\{\s*name:\s*['"]([^'"]+)['"]/g)) {
+          used.add(m[1]);
+          if (!BLOB_STORES.includes(m[1])) { ok = false; fail(`Workspace operations: ${dir}/${f} opens the blob store "${m[1]}", which backups do not cover`, 'Add it to BLOB_STORES in netlify/functions/_lib/workspace.js, or it will be missing from every backup.'); }
+        }
+      }
+    }
+    if (ok) pass(`Workspace operations: all ${used.size} blob stores in use are covered by backups (${[...used].join(', ')})`);
+  }
+
+  // (c) The rules workflow: single-install behaviour preserved, and multi-workspace mode must never deploy the plain rules.
+  const wf = readIfExists('.github/workflows/deploy-firestore-rules.yml');
+  if (wf != null) {
+    const stepOf = title => { const i = wf.indexOf(`- name: ${title}`); if (i < 0) return null; const j = wf.indexOf('\n      - name:', i + 1); return wf.slice(i, j < 0 ? undefined : j); };
+    const single = stepOf('Deploy Firestore rules'), multi = stepOf('Deploy rules to every database (multi-workspace)');
+    const problems = [];
+    if (!single) problems.push('the "Deploy Firestore rules" step is missing');
+    else if (!/if:\s*\$\{\{\s*vars\.MULTI_WORKSPACE\s*!=\s*'true'\s*\}\}/.test(single)) problems.push('the plain "Deploy Firestore rules" step must be conditional on MULTI_WORKSPACE != \'true\' — otherwise it overwrites your protected rules once clients exist');
+    if (!multi) problems.push('the multi-workspace deploy step is missing');
+    else {
+      if (!/if:\s*\$\{\{\s*vars\.MULTI_WORKSPACE\s*==\s*'true'\s*\}\}/.test(multi)) problems.push('the multi-workspace step must be conditional on MULTI_WORKSPACE == \'true\'');
+      if (!/deploy-rules\s+--all\s+--default/.test(multi)) problems.push('the multi-workspace step must run: workspace.js deploy-rules --all --default');
+    }
+    if (!/- 'scripts\/build-rules\.js'/.test(wf)) problems.push('scripts/build-rules.js must be a trigger path (the generated rules depend on it)');
+    if (problems.length) problems.forEach(p => fail('Workspace operations: deploy-firestore-rules.yml', p)); else pass('Workspace operations: the rules workflow keeps the single-install step and deploys per-database rules in multi-workspace mode');
+
+    // The CLI version CI installs and the one the tooling falls back to must be the same.
+    const drivers = readIfExists('scripts/lib/drivers.js') || '';
+    const a = (wf.match(/firebase-tools@([0-9.]+)/) || [])[1], b = (drivers.match(/FIREBASE_TOOLS_VERSION = '([0-9.]+)'/) || [])[1];
+    if (a && b && a !== b) fail('Workspace operations: firebase-tools versions differ', `CI installs ${a}, scripts/lib/drivers.js uses ${b} — keep them the same.`);
+    else pass(`Workspace operations: CI and the operator tooling use the same firebase-tools version (${a || '?'})`);
+  }
+}
+
 // ── Run everything ───────────────────────────────────────────────────────────
 console.log('Running verification checks...\n');
 checkFunctionSyntax();
@@ -448,6 +508,7 @@ checkFirestoreRules();
 checkWorkspaceSeam();
 checkWorkspaceConfig();
 checkWorkspaceAuth();
+checkWorkspaceOperations();
 
 console.log(`\n${checksRun} checks passed, ${failures} failed.`);
 if (failures > 0) {

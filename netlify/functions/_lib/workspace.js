@@ -48,11 +48,15 @@
 //   getConfig below. The context is one object per request and nothing in it is shared, so
 //   scheduled sweeps run workspaces in parallel.
 //
-// KNOWN LIMITS (docs/MULTI-WORKSPACE.md has the full list; do not enable a second
-// workspace until they are closed)
-//   - Security rules are deployed to one database only; every workspace database and the
-//     platform database (which now holds client settings) need them.
-//   - No automated provisioning, and no per-database backups.
+// OPERATING WORKSPACES
+//   Creating, activating, suspending and backing up workspaces is done with scripts/workspace.js
+//   (docs/MULTI-WORKSPACE.md). A workspace is only served while its registry status is "active";
+//   "provisioning" and "suspended" are refused here, and a suspended workspace's database is also
+//   locked against browsers (deny-all rules), so a still-valid session token gets nothing.
+//
+// STILL OPEN (see "Still open" in docs/MULTI-WORKSPACE.md before enabling a second workspace)
+//   - The generated security rules must be tried in the Firebase Emulator before they are deployed.
+//   - The operator tooling has been tested against fakes and these handlers, not live Google services.
 
 'use strict';
 
@@ -75,6 +79,11 @@ const CACHE_MAX_ENTRIES = 500;         // Host is attacker-controlled: bound the
 //
 // Not listed on purpose (platform-level, shared by every workspace, read from env
 // directly): FIREBASE_*, NETLIFY_*, SITE_ID and the switches in this file.
+// The Netlify Blobs stores the app writes to (the base names, before the workspace prefix). Backups
+// iterate this list, and scripts/verify.js fails the build if code opens a store that is not on it —
+// otherwise a new store would silently be left out of every backup.
+const BLOB_STORES = Object.freeze(['documents', 'invoices', 'moveout-statements', 'settings']);
+
 const MAIL_KEYS = Object.freeze(['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM']);
 // Operator-managed: stored in the platform database (workspaceSecrets/{id}), which no
 // client can read or write.
@@ -343,6 +352,10 @@ function setMailOverride(mail) {
   if (store) store.mail = mail ? Object.freeze({ ...mail }) : null;
 }
 
+// A handle on any database by id — for operator tooling (scripts/workspace.js) that works on a workspace
+// from outside a request. Application code uses getDb(), never this.
+const getDatabase = databaseId => firestoreFor(databaseId);
+
 // The Firestore database of the current workspace.
 const getDb = () => firestoreFor(getWorkspace().databaseId);
 
@@ -471,7 +484,7 @@ const withoutWorkspace = handler => handler;
 module.exports = {
   withWorkspace, withEachWorkspace, withoutWorkspace,
   getWorkspace, currentWorkspace, runWithWorkspace,
-  getDb, getAuth, getWorkspaceStore, getPlatformDb,
+  getDb, getAuth, getWorkspaceStore, getPlatformDb, getDatabase, normalizeWorkspace, BLOB_STORES,
   getConfig, setMailOverride, loadWorkspaceConfig, CLIENT_CONFIG_KEYS, MAIL_KEYS, SECRET_KEYS,
   resolveWorkspace, listActiveWorkspaces, hostFromEvent,
   WorkspaceError,

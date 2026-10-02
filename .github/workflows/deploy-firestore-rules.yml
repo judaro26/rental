@@ -22,6 +22,8 @@ on:
       - 'firebase.json'
       - '.firebaserc'
       - '.github/workflows/deploy-firestore-rules.yml'
+      # the per-workspace rules are generated from firestore.rules by this script
+      - 'scripts/build-rules.js'
 
 jobs:
   deploy-rules:
@@ -107,7 +109,10 @@ jobs:
           SCRIPTEOF
           node "$RUNNER_TEMP/validate-creds.mjs" "$file"
 
+      # SINGLE-INSTALL MODE (the default; repository variable MULTI_WORKSPACE is not "true"): exactly what this
+      # workflow has always done.
       - name: Deploy Firestore rules
+        if: ${{ vars.MULTI_WORKSPACE != 'true' }}
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
         # --project is passed explicitly rather than relying on
@@ -120,6 +125,25 @@ jobs:
         # machine, but this workflow no longer depends on it existing or
         # being named correctly.
         run: firebase deploy --only firestore:rules --project rental-a0793
+
+      # MULTI-WORKSPACE MODE (repository variable MULTI_WORKSPACE = true, set after `protect-default` — see
+      # docs/MULTI-WORKSPACE.md). Once clients exist, the PLAIN firestore.rules must never be deployed to your own
+      # database: it trusts any signed-in user, and a client's users are signed in to this same project. So instead
+      # of the step above, every database gets ITS OWN generated rules:
+      #   - your database      -> the "default variant" (rejects any client's users)
+      #   - each client's      -> rules scoped to that client's sign-in pool (a suspended client stays locked)
+      #   - the platform one   -> deny-all (it holds client secrets)
+      # Nothing here releases rules that have not compiled, and one client failing does not stop the others (but
+      # fails the job, so it is seen).
+      - name: Install dependencies (workspace tooling)
+        if: ${{ vars.MULTI_WORKSPACE == 'true' }}
+        run: npm install --no-audit --no-fund
+
+      - name: Deploy rules to every database (multi-workspace)
+        if: ${{ vars.MULTI_WORKSPACE == 'true' }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+        run: node scripts/workspace.js deploy-rules --all --default --platform --apply --project rental-a0793
 
       - name: Clean up credentials file
         # Belt-and-suspenders — $RUNNER_TEMP is already wiped between jobs,

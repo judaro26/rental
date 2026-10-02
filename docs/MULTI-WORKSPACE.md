@@ -4,10 +4,11 @@ RentBay can serve many clients — each a **workspace** — from **one deploymen
 Firebase project**. This document is the source of truth for how that works, what is done,
 and what must be finished before a second client is switched on.
 
-> **Status: data, settings and sign-in are isolated in code. Nothing here changes how the current
-> install behaves, and a second workspace still must not be activated** until the
-> [first-client runbook](#first-client-runbook) has been done — it needs steps in the Firebase console
-> and a rules deployment that cannot be automated yet.
+> **Status: everything needed to run clients is built — isolation, per-client settings and sign-in,
+> provisioning, backups and suspension — and none of it changes how your current install behaves.**
+> What is left is doing it once for real, carefully: see [Bringing up the first client](#bringing-up-the-first-client).
+> The provisioning tool has been tested against fakes and against your real request handlers, but **not
+> against live Google services** — so start with `doctor`, then a plan-only `create`, then a throwaway client.
 
 ## The model
 
@@ -178,46 +179,128 @@ refuses a malformed tenant id (it is written into rules text).
 > available in CI). Try them in the Firebase Emulator Suite — signed-in user of tenant A against database
 > B, and the reverse — before deploying them anywhere.
 
-## First-client runbook
+## Operating workspaces: `scripts/workspace.js`
 
-Until provisioning is automated, bringing up the first client is manual, **in this order** (the order
-matters: step 3 protects your own database before any client user exists):
+```
+npm run workspace -- help
+```
 
-1. **Upgrade the Firebase project to Identity Platform** (Console → Authentication → Settings). Review
-   the pricing first; on the Blaze plan a free tier of monthly active users applies, and the free Spark
-   plan is limited after upgrading. Treat the upgrade as one-way until you have checked.
-2. **Enable multi-tenancy** (Identity Platform → Settings → Security → *Allow tenants*).
-3. **Protect the default database first.** Build `--default` rules, try them in the emulator, then deploy
-   them to the `(default)` database. Do this *before* creating any tenant, while no client user exists.
-4. **Create the `platform` database** (production mode, deny-all rules; it holds client secrets) and
-   the client's database `ws-<id>` (production mode). Build `--tenant <id>` rules, try them in the
-   emulator, deploy them to the client's database.
-5. **Create the tenant** (Identity Platform → Tenants), enable *Email/Password*, note its id.
-6. **Write the registry** in the `platform` database: `workspaces/<id>` (with `authTenantId`, status
-   `provisioning`), `workspaceDomains/<host>`, and `workspaceSecrets/<id>` (Stripe etc.).
-7. **Attach the domain**: add it to the Netlify site and to Firebase Authentication's *Authorized
-   domains* (password-reset and invite links return to it).
-8. **Create the first admin** in the client's tenant, and its `admins/<uid>` document in the client's
-   database.
-9. Set the workspace `status` to `active`, and only then set `ALLOW_MULTI_WORKSPACE=true`.
+**Everything that changes something is plan-only unless you add `--apply`.** Run a command without it to
+see exactly what it would do. Commands read their credentials from `FIREBASE_SERVICE_ACCOUNT` (the key's
+JSON) or `GOOGLE_APPLICATION_CREDENTIALS` (a path).
 
-Check each of: sign in as the client's admin on the client's domain; confirm the same login is refused on
-your own domain; send a test invoice; send a password-reset email and follow the link.
+### Use a separate operator service account
 
-## Still open before a second workspace is enabled
+The runtime's key (in Netlify) never needs to create databases or tenants and should not be able to. Make a
+second service account for operators, kept on your own machine (and a CI one if you use multi-workspace
+rules deployment, below). Rather than guess role names, **run `doctor`**: it tries each capability read-only
+and tells you which one is missing. The capabilities needed are: create and list Firestore databases
+(`datastore.databases.create` is the permission for creating one), release Firestore rules, manage Identity
+Platform tenants and read/write its config (for authorized domains), manage Firestore backup schedules, and
+read/write the `platform` database.
 
-1. **The runbook above is manual** — creating the tenant and databases, deploying the scoped rules to
-   every database, writing the registry, adding the domain, seeding the first admin. Provisioning script
-   (Patch 4). **Generated rules must be tried in the Firebase Emulator before being deployed.**
-2. **Backups.** Firestore export per database on a schedule; Netlify Blobs has none built in.
-3. **Card payments are not hidden for a client without Stripe.** `/api/config` returns `stripePk: null`,
-   but the tenant portal still offers card payment and will error when used. Needs per-workspace feature
-   flags (with branding).
+### Commands
 
-**Closed:** data isolation (a database per workspace); per-client credentials and settings
-(`getConfig`, `workspaceSecrets`); per-request Stripe clients; links and notification addresses; mail
-isolation; parallel-safe scheduled runs; **per-workspace sign-in** (a pool per workspace, tokens checked
-in both directions, rules scoped per workspace, impersonation tokens minted in the right pool).
+| Command | What it does |
+|---|---|
+| `doctor` | Read-only pre-flight: credentials, CLI, permissions, multi-tenancy, registry. Run it first, always. |
+| `init` | Creates the `platform` database (holds client secrets) with deny-all rules. |
+| `protect-default` | Changes **your own database's** rules so a client's users cannot reach it. Gated: needs `--i-have-tested-in-the-emulator`. |
+| `create <id> --name … --domain …` | Builds a client end to end and leaves it **inactive**: tenant, database, scoped rules, domain records, authorized domain, seed data, first admin, backups. |
+| `invite-admin <id> --email …` | A fresh activation link (also how you add more admins). Links last 72 hours. |
+| `status [<id>]` | Health of every workspace, including rules drift. Exit code 2 if anything needs attention. |
+| `activate <id>` | Go live — only if every readiness check passes. |
+| `suspend <id>` / `resume <id>` | Lock a client out of the server **and** the browser, and lift it. |
+| `deploy-rules [<id>…] [--all] [--default] [--platform] [--check]` | Redeploy generated rules; `--check` only compiles. CI runs this. |
+| `set-secret <id> KEY` / `unset-secret` / `list-secrets` | Per-client settings. The value comes from stdin or a hidden prompt — there is deliberately no `--value`. |
+| `backups [--all] [--retention 30d] [--recurrence daily] [--pitr]` | Make sure every database has a backup schedule. |
+| `backup-blobs <id\|default> --out <dir>` / `restore-blobs` | Back up and restore documents and invoices (Netlify Blobs). |
+
+### How it stays safe
+
+* **Resumable and idempotent.** A failed run is simply run again; it never creates a second tenant or
+  database. The tenant id is saved to the registry the moment it exists.
+* **Inactive until verified.** `create` leaves a client in `provisioning`, which the runtime refuses to
+  serve. `activate` re-checks everything first: tenant, database, rules deployed, domains registered **and**
+  authorized, and — the important one — that **your own database is protected**.
+* **Refuses before it changes anything.** An existing database or domain that is not that client's is
+  refused, not adopted; so is a `.netlify.app` or `DEFAULT_WORKSPACE_HOSTS` domain (the runtime treats those
+  as your default workspace, so a client on one would never be reached).
+* **Rules are compile-checked before release,** and a client's rules cannot be loosened by a routine redeploy:
+  a suspended client keeps its deny-all rules.
+* **Authorized domains are never overwritten.** The domain list is read, extended, written back and then
+  re-read; if any existing domain went missing it stops loudly.
+* **Secrets never appear** in any output, plan, JSON or command line — only key names and lengths. Rules go to
+  the Firebase CLI in a file, credentials by file path.
+* **The first admin** is created exactly as the app's own invite flow creates one, so they activate through the
+  app. Its link returns to the client's own domain, which is why that domain must be an authorized domain.
+
+## Bringing up the first client
+
+Do this once, in this order. The order matters: steps 4 and 5 protect **your** database before any client
+user exists.
+
+1. **Console, once:** upgrade the project to Identity Platform and enable multi-tenancy (Authentication →
+   Settings; then Identity Platform → Settings → Security → *Allow tenants*). Review the pricing first; treat
+   the upgrade as one-way until you have checked.
+2. **Operator access:** create the operator service account; `export FIREBASE_SERVICE_ACCOUNT="$(cat key.json)"`.
+3. `npm run workspace -- doctor` — fix whatever it says, until it passes.
+4. `npm run workspace -- init` (look), then `init --apply`.
+5. **Protect your own database.** `npm run build-rules -- --default --out default.rules`, **try those rules in the
+   Firebase Emulator Suite** (a client's signed-in user against your database must be refused; your own admin,
+   tenants and applicants must still work), then
+   `npm run workspace -- protect-default --apply --i-have-tested-in-the-emulator`.
+6. **Keep CI from undoing it:** set the repository variable `MULTI_WORKSPACE` to `true` (Settings → Secrets and
+   variables → Actions → Variables). From then on `deploy-firestore-rules.yml` deploys the generated rules to
+   every database instead of the plain `firestore.rules`.
+7. `npm run workspace -- create acme --name "Acme Rentals" --domain portal.acme.com --admin-email owner@acme.com
+   --backups daily:30d` (plan), review, then add `--apply`.
+8. `npm run workspace -- set-secret acme STRIPE_SECRET_KEY --apply` (and the others the client needs).
+9. **Attach the domain last:** add `portal.acme.com` to the Netlify site and point DNS at it. Until you do, the client
+   is unreachable.
+10. Set `ALLOW_MULTI_WORKSPACE=true` on the Netlify site (once, for the first client) and redeploy.
+11. `npm run workspace -- status acme`, then `activate acme --apply`.
+12. Mint the admin's link now (`invite-admin acme --email … --apply`; links last 72 hours), and check: sign in as the
+    client's admin on the client's domain; the same login must be **refused on your own domain**; send a test
+    invoice; follow a password-reset email.
+
+Backups for what you already have: `npm run workspace -- backups --all --apply --pitr`, and
+`npm run workspace -- backup-blobs default --out <folder>`. Both cost money (stored backups, PITR storage) — review first.
+
+### Backups and restoring
+
+* **Firestore:** a scheduled backup per database (default, platform and every client), and optionally
+  point-in-time recovery. Restoring is a Firebase operation (`firebase firestore:databases:restore`), not part of
+  this tool; practise it once on a throwaway database before you need it.
+* **Netlify Blobs** (identity documents, leases, invoices) have no backup of their own. `backup-blobs` writes every
+  blob with a SHA-256 manifest, verifies each file after writing, is incremental, and holds **sensitive client
+  documents** — keep the folder encrypted. `restore-blobs` verifies every checksum before writing anything and
+  never overwrites an existing blob unless asked.
+* A new blob store added to the code must be added to `BLOB_STORES` in `_lib/workspace.js`; `verify.js` fails the
+  build otherwise, so a store can never silently be left out of backups.
+
+### Rules in CI
+
+With `MULTI_WORKSPACE` unset the workflow does exactly what it always did. With it set to `true`, a change to
+`firestore.rules` (or `scripts/build-rules.js`) deploys: the default variant to your database, each client's own
+scoped rules to its database (a suspended client stays locked), and deny-all to the platform database. The CI
+service account then also needs the capabilities above (read the registry; release rules) — `doctor` tells you.
+
+## Still open
+
+1. **Try the generated rules in the Firebase Emulator** before they go anywhere (the CI cannot evaluate rules). This is
+   the one unverified piece of the isolation, and `protect-default` will not run without you confirming it.
+2. **The tooling has not run against live Google services.** Its logic, its exact commands and requests, and its records
+   (through your real handlers) are tested; Google's acceptance of them is not. Hence `doctor`, plan-only by default,
+   and a throwaway client first. Some CLI output formats are parsed tolerantly for this reason.
+3. **Card payments are not hidden for a client without Stripe.** `/api/config` returns `stripePk: null`, but the tenant
+   portal still offers card payment and errors when used. Needs per-client feature flags (with branding).
+4. **Suspension takes up to a minute** to reach the server (the registry cache), though the browser lock-out is as soon
+   as the rules deploy.
+
+**Closed:** data isolation; per-client credentials and settings; per-request Stripe clients; links and notification
+addresses; mail isolation; parallel-safe scheduled runs; per-workspace sign-in; **provisioning, activation, suspension,
+backups (Firestore and Blobs) and per-database rules deployment.**
 
 ## Roadmap
 
@@ -226,8 +309,8 @@ in both directions, rules scoped per workspace, impersonation tokens minted in t
 | 1 ✅ | Workspace seam, mail isolation, `/api/config` database, enforcement + tests, CI fix |
 | 2 ✅ | Workspace-scoped settings and credentials, per-request Stripe, parallel-safe sweeps |
 | 3 ✅ | Per-workspace sign-in (Identity Platform tenants), tenant-scoped rules generator |
-| 4 | Provisioning script (tenant, databases, rules, registry, domain, first admin), backups, suspension |
-| 5 | White-label branding and per-workspace feature flags |
+| 4 ✅ | Provisioning tool, activation, suspension, backups (Firestore + Blobs), per-database rules in CI |
+| 5 | White-label branding and per-workspace feature flags (incl. hiding card payments) |
 | 6 | SaaS billing and client onboarding |
 
 ## Testing
