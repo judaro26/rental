@@ -92,9 +92,10 @@ exports.handler = async () => {
       // fired. Window is the previous due date through the upcoming one.
       const upcomingDue = new Date(cycle.dueMs);
       const prevCycle = computeCycle(tenant.rentDueDay, 0, upcomingDue.getUTCFullYear(), upcomingDue.getUTCMonth() - 1);
+      const windowStartMs = prevCycle.dueMs + Math.floor((cycle.dueMs - prevCycle.dueMs) / 2);
       const rentCovered = await isRentAlreadyCoveredForCycle({
         db, tenantId: tenantDoc.id, monthlyRent: tenant.monthlyRent,
-        cycleStartMs: prevCycle.dueMs, cycleEndMs: cycle.dueMs,
+        cycleStartMs: windowStartMs, cycleEndMs: cycle.dueMs,
       });
       if (rentCovered) {
         await tenantDoc.ref.update({ autoInvoiceLastPeriod: cycle.period });
